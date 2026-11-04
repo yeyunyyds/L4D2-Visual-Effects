@@ -28,7 +28,7 @@ int main(){
  selection.setGroup(EntityGroup::Special,true);
  check(selection.selected(260,"Tank")&&selection.selected(270,"Witch")&&selection.selected(271,"Boomer"));
  check(selection.selected(10,"CPistol")&&!selection.selected(11,"CGnome"));
- selection.classes[260]=false;check(!selection.selected(260,"Tank")&&selection.selected(270,"Witch"));
+ selection.specials[specialIndex("Tank")]=false;check(!selection.selected(260,"Tank")&&selection.selected(270,"Witch"));
  selection.setGroup(EntityGroup::Special,false);check(!selection.selected(260,"Tank")&&!selection.selected(270,"Witch")&&selection.selected(10,"CPistol"));
  nlohmann::json j={{"font",27}};writeEntitySelection(j,selection);
  auto restored=readEntitySelection(nlohmann::json::parse(j.dump()));check(!restored.selected(270,"Witch")&&restored.selected(10,"CPistol")&&j["font"]==27);

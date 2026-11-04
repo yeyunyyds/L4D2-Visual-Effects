@@ -5,7 +5,7 @@ root = Path(__file__).resolve().parents[1]
 binary = root / 'build/L4D2Visual.dll'
 if not binary.is_file():
     raise SystemExit('Build the DLL first')
-output = root / 'build/L4D2Visual-0.5.2-test.zip'
+output = root / 'build/L4D2Visual-0.5.3-test.zip'
 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
     archive.write(binary, 'bin/neko/plugins/L4D2Visual.dll')
     archive.write(root / 'README.md', 'README.md')

@@ -106,3 +106,13 @@ client.dll 静态核对：508b30 注册 cl_modelfastpath，对象7a62d0；1d25ad
 保留死亡、隐藏、休眠、地图、时效、手持物 / 附件与普通感染者排除测试。
 
 八组 ASan/UBSan 回归和 Windows x86 编译用于验证本地实现，不替代游戏内验收。
+
+# 0.5.3-test：求生者八角色
+
+求生者菜单固定列出 Nick / Rochelle / Coach / Ellis / Bill / Zoey / Francis / Louis，
+不依赖角色在场，不再以 CTerrorPlayer / SurvivorBot 作为求生者菜单选项。
+新增角色回归覆盖同 Class ID 的八角色分离、真人 / Bot、感染者队伍排除、角色批量开关、
+单角色覆盖、配置往返与旧设置兼容，以及真实 RecvTable 解析中的角色字段提取。
+手动绘制还会读取当前队伍 / 角色与快照核对，未知角色或队伍拒绝套用角色规则。
+新增特感测试覆盖八类型、NPC / 真人、共享 Class ID 的类型分离、未知类型拒绝、类型开关保存及真人 Tank 范围中心。
+十组本地回归与 Windows x86 编译用于验证本地实现，仍需实机确认角色识别。

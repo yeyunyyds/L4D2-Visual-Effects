@@ -91,6 +91,18 @@ bool entityAction(uintptr_t id){
   selection.setType(name,!current);std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(std::move(selection)));
   saveMessage=u8"实体类型设置未保存";return true;
  }
+ if(id>=0x60000&&id<0x60000+visual::SpecialCount){
+  auto selection=*std::atomic_load(&visual::render::selection);int role=int(id-0x60000);
+  selection.specials[role]=!selection.selectedSpecial(role);
+  std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(std::move(selection)));
+  saveMessage=u8"特感类型设置未保存";return true;
+ }
+ if(id>=0x50000&&id<0x50000+visual::SurvivorCount){
+  auto selection=*std::atomic_load(&visual::render::selection);int role=int(id-0x50000);
+  selection.survivors[role]=!selection.selectedSurvivor(role);
+  std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(std::move(selection)));
+  saveMessage=u8"求生者角色设置未保存";return true;
+ }
  bool aimed=id==124||id==125;
  if(aimed&&entityMenus.aimed.classId<0)return true;
  bool group=id>=130&&id<130+visual::EntityGroupCount*2;
@@ -133,7 +145,7 @@ std::string buildMenu(uintptr_t id){
  if(id==24){std::string body=row(visual::render::status.load());body+=row("Camera: "+std::string(source_camera::status()));body+=row("Entities: "+f->status);body+=row("Identify: "+std::string(visual::render::identifyReason.load()));body+=row("Pose: "+std::string(visual::render::poseReason.load()));body+=row("Engine/Studio: "+std::to_string(visual::render::engineCalls.load())+" / "+std::to_string(visual::render::studioCalls.load()));body+=row("Matched/Drawn: "+std::to_string(visual::render::identified.load())+" / "+std::to_string(visual::render::drawn.load()));body+=row(visual::diagnostics::writable?u8"日志已写入 L4D2Visual/L4D2Visual.log":u8"日志写入失败，请检查目录权限");return "\"L4D2Visual · 诊断\" {"+body+"}";}
  auto proximity=std::atomic_load(&visual::render::proximity);
  std::string experimental=!proximity->enabled?u8"范围实验：关":visual::render::proximityActive.load()?u8"范围实验：已触发":u8"范围实验：待机";
- return "\"L4D2Visual 0.5.2-test\" {"+item(requested?u8"拉伸总开关：开":u8"拉伸总开关：关",100)+
+ return "\"L4D2Visual 0.5.3-test\" {"+item(requested?u8"拉伸总开关：开":u8"拉伸总开关：关",100)+
  item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
  item(experimental,108)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+item(u8"接口与日志诊断",24)+"}";
 }
@@ -159,15 +171,15 @@ class Plugin final:public IL4NPlugin {
   }
  }
 public:
- Plugin(){note("=== L4D2Visual 0.5.2-test startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);
+ Plugin(){note("=== L4D2Visual 0.5.3-test startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);
   try{std::ifstream file(visual::diagnostics::path.parent_path()/L"hud.json");if(file){nlohmann::json j;file>>j;std::atomic_store(&visual::render::proximity,std::make_shared<const visual::ProximitySettings>(visual::readProximity(j)));visual::render::compatibility=visual::readRenderCompatibility(j);std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(visual::readEntitySelection(j)));visual::render::boneLimit=visual::readBoneLimit(j);std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(visual::readAnimationSettings(j)));appearance.preset=std::min(3u,j.value("preset",0u));appearance.step=std::clamp(j.value("step",8u),1u,64u);appearance.opacity=std::clamp(j.value("opacity",.48f),.05f,1.f);appearance.font=std::clamp(j.value("font",22.f),12.f,48.f);appearance.x=j.value("x",8.f);appearance.y=j.value("y",14.f);appearance.f10=j.value("f10",false);appearance.centerY=j.value("centerY",true);visual::hudruntime::hud.loadAppearance(appearance);}}catch(const std::exception& e){note(std::string("HUD settings load failed: ")+e.what());}
   worker=std::thread([this]{diagnostics();});}
  const char* GetName()override{return "L4D2Visual";}
- const char* GetVersion()override{return "0.5.2-test";}
+ const char* GetVersion()override{return "0.5.3-test";}
  void OnModuleLoaded(const char* name,uintptr_t handle)override{if(!name)return;std::string n(name);if(n=="client"||n=="client.dll")source_camera::clientModule=reinterpret_cast<HMODULE>(handle);if(n=="engine"||n=="engine.dll")source_camera::engineModule=reinterpret_cast<HMODULE>(handle);note("Module loaded: "+n);connect();}
  void OnGameLaunch()override{note("OnGameLaunch");connect();}
  void OnD3DDeviceCreated(void* d,bool dxvk)override{note(std::string("OnD3DDeviceCreated dxvk=")+(dxvk?"yes":"no"));visual::hudruntime::created(static_cast<IDirect3DDevice9*>(d));}
- const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.5.2-test";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开拉伸控制面板\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
+ const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.5.3-test";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开拉伸控制面板\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
  void stop(){stopping=true;if(worker.joinable())worker.join();requested=false;visual::modelpath::apply(false);visual::hudruntime::stop();visual::render::stop();source_entities::browseRequested=false;source_camera::frameListener=nullptr;source_camera::stop();}
  ~Plugin()override{stop();}
 };

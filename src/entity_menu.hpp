@@ -19,12 +19,22 @@ struct EntityMenuState {
   for(unsigned g=0;g<EntityGroupCount;++g){unsigned count=0;
    for(auto name:BuiltinEntityClasses)if(groupForName(name)==EntityGroup(g))++count;
    for(const auto& c:known)if(builtinClassIndex(c.second)<0&&groupForName(c.second)==EntityGroup(g))++count;
+   if(EntityGroup(g)==EntityGroup::Survivors)count=SurvivorCount;
+   if(EntityGroup(g)==EntityGroup::Special)count=SpecialCount;
    body+=menuItem(std::string(groupName(EntityGroup(g)))+" ("+std::to_string(count)+")",1000+g);
   }
   return menuPage(u8"实体分类",body+menuItem(u8"进入手动识别",104)+menuItem(u8"一键全部关闭（含实验）",121)+menuItem(u8"保存设置",101));
  }
  std::string group(EntityGroup group,const EntitySelection& selection)const {
   std::string body=menuItem(u8"开启本分类全部实体",130+unsigned(group)*2)+menuItem(u8"关闭本分类全部实体",131+unsigned(group)*2);
+  if(group==EntityGroup::Special){
+   for(unsigned role=0;role<SpecialCount;++role)body+=menuItem(std::string(SpecialNames[role])+(selection.selectedSpecial(int(role))?u8"：开":u8"：关"),0x60000+role);
+   return menuPage(u8"特感 · 八种类型",body+menuItem(u8"保存设置",101));
+  }
+  if(group==EntityGroup::Survivors){
+   for(unsigned role=0;role<SurvivorCount;++role)body+=menuItem(std::string(SurvivorNames[role])+(selection.selectedSurvivor(int(role))?u8"：开":u8"：关"),0x50000+role);
+   return menuPage(u8"求生者 · 八名角色",body+menuItem(u8"保存设置",101));
+  }
   for(unsigned i=0;i<BuiltinEntityClassCount;++i){std::string name=BuiltinEntityClasses[i];if(groupForName(name)!=group)continue;
    auto match=std::find_if(known.begin(),known.end(),[&](const auto& c){return c.second==name;});
    bool on=match==known.end()?selection.selectedType(name):selection.selected(match->first,name);

@@ -123,6 +123,14 @@ inline Context identify(const DrawState& state,const ModelInfo& info) {
     if(known==indexed.classes.end())known=indexed.classes.emplace(*address,readClass(*address)).first;
     const auto& cls=known->second;
     if(cls.name!=record->className || cls.id!=record->classId){identifyReason.store("current class mismatch",std::memory_order_relaxed);return result;}
+    if(!indexed.experiment->enabled&&survivorPlayerClass(record->className)){
+        auto team=field<int>(entry.entity,cls,"m_iTeamNum",0);
+        if(!team||!record->team||*team!=*record->team){identifyReason.store("current player team mismatch",std::memory_order_relaxed);return result;}
+        if(*team==2){auto character=field<int>(entry.entity,cls,"m_survivorCharacter",0);
+            if(!character||!record->character||*character!=*record->character){identifyReason.store("current survivor character mismatch",std::memory_order_relaxed);return result;}}
+        if(*team==3){auto zombie=field<int>(entry.entity,cls,"m_zombieClass",0);
+            if(!zombie||!record->zombieClass||*zombie!=*record->zombieClass){identifyReason.store("current special infected type mismatch",std::memory_order_relaxed);return result;}}
+    }
     const auto model=field<std::int16_t>(entry.entity,cls,"m_nModelIndex",0);
     if(!model || *model!=*record->modelIndex){identifyReason.store("current model index mismatch",std::memory_order_relaxed);return result;}
     identifyReason.store("Entity matched",std::memory_order_relaxed);result.valid=true;result.identity={frame->epoch,*handle,*model};

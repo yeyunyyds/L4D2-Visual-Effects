@@ -1,12 +1,12 @@
 # L4D2 Visual Effects
 
-**求生之路 2 视觉效果插件 · 开发测试版 0.5.2-test / 正式版 0.4.0**
+**求生之路 2 视觉效果插件 · 开发测试版 0.5.3-test / 正式版 0.4.0**
 
 基于 **L4N v2 / Windows x86** 的求生之路 2 视觉效果项目。当前实现周期性竖直拉伸。0.5.0-test 将目标选择扩展为 **Class ID 类别开关**，默认所有类别关闭，并支持 128 / 256 骨骼容量运行时切换。具有双脚的模型保留脚部及脚趾姿态；其他受支持模型以渲染根骨骼为锚点。效果在绘制阶段使用骨骼矩阵副本，不写入实体位置、碰撞边界或命中骨骼缓存。
 
 项目名称为 **L4D2 Visual Effects（求生之路 2 视觉效果）**，覆盖项目整体的视觉效果方向；拉伸是当前实现的功能。插件标识、游戏内菜单、DLL 和安装包使用 `L4D2Visual`。
 
-[下载 0.5.2 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.2-test.zip) · [下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
+[下载 0.5.3 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.3-test.zip) · [下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
 
 ## 下载与分支
 
@@ -17,7 +17,7 @@
 
 `main` 的初始源码从正式安装包 `L4D2Visual-0.4.0.zip` 中的 `source/` 完整恢复。对应下载分支提交为 `2dd0a515a8dbbe552698464903ef84e7638b517a`；既有 `v0.4.0` 标签保留指向该打包提交。后续源码更改在 `main` 开发，生成的安装包单独发布至 `zip`。
 
-以下哈希仅对应 **0.4.0 正式包**；0.5.2-test 为新的独立测试包，覆盖与性能需要实机验收。
+以下哈希仅对应 **0.4.0 正式包**；0.5.3-test 为新的独立测试包，覆盖与性能需要实机验收。
 
 0.4.0 安装包 SHA-256：
 
@@ -31,23 +31,25 @@ f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 
 1. 准备已安装 **L4N v2** 的 Windows x86 游戏环境。游戏构建必须匹配 [render-profile.json](docs/research/render-profile.json) 中记录的 `client.dll`、`engine.dll`、`studiorender.dll`。
 2. 完整退出游戏，解压所选版本安装包，将 `bin` 合并到游戏根目录。确认插件位于 `bin/neko/plugins/L4D2Visual.dll`，且只加载一份。
-3. 启动游戏并进入地图，在 **L4N → L4D2Visual 0.5.2-test → 实体分类** 中开启需要的 Class ID 类别，再返回主菜单开启 **拉伸总开关**。正式版 0.4.0 沿用原特感开关。
+3. 启动游戏并进入地图，在 **L4N → L4D2Visual 0.5.3-test → 实体分类** 中开启需要的角色或类型，再返回主菜单开启 **拉伸总开关**。正式版 0.4.0 沿用原特感开关。
 4. 进入 **动画预设与细调** 调整效果；使用 **保存设置** 保存动画参数、类别规则、骨骼容量、渲染模式与菜单外观。
 5. 关闭拉伸后检查外观恢复。更新或移除插件前完整退出游戏，不要运行时卸载。
 
 拉伸开关默认关闭，且不跨游戏会话保存。卸载时删除该 DLL 即可停止加载；配置与日志保存在同目录下的 `L4D2Visual/` 文件夹，可按需备份或删除。
 
-## 实体分类与识别（0.5.2-test）
+## 实体分类与识别（0.5.3-test）
 
 入口：**实体分类**，按 **特感、求生者、场景可拾取武器与物品、手上道具、其他** 整理类别。使用 **`- / =`** 翻页，`1～9` 选择，`0` 返回；方向键只在菜单位置编辑器中移动面板。
 
+- **特感固定列出八种实际类型：Smoker、Boomer、Hunter、Spitter、Jockey、Charger、Tank、Witch。** NPC 依网络类型识别，感染者玩家以队伍和 `m_zombieClass` 区分；不同特感共享玩家 Class ID 时仍可独立开关。
+- **求生者固定列出八人：Nick、Rochelle、Coach、Ellis、Bill、Zoey、Francis、Louis。** 每个角色独立开关，同时作用于该角色的真人和机器人，不因共享 Class ID 而联动；分类的全开 / 全关仅设置这八名角色。旧版类别规则作为默认值，单角色设置优先并可保存。
 - 采用 DangoMusic 的固定类型目录思路，**八种特感始终完整列出**，求生者、可拾取物和手持模型等已知类型也无需刷出即可设置。开关按网络类型名称保存，实体出现后自动按其真实类型生效，不猜测或伪造 Class ID。
 - 每个分类内提供 **开启本分类全部实体 / 关闭本分类全部实体**，分类规则也适用于后来识别到的新类别。单独 Class ID 开关可覆盖分类规则；再次批量设置该分类会清除该分类的单项覆盖。
-- 每项仍按 **Class ID** 生效，例如 Tank 同一编号下的所有实例共享开关。垃圾桶若属于 `CPhysicsProp`，其类别开关也会影响其他同 Class ID 道具。
+- 除求生者角色和特感类型外，其余项目仍按 **Class ID** 生效，例如垃圾桶若属于 `CPhysicsProp`，其类别开关也会影响其他同 Class ID 道具。
 - 保留 **一键全部关闭（含实验）**，同时清空类别 / 分类规则、关闭范围实验和拉伸总开关。所有类别在新配置中默认关闭，原有已保存的单项规则继续兼容。
 - **手动识别与开关** 是独立页面：进入后选择手动识别，核对显示的名称与 Class ID，再明确选择 **开启该类别 / 关闭该类别**。进入页面和识别动作均不自动改变实体规则。也可将识别结果选作范围实验的触发类别。
 - 识别复用 DangoMusic 的视角 / 距离排序，不是精确碰撞射线，不检测墙体遮挡；操作前请核对显示结果。
-- 预定义目录外的扩展类型可由实体识别、ClientClass 链表和保存规则补充。菜单不展示实例列表，也不要求目标当前在场。分类只是菜单整理，`CTerrorPlayer` 等共享 Class ID 仍可能包括不同队伍的玩家，不按显示分组改变其编号含义。
+- 预定义目录外的扩展类型可由实体识别、ClientClass 链表和保存规则补充。菜单不展示实例列表，也不要求目标当前在场。求生者通过队伍与 `m_survivorCharacter` 识别，不把同 Class ID 的感染者玩家当成该角色；其余类型沿用原有开关规则。
 - 可列出或识别不等于可变形。仍要求有效模型索引、实体关联及已接入的 Studio 骨骼绘制；静态地图物件、BSP、无骨骼模型与未接入的批量路径不保证覆盖。
 
 ## 实验：实体进入目标范围（0.5.2-test）
@@ -126,7 +128,7 @@ f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 
 ## 排查无效果或异常
 
-1. 确认只加载了一份对应版本 DLL，进入地图后在分类菜单选择需要的 Class ID，再启用拉伸，等待至少一秒。
+1. 确认只加载了一份对应版本 DLL，进入地图后在分类菜单选择需要的角色或类型，再启用拉伸，等待至少一秒。
 2. 查看 **接口与日志诊断**：关联次数为 0 与关联成功但绘制为 0 属于不同阶段的问题。
 3. 查看 `bin/neko/plugins/L4D2Visual/L4D2Visual.log`。日志自动启用，含版本、接口校验、目标分类、模型绘制统计和姿态拒绝原因；启用时每两秒记录状态，避免逐帧写文件。
 4. `fastpath=0` 表示兼容路径生效，`-1` 表示该变量未通过验证。构建校验失败时先核对游戏 DLL，不要跳过校验。
@@ -140,13 +142,13 @@ f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 git clone --branch main https://github.com/yeyunyyds/L4D2-Visual-Effects.git
 cd L4D2-Visual-Effects
 
-# 八组本地回归；受限运行器中可单独关闭泄漏检测
+# 十组本地回归；受限运行器中可单独关闭泄漏检测
 ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
 
 # Windows x86 DLL，可用 CXX_X86 指定编译器
 bash scripts/build-mingw.sh
 
-# 生成 build/L4D2Visual-0.5.2-test.zip（DLL + 对应完整源码）
+# 生成 build/L4D2Visual-0.5.3-test.zip（DLL + 对应完整源码）
 python3 scripts/package.py
 
 # 可选：使用自己合法持有的游戏 DLL 进行离线构建核对
@@ -166,7 +168,16 @@ scripts/   本地测试、交叉编译、打包及 PE / ABI 校验
 docs/      验证记录与渲染接口研究
 ```
 
-## 0.5.2-test 修正
+## 0.5.3-test 求生者与特感类型菜单
+
+- 求生者分类改为固定八名角色，参考 DangoMusic 的 `m_survivorCharacter` 映射。
+- 特感也按八种实际类型独立保存，支持 NPC 与共享 Class ID 的感染者玩家；未知队伍或类型不套用角色规则。
+- 角色与特感开关独立保存，共享 Class ID 时不会互相联动。
+- 绘制前重新核对队伍和角色，防止快照期间换人 / 换队导致错用开关。
+- 默认 Tank 范围中心同时支持 NPC Tank 和已识别的真人 Tank；范围计算仍逐实体进行。
+- 其他实体分类、识别方式及翻页方式保留。
+
+## 0.5.2-test 修正（历史）
 
 - 固定列出全部预定义类型；八种特感无需在场即可单独设置，后续出现时沿用保存规则。
 - 范围实验改为逐实体计算到 Tank / 所选中心的距离；同类别实体可分别处于范围内外。

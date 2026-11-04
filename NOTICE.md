@@ -54,3 +54,13 @@ reserved for the existing menu-position editor.
 filters, with name-based settings available before entities spawn. The proximity
 experiment now creates a per-entity distance mask around target entities;
 viewer position is not used.
+
+0.5.3 survivor roles use the m_survivorCharacter ordering from LDBDangoMusic
+experiment/npc-dialogue, commit 5d9869cf13e7eec9e82c8ff78f26ad31d03ab839,
+src/dialogue.hpp and src/source_entities.hpp. The local entity collector and
+RecvTable field allowlist include this role property.
+
+Special-infected matching also reads m_zombieClass for infected players.
+The 1..8 zombie-type mapping was checked against the public L4D2ZombieClass
+enum in SilvDev/Left4DHooks, sourcemod/scripting/include/left4dhooks_stocks.inc.
+These are zombie-type values, not network Class IDs.
