@@ -2,11 +2,11 @@
 
 求生之路 2 视觉效果项目；当前提供模型竖直拉伸效果。
 
-本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-visual/tree/main)**。
+本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
 ## 测试版 0.5.0-test
 
-**[下载 L4D2Visual-0.5.0-test.zip](https://github.com/yeyunyyds/L4D2-visual/raw/refs/heads/zip/L4D2Visual-0.5.0-test.zip)** · [完整说明](https://github.com/yeyunyyds/L4D2-visual/blob/main/README.md)
+**[下载 L4D2Visual-0.5.0-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.0-test.zip)** · [完整说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)
 
 - 独立 Class ID 类别菜单，默认全部关闭，左右方向键翻页，一键全开 / 全关。
 - 复用 DangoMusic 的准星附近识别，显示 Class ID 后切换该类别的所有实体。
@@ -21,12 +21,12 @@
 SHA-256：
 
 ```text
-7c046e53c6294c11a0dbcdfd6fead9c8edb2699d531b4a56aaf621bf06ad327b
+905d308c9d77b81541411bd4cbabe1f8e2d3c298cf87154a4c1ba4bcf527fdd1
 ```
 
 ## 正式版 0.4.0
 
-**[下载 L4D2Visual-0.4.0.zip](https://github.com/yeyunyyds/L4D2-visual/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip)** · [Release 说明](https://github.com/yeyunyyds/L4D2-visual/releases/tag/v0.4.0)
+**[下载 L4D2Visual-0.4.0.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip)** · [Release 说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.4.0)
 
 需要 Windows x86、L4N v2 及匹配的游戏构建。完整退出游戏后，将 ZIP 内的 `bin` 合并到游戏根目录，保证只加载一份 `bin/neko/plugins/L4D2Visual.dll`。在 **L4N → L4D2Visual 0.4.0 → 开启拉伸测试** 中启用。
 
@@ -38,4 +38,4 @@ SHA-256：
 f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 ```
 
-除上述 0.5.0-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-visual/blob/main/README.md)。
+除上述 0.5.0-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
