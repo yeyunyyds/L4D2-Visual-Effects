@@ -1,0 +1,109 @@
+{
+  "engine": {
+    "sha256": "8a6d468059394bf4cfce32f11dcba12ef45de88da1373084d5a2916d0bf7ba86",
+    "timestamp": 1782845142,
+    "image_size": 7598080,
+    "samples": [
+      {
+        "rva": 919040,
+        "bytes": "558bec81ec8c020000",
+        "mask": "ffffffffffffffffff"
+      },
+      {
+        "rva": 919059,
+        "bytes": "8b4510568b7508578b7d0c",
+        "mask": "ffffffffffffffffffffff"
+      },
+      {
+        "rva": 920200,
+        "bytes": "8b4618898de0fdffff8b8db4fdffff8995e4fdffff",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffff"
+      },
+      {
+        "rva": 920359,
+        "bytes": "8b0de80b6e108b118b52648d85ccfdffff508d45ac50ffd2",
+        "mask": "ffff00000000ffffffffffffffffffffffffffffffffffff"
+      },
+      {
+        "rva": 920574,
+        "bytes": "c20c00",
+        "mask": "ffffff"
+      }
+    ],
+    "interface": "VEngineModel016",
+    "factory_rva": 869984,
+    "object_rva": 6308424,
+    "vtable_rva": 3618916,
+    "slot": 19,
+    "method_rva": 919040,
+    "constructor_rva": 903727
+  },
+  "client": {
+    "sha256": "c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f",
+    "timestamp": 1782845135,
+    "image_size": 9842688,
+    "samples": [
+      {
+        "rva": 138044,
+        "bytes": "8bc869c9d8000000038fa0000000f78439a000000000ff0700",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      {
+        "rva": 175051,
+        "bytes": "69ffd80000008b088b81a000000003c703c183c10c518b0803c8",
+        "mask": "ffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    ],
+    "compatibility": {
+      "variable": "cl_modelfastpath",
+      "name_rva": 5822460,
+      "object_rva": 8020688,
+      "vtable_rva": 6663980,
+      "parent_offset": 28,
+      "integer_offset": 48,
+      "setter_slot": 14,
+      "setter_rva": 4013456,
+      "registration_rva": 5278512,
+      "consumer_rva": 1910189
+    }
+  },
+  "studio": {
+    "sha256": "03964dedcf8b7f4ebde24cd3d0738873d37c075a7a9b313dad001bb937f9d1b6",
+    "timestamp": 1782844886,
+    "image_size": 6631424,
+    "samples": [
+      {
+        "rva": 434512,
+        "bytes": "558bec83ec3c538b5d0857894dfc",
+        "mask": "ffffffffffffffffffffffffffff"
+      },
+      {
+        "rva": 434808,
+        "bytes": "8b4d108b178b829c000000",
+        "mask": "ffffffffffffffffffffff"
+      },
+      {
+        "rva": 435164,
+        "bytes": "c21c00",
+        "mask": "ffffff"
+      },
+      {
+        "rva": 421533,
+        "bytes": "8d3c7fc1e704",
+        "mask": "ffffffffffff"
+      },
+      {
+        "rva": 421553,
+        "bytes": "575350e8a77700008b4508",
+        "mask": "ffffffffffffffffffffff"
+      }
+    ],
+    "interface": "VStudioRender026",
+    "factory_rva": 414912,
+    "object_rva": 4419608,
+    "vtable_rva": 520252,
+    "slot": 25,
+    "method_rva": 434512,
+    "constructor_rva": 439505
+  }
+}

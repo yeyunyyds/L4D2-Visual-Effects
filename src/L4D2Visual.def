@@ -1,0 +1,3 @@
+LIBRARY L4D2Visual
+EXPORTS
+    GetL4NPluginInstance

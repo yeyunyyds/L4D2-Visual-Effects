@@ -1,0 +1,9 @@
+build/
+__pycache__/
+
+# Download artifacts belong on the zip branch.
+*.zip
+*.dll
+# Per-user plugin state and logs.
+hud.json
+*.log
