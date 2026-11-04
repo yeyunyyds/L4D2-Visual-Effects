@@ -6,13 +6,13 @@
 
 项目名称为 **L4D2 Visual Effects（求生之路 2 视觉效果）**，覆盖项目整体的视觉效果方向；拉伸是当前实现的功能。插件标识、游戏内菜单、DLL 和安装包使用 `L4D2Visual`。
 
-[下载 0.5.0 测试包](https://github.com/yeyunyyds/L4D2-visual/raw/refs/heads/zip/L4D2Visual-0.5.0-test.zip) · [下载正式版](https://github.com/yeyunyyds/L4D2-visual/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-visual/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
+[下载 0.5.0 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.0-test.zip) · [下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
 
 ## 下载与分支
 
 | 分支 | 用途 | 内容 |
 | --- | --- | --- |
-| `main` | 源码开发与文档；默认分支的目标 | 源码、测试、构建与打包脚本、文档、许可证；不提交 DLL、ZIP 或本地配置 |
+| `main` | 默认分支；源码开发与文档 | 源码、测试、构建与打包脚本、文档、许可证；不提交 DLL、ZIP 或本地配置 |
 | `zip` | 安装包下载 | 已发布的 ZIP；不用于源码开发 |
 
 `main` 的初始源码从正式安装包 `L4D2Visual-0.4.0.zip` 中的 `source/` 完整恢复。对应下载分支提交为 `2dd0a515a8dbbe552698464903ef84e7638b517a`；既有 `v0.4.0` 标签保留指向该打包提交。后续源码更改在 `main` 开发，生成的安装包单独发布至 `zip`。
@@ -116,8 +116,8 @@ f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 使用 C++17。Linux 回归需要 `g++` 与 ASan/UBSan；Windows x86 交叉编译需要 `i686-w64-mingw32-g++` 及 Windows/D3D9 开发库。
 
 ```sh
-git clone --branch main https://github.com/yeyunyyds/L4D2-visual.git
-cd L4D2-visual
+git clone --branch main https://github.com/yeyunyyds/L4D2-Visual-Effects.git
+cd L4D2-Visual-Effects
 
 # 七组本地回归；受限运行器中可单独关闭泄漏检测
 ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
