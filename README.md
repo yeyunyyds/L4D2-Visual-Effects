@@ -4,7 +4,28 @@
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 测试版 0.5.0-test
+## 当前测试版 0.5.1-test
+
+**[下载 L4D2Visual-0.5.1-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.1-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/ffb73e1) · [完整指南](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)
+
+- 实体开关整理为特感、求生者、场景可拾取武器与物品、手上道具、其他，各分类支持全开 / 全关。
+- 保留“一键全部关闭（含实验）”，翻页恢复为 `- / =`。
+- 独立手动识别页面，识别后明确选择开启或关闭同一 Class ID 的所有实体。
+- 新增默认关闭的范围实验：默认 Tank / 500 游戏单位，可选择触发类别，范围 100～5000，支持 ±100 / ±10。
+- 进入范围后临时拉伸全部可处理实体，退出恢复手动规则；实验排除手持武器与可关联附件，普通感染者默认不参与并可单独开启。
+- 保留 128 / 256 骨骼容量切换、完整兼容 / 实验快速模式和旧版配置兼容。
+
+距离以当前视角位置计算。普通感染者衣物不随身体变形的问题尚未修复；实验范围覆盖仍受绘制路径限制。识别沿用 DangoMusic 的附近候选排序，不检测墙体遮挡。
+
+八组本地回归与 Windows x86 交叉编译通过，游戏内体验和性能仍需实测。包内含 DLL 和对应完整源码。
+
+SHA-256：
+
+```text
+9cb08e89bf0dd6cdd323039936f79a7dfc99cbd55edf038b4701e83e45fc4a2b
+```
+
+## 历史测试版 0.5.0-test
 
 **[下载 L4D2Visual-0.5.0-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.0-test.zip)** · [完整说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)
 
@@ -38,4 +59,4 @@ SHA-256：
 f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 ```
 
-除上述 0.5.0-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
+除当前 0.5.1-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
