@@ -4,7 +4,25 @@
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 当前测试版 0.5.2-test
+## 当前测试版 0.5.3-test
+
+**[下载 L4D2Visual-0.5.3-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.3-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/cc32acf) · [完整指南](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)
+
+- 求生者固定八角色：Nick、Rochelle、Coach、Ellis、Bill、Zoey、Francis、Louis，按角色独立开关并保存。
+- 特感固定八实际类型：Smoker、Boomer、Hunter、Spitter、Jockey、Charger、Tank、Witch；NPC 与感染者玩家均按实际类型匹配。
+- 共享 Class ID 的角色 / 类型不再联动，保留对应分类全开 / 全关；真人和机器人使用同一角色 / 类型规则。
+- 延续逐实体范围实验、手持物排除、普通感染者参与开关、`- / =` 翻页和其他实体控制。
+- Tank 类型范围中心同时支持 NPC Tank 和已识别的真人 Tank；范围计算仍是实体到中心的距离。
+
+十组本地回归与 Windows x86 交叉编译通过，仍需实机确认角色 / 类型识别。包内含 DLL 与完整对应源码。
+
+SHA-256：
+
+```text
+fea88a6fe858c06638e2cacb4fde2cd075a2ecc4b7fb633b985cb7584aefccc5
+```
+
+## 历史测试版 0.5.2-test
 
 **[下载 L4D2Visual-0.5.2-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.2-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/5e82397) · [完整指南](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)
 
@@ -64,4 +82,4 @@ SHA-256：
 f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 ```
 
-除当前 0.5.2-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
+除当前 0.5.3-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
