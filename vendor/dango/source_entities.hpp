@@ -94,7 +94,7 @@ inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint
  // The cached IsDormant bit is only a diagnostic comparison, not authority.
  uint32_t base=0,dataGetter=0;if(method(net,profile::DataBaseSlot,dataGetter)){auto b=wire::addressGetter(reader,dataGetter,net);if(b&&*b==entry.entity)base=*b;}
  if(!base){++frame.unknownBase;getterHint(frame,"data_base",dataGetter);}else if(!info.schema)++frame.unknownTables;else{
- r.networkOrigin=vectorField(base,info,"m_vecOrigin");r.networkAngles=vectorField(base,info,"m_angRotation");r.team=field<int>(base,info,"m_iTeamNum",0);r.effects=field<int>(base,info,"m_fEffects",0);
+ r.networkOrigin=vectorField(base,info,"m_vecOrigin");r.networkAngles=vectorField(base,info,"m_angRotation");r.team=field<int>(base,info,"m_iTeamNum",0);r.effects=field<int>(base,info,"m_fEffects",0);r.health=field<int>(base,info,"m_iHealth",0);r.lifeState=field<uint8_t>(base,info,"m_lifeState",0);
  auto index=field<int16_t>(base,info,"m_nModelIndex",0);if(index){r.modelIndex=int(*index);r.modelName=modelName(*index);}
  r.parent=field<uint32_t>(base,info,"moveparent",0);r.parentAttachment=field<uint8_t>(base,info,"m_iParentAttachment",0);r.owner=field<uint32_t>(base,info,"m_hOwnerEntity",0);r.weaponOwner=field<uint32_t>(base,info,"m_hOwner",0);r.activeWeapon=field<uint32_t>(base,info,"m_hActiveWeapon",0);r.viewModel=field<uint32_t>(base,info,"m_hViewModel[0]",0);
  }return r;

@@ -21,7 +21,5 @@ int main(){
  // The key that selected the L4N entry must be released; holding a key is one
  // operation, and focus loss also requires a fresh release before accepting keys.
  KeyGate gate;KeyGate::Keys keys{};keys[1]=true;check(!gate.update(keys,true)[1]);keys.fill(false);gate.update(keys,true);keys[1]=true;check(gate.update(keys,true)[1]);check(!gate.update(keys,true)[1]);gate.update(keys,false);check(!gate.update(keys,true)[1]);keys.fill(false);gate.update(keys,true);keys[1]=true;check(gate.update(keys,true)[1]);
- keys.fill(false);gate.update(keys,true);keys[14]=true;check(gate.update(keys,true)[14]);check(!gate.update(keys,true)[14]);
- keys.fill(false);gate.update(keys,true);keys[15]=true;check(gate.update(keys,true)[15]);gate.update(keys,false);check(!gate.update(keys,true)[15]);
  std::cout<<"Passed: live labels, bounded navigation, fresh Back, 1..9 lyric position pagination, disabled rows, key release/repeat/focus gating\n";
 }

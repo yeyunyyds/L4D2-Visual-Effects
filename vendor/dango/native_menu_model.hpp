@@ -42,7 +42,7 @@ struct MenuStack {
  uintptr_t select(const Document& doc,size_t digit){auto index=current().sheet*PageSize+digit-1;return digit>=1&&digit<=PageSize&&index<doc.rows.size()?doc.rows[index].action:0;}
 };
 struct KeyGate {
- static constexpr size_t Count=16;
+ static constexpr size_t Count=14;
  using Keys=std::array<bool,Count>;
  bool armed=false;Keys held{};
  void reset(){armed=false;held.fill(false);}

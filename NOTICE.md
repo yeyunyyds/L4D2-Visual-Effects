@@ -44,3 +44,8 @@ This ranking uses network poses and does not test wall occlusion.
 source_entities.hpp additionally captures m_fEffects for hidden-target rejection in nearby identification.
 
 Entity inventory also publishes a bounded Class ID/name catalog by following verified module-owned ClientClass descriptors.
+
+0.5.1 adds category rules, an explicit identification menu and a default-off
+proximity experiment. Actor health/life-state network fields are captured
+for trigger validation. HUD pagination uses minus/equal again; arrows remain
+reserved for the existing menu-position editor.

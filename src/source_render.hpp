@@ -10,6 +10,7 @@
 #include "target_identity.hpp"
 #include "target_index.hpp"
 #include "entity_selection.hpp"
+#include "proximity.hpp"
 #include "render_settings.hpp"
 #include <unordered_map>
 #include "render_profile.hpp"
@@ -35,6 +36,9 @@ inline std::atomic<bool> enabled{false},bound{false};
 inline std::atomic<unsigned> boneLimit{128};
 inline std::atomic<bool> compatibility{true};
 inline std::shared_ptr<const EntitySelection> selection=std::make_shared<const EntitySelection>();
+inline std::shared_ptr<const ProximitySettings> proximity=std::make_shared<const ProximitySettings>();
+inline std::atomic<bool> proximityActive{false};
+inline std::atomic<float> proximityDistance{-1};
 inline std::shared_ptr<const AnimationSettings> animation=std::make_shared<const AnimationSettings>();
 inline std::atomic<ULONGLONG> startedAt{0};
 inline std::atomic<unsigned long> drawn{0},rejected{0};
@@ -67,16 +71,20 @@ struct IndexedFrame {
  TargetIndex<source_entities::Frame,source_entities::profile::MaxNetworked> index;
  std::unordered_map<std::uint32_t,source_entities::ClassInfo> classes;
  std::shared_ptr<const EntitySelection> selected;
+ std::shared_ptr<const ProximitySettings> experiment;
+ bool experimentalActive=false;
  void update(std::shared_ptr<const source_entities::Frame> next){
   auto options=std::atomic_load(&selection);
-  if(frame==next && selected==options)return;
+  auto settings=std::atomic_load(&proximity);bool active=proximityActive.load(std::memory_order_relaxed);
+  if(frame==next && selected==options && experiment==settings && experimentalActive==active)return;
   if(frame!=next)classes.clear();
-  frame=std::move(next);selected=std::move(options);
+  frame=std::move(next);selected=std::move(options);experiment=std::move(settings);experimentalActive=active;
+  const auto held=active?experimentExcludedHandles(*frame,experiment->includeCommon):HeldHandles{};
   auto object=std::uint32_t(reinterpret_cast<std::uintptr_t>(source_camera::clientModule))+source_entities::profile::Object;
   auto entries=std::uint32_t(std::int64_t(object)+source_entities::profile::EntryBaseDelta);
   index.rebuild(*frame,[&](unsigned i){source_entities::wire::Entry entry{};
    if(!source_entities::wire::load(source_entities::reader,entries+i*sizeof(entry),entry))entry={};return entry;},
-   [&](const auto& r){return selected->selected(r.classId);});
+   [&](const auto& r){return selectedForEffect(r,*selected,*experiment,experimentalActive,held);});
  }
 };
 inline thread_local IndexedFrame indexed;

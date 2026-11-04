@@ -1,4 +1,5 @@
 #pragma once
+#include "entity_categories.hpp"
 #include <charconv>
 #include <map>
 #include <string>
@@ -6,14 +7,26 @@ namespace visual {
 struct EntitySelection {
  bool all=false;
  std::map<int,bool> classes;
+ std::map<unsigned,bool> groups;
  std::map<int,std::string> names;
- bool selected(int classId)const {
+ bool selected(int classId,std::string_view name={})const {
   if(classId<0 || classId>4096)return false;
-  auto c=classes.find(classId);return c==classes.end()?all:c->second;
+  auto c=classes.find(classId);if(c!=classes.end())return c->second;
+  if(name.empty()){auto label=names.find(classId);if(label!=names.end())name=label->second;}
+  auto group=groups.find(unsigned(groupForName(name)));return group==groups.end()?all:group->second;
  }
- void setAll(bool value){all=value;classes.clear();}
+ void setAll(bool value){all=value;classes.clear();groups.clear();}
+ void setGroup(EntityGroup group,bool value){
+  if(unsigned(group)>=EntityGroupCount)return;
+  groups[unsigned(group)]=value;
+  for(auto i=classes.begin();i!=classes.end();){
+   auto label=names.find(i->first);auto current=groupForName(label==names.end()?std::string_view{}:std::string_view(label->second));
+   if(current==group)i=classes.erase(i);else ++i;
+  }
+ }
  bool anyEnabled()const {
   if(all)return true;
+  for(const auto& g:groups)if(g.second)return true;
   for(const auto& c:classes)if(c.second)return true;
   return false;
  }
@@ -30,6 +43,9 @@ template<class Json> EntitySelection readEntitySelection(const Json& j){
    int id=-1;if(c.value().is_boolean()&&parseClassId(c.key(),id))result.classes[id]=c.value().template get<bool>();
   }
  }
+ auto groups=i->find("groups");if(groups!=i->end()&&groups->is_object()){
+  for(auto g=groups->begin();g!=groups->end();++g){int id=-1;if(parseClassId(g.key(),id)&&unsigned(id)<EntityGroupCount&&g.value().is_boolean())result.groups[unsigned(id)]=g.value().template get<bool>();}
+ }
  auto names=i->find("names");if(names!=i->end()&&names->is_object()){
   for(auto c=names->begin();c!=names->end()&&result.names.size()<4097;++c){
    int id=-1;if(c.value().is_string()&&parseClassId(c.key(),id)){
@@ -40,9 +56,10 @@ template<class Json> EntitySelection readEntitySelection(const Json& j){
  return result;
 }
 template<class Json> void writeEntitySelection(Json& j,const EntitySelection& s){
- Json classes=Json::object(),names=Json::object();
+ Json classes=Json::object(),names=Json::object(),groups=Json::object();
  for(const auto& c:s.classes)classes[std::to_string(c.first)]=c.second;
  for(const auto& c:s.names)names[std::to_string(c.first)]=c.second;
- j["entitySelection"]={{"all",s.all},{"classes",classes},{"names",names}};
+ for(const auto& g:s.groups)groups[std::to_string(g.first)]=g.second;
+ j["entitySelection"]={{"all",s.all},{"classes",classes},{"names",names},{"groups",groups}};
 }
 } // namespace visual
