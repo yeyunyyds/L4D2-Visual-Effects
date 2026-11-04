@@ -31,7 +31,7 @@ class NativeHud {
  ImVec4 background{.015f,.018f,.020f,1};
  struct ContextScope {ImGuiContext* previous;explicit ContextScope(ImGuiContext* c):previous(ImGui::GetCurrentContext()){ImGui::SetCurrentContext(c);}~ContextScope(){ImGui::SetCurrentContext(previous);}};
  static constexpr UINT_PTR SubclassId=0x44414e47;
- static bool required(WPARAM key){return (key>='0'&&key<='9')||(key>=VK_NUMPAD0&&key<=VK_NUMPAD9)||key==VK_ESCAPE||key==VK_OEM_2||key==VK_DIVIDE||key==VK_OEM_MINUS||key==VK_OEM_PLUS||key==VK_SUBTRACT||key==VK_ADD;}
+ static bool required(WPARAM key){return (key>='0'&&key<='9')||(key>=VK_NUMPAD0&&key<=VK_NUMPAD9)||key==VK_ESCAPE||key==VK_OEM_2||key==VK_DIVIDE||key==VK_OEM_MINUS||key==VK_OEM_PLUS||key==VK_SUBTRACT||key==VK_ADD||key==VK_LEFT||key==VK_RIGHT;}
  static LRESULT CALLBACK proc(HWND h,UINT m,WPARAM w,LPARAM l,UINT_PTR,DWORD_PTR ref){
  auto self=reinterpret_cast<NativeHud*>(ref);
  bool keyboard=m==WM_KEYDOWN||m==WM_KEYUP||m==WM_SYSKEYDOWN||m==WM_SYSKEYUP;
@@ -49,7 +49,7 @@ class NativeHud {
  auto foreground=GetForegroundWindow();if(localWindow(foreground))return foreground;
  WindowSearch search;EnumWindows(searchWindow,reinterpret_cast<LPARAM>(&search));return search.window;
  }
- KeyGate::Keys keys(){KeyGate::Keys k{};for(int i=0;i<10;++i)k[i]=down('0'+i)||down(VK_NUMPAD0+i);k[10]=down(VK_ESCAPE);k[11]=down(VK_OEM_2)||down(VK_DIVIDE);k[12]=down(VK_OEM_MINUS)||down(VK_SUBTRACT);k[13]=down(VK_OEM_PLUS)||down(VK_ADD);return k;}
+ KeyGate::Keys keys(){KeyGate::Keys k{};for(int i=0;i<10;++i)k[i]=down('0'+i)||down(VK_NUMPAD0+i);k[10]=down(VK_ESCAPE);k[11]=down(VK_OEM_2)||down(VK_DIVIDE);k[12]=down(VK_OEM_MINUS)||down(VK_SUBTRACT);k[13]=down(VK_OEM_PLUS)||down(VK_ADD);k[14]=down(VK_LEFT);k[15]=down(VK_RIGHT);return k;}
  void close(){opened=false;gate.reset();if(closed)closed();}
  void applyPreset(){if(preset==0){background={.015f,.018f,.020f,1};opacity=.48f;}if(preset==1){background={.10f,.105f,.11f,1};opacity=.42f;}if(preset==2){background={.055f,.065f,.075f,1};opacity=.66f;}if(preset==3){background={.01f,.012f,.014f,1};opacity=.28f;}}
  static void text(const std::string& s,ImVec4 color={.94f,.94f,.91f,1}){ImGui::PushStyleColor(ImGuiCol_Text,color);ImGui::TextWrapped("%s",s.c_str());ImGui::PopStyleColor();}
@@ -101,10 +101,10 @@ public:
  if(ImGui::Begin("L4D2DangoMusic Native HUD",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_AlwaysAutoResize)){
  ImGui::SetWindowFontScale(fontPixels/24.f);
  if(page==Page::Settings){auto doc=document(build(stack.current().page));stack.clamp(doc.rows.size());
- if(edge[12])stack.previous();if(edge[13])stack.next(doc.rows.size());
+ if(edge[12]||edge[14])stack.previous();if(edge[13]||edge[15])stack.next(doc.rows.size());
  text(doc.title,{1,.84f,.22f,1});ImGui::Separator();size_t first=stack.current().sheet*MenuStack::PageSize;
  for(size_t i=first;i<doc.rows.size()&&i<first+MenuStack::PageSize;++i){auto& item=doc.rows[i];unsigned n=unsigned(i-first+1);row(n,item.label,item.action!=0);if(edge[n]&&item.action)action=item.action;}
- size_t count=std::max<size_t>(1,(doc.rows.size()+MenuStack::PageSize-1)/MenuStack::PageSize);if(count>1)text(u8"[-] 上页    [=] 下页    "+std::to_string(stack.current().sheet+1)+" / "+std::to_string(count),{.58f,.60f,.60f,1});
+ size_t count=std::max<size_t>(1,(doc.rows.size()+MenuStack::PageSize-1)/MenuStack::PageSize);if(count>1)text(u8"[← / -] 上页    [→ / =] 下页    "+std::to_string(stack.current().sheet+1)+" / "+std::to_string(count),{.58f,.60f,.60f,1});
  openAppearance=action==9000;
  }else if(page==Page::Appearance){text(u8"菜单外观",{1,.84f,.22f,1});ImGui::Separator();appearance(edge);
  }else{text(u8"调整菜单位置",{1,.84f,.22f,1});ImGui::Separator();if(edge[12]&&step>1)--step;if(edge[13]&&step<64)++step;if(edge[1]){x=8;y=14;centerY=true;}move(focused);text(u8"位置："+std::to_string(int(x))+", "+std::to_string(int(centerY?ImGui::GetWindowPos().y:y)));text(u8"方向键移动菜单；[- / =] 步宽："+std::to_string(step)+" px",{1,.84f,.22f,1});row(1,u8"重置到默认位置");}

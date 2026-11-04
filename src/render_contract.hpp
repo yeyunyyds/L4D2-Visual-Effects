@@ -16,7 +16,7 @@ struct RenderInput {
     int minTenths=5,maxTenths=11;
     unsigned preset=0;
 };
-inline bool prepareDraw(const RenderInput& input, PoseCopy& output) noexcept {
+template<std::size_t Capacity> inline bool prepareDraw(const RenderInput& input, BasicPoseCopy<Capacity>& output) noexcept {
     if (!input.enabled || !input.special || input.dormant ||
         !input.verifiedRenderAbi || !input.verifiedAnchor ||
         input.snapshotAgeMs > 250 || !sameDraw(input.observed, input.draw)) return false;

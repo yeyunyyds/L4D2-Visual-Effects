@@ -49,6 +49,6 @@ int main(){
     bad=Reader{};bad.integer(160,4090);check(!studioPose(bad,0x1000,studio));
     bad=Reader{};bad.integer(168,-1);check(!studioPose(bad,0x1000,studio));
     bad=Reader{};bad.integer(4,99);check(!studioPose(bad,0x1000,studio));
-    bad=Reader{};std::strcpy(reinterpret_cast<char*>(bad.data.data()+1405),"left_joint");check(!studioPose(bad,0x1000,studio));
+    bad=Reader{};std::strcpy(reinterpret_cast<char*>(bad.data.data()+1405),"left_joint");check(studioPose(bad,0x1000,studio));check(studio.feet.empty());check(poseAnchor(studio,pose,anchor)&&anchor==0);
     std::cout<<"PASS: bounded studio metadata, model identity, per-model foot lookup, both feet/toes fixed across full cycle, malformed hierarchy rejection\n";
 }

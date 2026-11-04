@@ -27,7 +27,7 @@ int main() {
     tank.modelIndex.reset();check(!eligibleRecord(tank));
     tank.modelIndex=0;check(!eligibleRecord(tank));
     tank.modelIndex=12;tank.className="CTerrorPlayer";tank.team=3;check(eligibleRecord(tank));
-    tank.team=2;check(!eligibleRecord(tank));
+    tank.team=2;check(eligibleRecord(tank)); // Survivors now eligible, selection is separate.
     // Direct Studio draws lack an engine context. All special-infected classes
     // can match their renderable; stale serials and other entities cannot.
     for(auto name:{"Tank","Boomer","Hunter","Smoker","Charger","Spitter","Jockey","Witch"}) {
@@ -50,7 +50,7 @@ int main() {
     Matrix3x4 pose[2]{{{{1,0,0,10},{0,1,0,20},{0,0,1,30}}},
                       {{{0,-1,0,12},{1,0,0,25},{0,0,1,100}}}};
     Matrix3x4 original[2]; std::memcpy(original,pose,sizeof(pose));
-    PoseCopy output;
+    PoseCopy output{};
     for(float scale : {.5f,1.f,1.5f}) {
         check(stretchCopy(pose,2,30,scale,output));
         check(near(output.bones[0].m[2][3],30)); // foot-plane stays fixed

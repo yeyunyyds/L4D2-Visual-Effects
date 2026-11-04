@@ -5,7 +5,7 @@ namespace dango::hud {
 inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  ImFontGlyphRangesBuilder builder;
  builder.AddRanges(atlas.GetGlyphRangesChineseSimplifiedCommon());
- builder.AddText(MenuGlyphs);builder.AddText(u8"动画预设细调平滑往复Q弹回弹双跳脉冲最小最大比例恢复默认秒周期设置");builder.AddText(u8"动画速度切换重启周期未保存兼容渲染");
+ builder.AddText(MenuGlyphs);builder.AddText(u8"←→");builder.AddText(u8"性能与兼容渲染模式完整保留快速路径实验可能漏掉部分主模型");builder.AddText(u8"类别准星附近已识别此所有请选择开启或关闭未到目标请对准实体并稍等进入地图后左右翻页");builder.AddText(u8"骨骼上限切换未保存（128/256）实体选择全部开启关闭类别当前地图单个准星识别暂不可用角色道具侏儒垃圾桶左右方向键翻页返回仅完整句柄有效时生效失效请重新没有可识别模型进入地图按一已");builder.AddText(u8"动画预设细调平滑往复Q弹回弹双跳脉冲最小最大比例恢复默认秒周期设置");builder.AddText(u8"动画速度切换重启周期未保存兼容渲染");
  builder.AddText(u8"拉伸测试保留双脚脚趾姿态接口日志诊断保存菜单设置已提交失败写入目录权限比例往复绘制开关");
  builder.BuildRanges(&ranges);
 }

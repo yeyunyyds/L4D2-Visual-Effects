@@ -5,6 +5,7 @@
 #include "source_entity_binding.hpp"
 #include "entity_inventory.hpp"
 #include "json.hpp"
+#include "class_catalog.hpp"
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -80,14 +81,20 @@ inline std::string modelName(int index){
 inline void getterHint(Frame& frame,const char* kind,uint32_t fn){
  if(!fn||frame.getterHints.size()>=16||!source_camera::owns(reinterpret_cast<void*>(uintptr_t(fn)),source_camera::clientModule))return;uint8_t code[12];if(!reader.read(fn,code,sizeof(code)))return;char prefix[96];std::snprintf(prefix,sizeof(prefix),"%s client+0x%x bytes=",kind,fn-uint32_t(reinterpret_cast<uintptr_t>(source_camera::clientModule)));std::string hint=prefix;const char* digits="0123456789abcdef";for(auto c:code){hint+=digits[c>>4];hint+=digits[c&15];}if(std::find(frame.getterHints.begin(),frame.getterHints.end(),hint)==frame.getterHints.end())frame.getterHints.push_back(std::move(hint));
 }
+// Class ID catalog follows only module-owned ClientClass descriptors. It does
+// not dispatch GetAllClasses or any new game virtual method. Bounded per map.
+inline visual::ClassCatalog classCatalog;
+inline void catalogClasses(uint32_t address){
+ classCatalog.observe(reader,address,[](uint32_t p){return source_camera::owns(reinterpret_cast<void*>(uintptr_t(p)),source_camera::clientModule);});
+}
 inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint32_t net,Frame& frame){
  ++frame.occupied;auto h=wire::handle(i,entry.serial);if(!h)return {};Record r;r.index=i;r.serial=entry.serial;r.handle=*h;
- auto cls=classAddress(net);if(!cls){++frame.unknownClass;uint32_t getter=0;if(method(net,profile::ClassSlot,getter))getterHint(frame,"class",getter);return {};}auto it=classes.find(*cls);if(it==classes.end())it=classes.emplace(*cls,readClass(*cls)).first;const auto& info=it->second;if(info.name.empty()){++frame.unknownClass;return {};}r.className=info.name;r.classId=info.id;
+ auto cls=classAddress(net);if(!cls){++frame.unknownClass;uint32_t getter=0;if(method(net,profile::ClassSlot,getter))getterHint(frame,"class",getter);return {};}auto it=classes.find(*cls);if(it==classes.end())it=classes.emplace(*cls,readClass(*cls)).first;const auto& info=it->second;if(info.name.empty()){++frame.unknownClass;return {};}r.className=info.name;r.classId=info.id;catalogClasses(*cls);
  uint32_t fn;if(method(net,profile::DormantSlot,fn))r.dormant=wire::byteGetter(reader,fn,net);
  // The cached IsDormant bit is only a diagnostic comparison, not authority.
  uint32_t base=0,dataGetter=0;if(method(net,profile::DataBaseSlot,dataGetter)){auto b=wire::addressGetter(reader,dataGetter,net);if(b&&*b==entry.entity)base=*b;}
  if(!base){++frame.unknownBase;getterHint(frame,"data_base",dataGetter);}else if(!info.schema)++frame.unknownTables;else{
- r.networkOrigin=vectorField(base,info,"m_vecOrigin");r.networkAngles=vectorField(base,info,"m_angRotation");r.team=field<int>(base,info,"m_iTeamNum",0);
+ r.networkOrigin=vectorField(base,info,"m_vecOrigin");r.networkAngles=vectorField(base,info,"m_angRotation");r.team=field<int>(base,info,"m_iTeamNum",0);r.effects=field<int>(base,info,"m_fEffects",0);
  auto index=field<int16_t>(base,info,"m_nModelIndex",0);if(index){r.modelIndex=int(*index);r.modelName=modelName(*index);}
  r.parent=field<uint32_t>(base,info,"moveparent",0);r.parentAttachment=field<uint8_t>(base,info,"m_iParentAttachment",0);r.owner=field<uint32_t>(base,info,"m_hOwnerEntity",0);r.weaponOwner=field<uint32_t>(base,info,"m_hOwner",0);r.activeWeapon=field<uint32_t>(base,info,"m_hActiveWeapon",0);r.viewModel=field<uint32_t>(base,info,"m_hViewModel[0]",0);
  }return r;
@@ -107,7 +114,7 @@ inline void capture(const GameCameraFrame& camera){
  uint32_t entryBase=uint32_t(int64_t(object)+profile::EntryBaseDelta);
  if(!reader.read(entryBase,entries.data(),sizeof(entries))||!reader.read(object+profile::CacheOffset,cache.data(),sizeof(cache))){faulted=true;frame.status="Entity list memory unavailable";publish(std::move(frame));return;}
  for(unsigned i=0;i<unsigned(std::min(highest+1,int(profile::MaxNetworked)));++i){auto entry=entries[i];auto net=cache[i].networkable;if(!entry.entity||!net)continue;auto record=readRecord(i,entry,net,frame);if(record)frame.records.push_back(std::move(*record));}
- frame.bindingChecks=bindingChecks;frame.modelLookup=modelReady;frame.status="Network inventory: "+std::to_string(frame.records.size())+" objects; position source=network properties; not render poses";publish(std::move(frame));
+ frame.classCatalog=classCatalog.names;frame.bindingChecks=bindingChecks;frame.modelLookup=modelReady;frame.status="Network inventory: "+std::to_string(frame.records.size())+" objects; position source=network properties; not render poses";publish(std::move(frame));
 }
 inline void captureFollow(const GameCameraFrame& camera,const dango::inventory::FollowRequest& request){
  Frame f;f.epoch=camera.epoch;f.tick=camera.tick;
@@ -121,8 +128,8 @@ inline void captureFollow(const GameCameraFrame& camera,const dango::inventory::
  }f.status=f.records.empty()?"Follow target unavailable":"Target-only network pose update";finish();
 }
 inline void onFrame(const GameCameraFrame& camera)noexcept{
- try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled;if(!active){if(wasEnabled){classes.clear();models.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}wasEnabled=false;return;}
- if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=0;epoch=camera.epoch;wasEnabled=true;}
+ try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled;if(!active){if(wasEnabled){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}wasEnabled=false;return;}
+ if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=0;epoch=camera.epoch;wasEnabled=true;}
  if(request->enabled&&camera.tick>=nextFollow){nextFollow=camera.tick+33;captureFollow(camera,*request);}
  if((enabled.load()||browseRequested.load())&&camera.tick>=nextCapture){nextCapture=camera.tick+200;capture(camera);}
  }catch(...){faulted=true;log("Capture stopped after an exception; toggle diagnostics to retry");}

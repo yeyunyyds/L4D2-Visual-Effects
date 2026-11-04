@@ -47,7 +47,8 @@ template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, Stu
         if(boneName.find("foot")!=std::string::npos &&
            boneName.find("attach")==std::string::npos)result.feet.push_back(i);
     }
-    if(result.feet.size()<2)return fail("fewer than two named foot bones");
+    // Props without a pair of feet are supported without partial foot preservation.
+    if(result.feet.size()<2)result.feet.clear();
     for(unsigned i=0;i<count;++i) {
         bool fixed=false;
         int parent=int(i);unsigned depth=0;
@@ -60,8 +61,14 @@ template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, Stu
     }
     out=std::move(result);return true;
 }
-inline void preserveFeet(const StudioPose& studio,const Matrix3x4* original,PoseCopy& output) {
+template<std::size_t Capacity> inline void preserveFeet(const StudioPose& studio,const Matrix3x4* original,BasicPoseCopy<Capacity>& output) {
     for(auto i:studio.fixed)if(i<output.count)output.bones[i]=original[i];
+}
+template<std::size_t Capacity,class Reader> bool readDrawPose(Reader& reader,std::uint32_t address,
+    const StudioPose& studio,BasicPoseCopy<Capacity>& out) {
+    if(!studio.count || studio.count>Capacity)return false;
+    if(!reader.read(address,out.bones.data(),studio.count*sizeof(Matrix3x4)))return false;
+    out.count=studio.count;return true;
 }
 inline bool footAnchor(const StudioPose& studio,const Matrix3x4* pose,float& anchor) {
     if(!pose || studio.feet.size()<2)return false;
@@ -71,6 +78,12 @@ inline bool footAnchor(const StudioPose& studio,const Matrix3x4* pose,float& anc
         low=std::min(low,pose[i].m[2][3]);
     }
     anchor=low;return std::isfinite(anchor);
+}
+inline bool poseAnchor(const StudioPose& studio,const Matrix3x4* pose,float& anchor) {
+    if(studio.feet.size()>=2)return footAnchor(studio,pose,anchor);
+    if(!pose || !studio.count)return false;
+    // Rigid props scale about their rendered root bone; no entity/collision writes.
+    anchor=pose[0].m[2][3];return std::isfinite(anchor);
 }
 inline std::string canonicalModel(std::string name) {
     for(char& c:name) {if(c=='\\')c='/';if(c>='A'&&c<='Z')c=char(c-'A'+'a');}

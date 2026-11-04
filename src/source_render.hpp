@@ -8,6 +8,10 @@
 #include "studio_pose.hpp"
 #include "studio_cache.hpp"
 #include "target_identity.hpp"
+#include "target_index.hpp"
+#include "entity_selection.hpp"
+#include "render_settings.hpp"
+#include <unordered_map>
 #include "render_profile.hpp"
 #include "module_verification.hpp"
 
@@ -28,6 +32,9 @@ inline StudioDraw studioOriginal=nullptr;
 inline void** engineTable=nullptr;
 inline void** studioTable=nullptr;
 inline std::atomic<bool> enabled{false},bound{false};
+inline std::atomic<unsigned> boneLimit{128};
+inline std::atomic<bool> compatibility{true};
+inline std::shared_ptr<const EntitySelection> selection=std::make_shared<const EntitySelection>();
 inline std::shared_ptr<const AnimationSettings> animation=std::make_shared<const AnimationSettings>();
 inline std::atomic<ULONGLONG> startedAt{0};
 inline std::atomic<unsigned long> drawn{0},rejected{0};
@@ -35,7 +42,7 @@ inline std::atomic<unsigned long> engineCalls{0},identified{0},studioCalls{0};
 inline std::atomic<const char*> identifyReason{"No target draw yet"},poseReason{"No associated studio draw yet"};
 inline std::atomic<const char*> status{"Waiting for game modules"};
 inline HMODULE studioModule=nullptr;
-struct Context {bool valid=false;DrawIdentity identity{};std::uint32_t header{},renderable{};std::uint64_t age{};std::string model,className;};
+struct Context {bool valid=false;DrawIdentity identity{};std::uint32_t header{},renderable{};std::uint64_t age{};int classId=-1;};
 inline thread_local Context* context=nullptr;
 
 template<std::size_t N> bool samples(HMODULE module,const profile::Sample(&list)[N]) {
@@ -55,44 +62,63 @@ inline bool patch(void** table,unsigned slot,void* expected,void* replacement) {
     DWORD ignored{};VirtualProtect(table+slot,sizeof(void*),previous,&ignored);
     return actual==expected;
 }
+struct IndexedFrame {
+ std::shared_ptr<const source_entities::Frame> frame;
+ TargetIndex<source_entities::Frame,source_entities::profile::MaxNetworked> index;
+ std::unordered_map<std::uint32_t,source_entities::ClassInfo> classes;
+ std::shared_ptr<const EntitySelection> selected;
+ void update(std::shared_ptr<const source_entities::Frame> next){
+  auto options=std::atomic_load(&selection);
+  if(frame==next && selected==options)return;
+  if(frame!=next)classes.clear();
+  frame=std::move(next);selected=std::move(options);
+  auto object=std::uint32_t(reinterpret_cast<std::uintptr_t>(source_camera::clientModule))+source_entities::profile::Object;
+  auto entries=std::uint32_t(std::int64_t(object)+source_entities::profile::EntryBaseDelta);
+  index.rebuild(*frame,[&](unsigned i){source_entities::wire::Entry entry{};
+   if(!source_entities::wire::load(source_entities::reader,entries+i*sizeof(entry),entry))entry={};return entry;},
+   [&](const auto& r){return selected->selected(r.classId);});
+ }
+};
+inline thread_local IndexedFrame indexed;
 inline Context identify(const DrawState& state,const ModelInfo& info) {
     using namespace source_entities;
     Context result;
     if(info.index<0 || info.index>=int(source_entities::profile::MaxNetworked) ||
-       !state.header || !state.renderable || state.renderable!=info.renderable){identifyReason="invalid index/header/renderable";return result;}
+       !state.header || !state.renderable || state.renderable!=info.renderable){identifyReason.store("invalid index/header/renderable",std::memory_order_relaxed);return result;}
     const auto camera=std::atomic_load(&source_camera::snapshot);
     const auto frame=std::atomic_load(&snapshot);
     const auto now=GetTickCount64();
     if(!camera->active || camera->epoch!=frame->epoch || now<frame->tick ||
-       now-frame->tick>250){identifyReason="inactive camera / map epoch / stale snapshot";return result;}
+       now-frame->tick>250){identifyReason.store("inactive camera / map epoch / stale snapshot",std::memory_order_relaxed);return result;}
+    indexed.update(frame);
+    const auto* record=indexed.index.records[info.index];
+    if(!record){identifyReason.store("snapshot lacks model identity",std::memory_order_relaxed);return result;}
     const auto object=std::uint32_t(reinterpret_cast<std::uintptr_t>(source_camera::clientModule))+source_entities::profile::Object;
     wire::Entry entry;std::uint32_t net{};
     const auto entries=std::uint32_t(std::int64_t(object)+source_entities::profile::EntryBaseDelta);
     if(!wire::load(reader,entries+info.index*sizeof(entry),entry)||!entry.entity||
-       !wire::load(reader,object+source_entities::profile::CacheOffset+info.index*8,net)||!net){identifyReason="entity entry or networkable unreadable";return result;}
+       !wire::load(reader,object+source_entities::profile::CacheOffset+info.index*8,net)||!net){identifyReason.store("entity entry or networkable unreadable",std::memory_order_relaxed);return result;}
     const auto handle=wire::handle(info.index,entry.serial);
-    if(!handle){identifyReason="invalid handle";return result;}
-    const dango::inventory::Record* record=nullptr;
-    for(const auto& r:frame->records)if(r.handle==*handle){record=&r;break;}
-    if(!record || !eligibleRecord(*record)){identifyReason="snapshot lacks special infected / model identity";return result;}
+    if(!handle){identifyReason.store("invalid handle",std::memory_order_relaxed);return result;}
+    if(record->handle!=*handle){identifyReason.store("current entity serial mismatch",std::memory_order_relaxed);return result;}
     // Decode the profiled tiny getters; do not execute entity virtual methods.
     std::uint32_t getter{};
-    if(!method(state.renderable,0,getter)){identifyReason="renderable getter unavailable";return result;}
+    if(!method(state.renderable,0,getter)){identifyReason.store("renderable getter unavailable",std::memory_order_relaxed);return result;}
     auto base=wire::addressGetter(reader,getter,state.renderable);
-    if(!base || *base!=entry.entity){identifyReason="renderable getter does not map to entity base";return result;}
-    if(!method(net,source_entities::profile::DormantSlot,getter)){identifyReason="dormancy getter unavailable";return result;}
+    if(!base || *base!=entry.entity){identifyReason.store("renderable getter does not map to entity base",std::memory_order_relaxed);return result;}
+    if(!method(net,source_entities::profile::DormantSlot,getter)){identifyReason.store("dormancy getter unavailable",std::memory_order_relaxed);return result;}
     auto dormant=wire::byteGetter(reader,getter,net);
-    if(!dormant || *dormant){identifyReason="dormant or unknown dormancy";return result;}
-    auto address=classAddress(net);if(!address){identifyReason="class getter unavailable";return result;}
-    auto cls=readClass(*address);
-    if(cls.name!=record->className){identifyReason="current class mismatch";return result;}
-    auto team=field<int>(entry.entity,cls,"m_iTeamNum",0);
-    if(!specialInfected(cls.name,team.value_or(-1))){identifyReason="current team is not special infected";return result;}
+    if(!dormant || *dormant){identifyReason.store("dormant or unknown dormancy",std::memory_order_relaxed);return result;}
+    auto address=classAddress(net);if(!address){identifyReason.store("class getter unavailable",std::memory_order_relaxed);return result;}
+    auto known=indexed.classes.find(*address);
+    if(known==indexed.classes.end())known=indexed.classes.emplace(*address,readClass(*address)).first;
+    const auto& cls=known->second;
+    if(cls.name!=record->className || cls.id!=record->classId){identifyReason.store("current class mismatch",std::memory_order_relaxed);return result;}
     const auto model=field<std::int16_t>(entry.entity,cls,"m_nModelIndex",0);
-    if(!model || *model!=*record->modelIndex){identifyReason="current model index mismatch";return result;}
-    identifyReason="Entity matched";result.valid=true;result.identity={frame->epoch,*handle,*model};
+    if(!model || *model!=*record->modelIndex){identifyReason.store("current model index mismatch",std::memory_order_relaxed);return result;}
+    identifyReason.store("Entity matched",std::memory_order_relaxed);result.valid=true;result.identity={frame->epoch,*handle,*model};
     result.header=state.header;result.renderable=state.renderable;
-    result.age=now-frame->tick;result.model=record->modelName;result.className=record->className;
+    result.age=now-frame->tick;result.classId=record->classId;
     return result;
 }
 // Some engine-internal/shadow paths dispatch Studio directly instead of the
@@ -106,54 +132,107 @@ inline Context identifyStudio(std::uint32_t header,std::uint32_t renderable) {
     auto frame=std::atomic_load(&source_entities::snapshot);
     auto object=std::uint32_t(reinterpret_cast<std::uintptr_t>(source_camera::clientModule))+source_entities::profile::Object;
     auto entries=std::uint32_t(std::int64_t(object)+source_entities::profile::EntryBaseDelta);
-    static thread_local std::shared_ptr<const dango::inventory::Frame> cached;
-    static thread_local std::vector<std::size_t> candidates;
-    if(cached!=frame) {
-        cached=frame;candidates.clear();
-        for(std::size_t i=0;i<frame->records.size();++i)
-            if(eligibleRecord(frame->records[i]) && frame->records[i].index<source_entities::profile::MaxNetworked)candidates.push_back(i);
-    }
-    for(auto index:candidates) {
-        const auto& r=frame->records[index];
+    indexed.update(frame);
+    const auto found=indexed.index.bases.find(*base);
+    if(found!=indexed.index.bases.end()) {
+        const auto* r=indexed.index.records[found->second];
         source_entities::wire::Entry entry;
-        if(!source_entities::wire::load(source_entities::reader,entries+r.index*sizeof(entry),entry) ||
-           !sameRenderableTarget(r,entry.entity,entry.serial,*base))continue;
-        DrawState state{};state.header=header;state.renderable=renderable;
-        ModelInfo info{};info.index=int(r.index);info.renderable=renderable;
-        return identify(state,info);
+        if(r && source_entities::wire::load(source_entities::reader,entries+r->index*sizeof(entry),entry) &&
+           sameRenderableTarget(*r,entry.entity,entry.serial,*base)) {
+            DrawState state{};state.header=header;state.renderable=renderable;
+            ModelInfo info{};info.index=int(r->index);info.renderable=renderable;
+            return identify(state,info);
+        }
     }
     return empty;
 }
-struct TargetStats {unsigned long accepted=0,rejected=0,direct=0;std::string reason,model;};
+struct TargetStats {
+ std::atomic<unsigned long> accepted{0},rejected{0},direct{0};
+ std::atomic<const char*> reason{"not drawn"};std::string model;int classId{},modelIndex{};std::uint32_t epoch{};
+};
 inline std::mutex targetMutex;
-inline std::map<std::string,TargetStats> targets;
+inline std::map<std::uint64_t,TargetStats> targets;
 inline void targetResult(const Context& target,bool accepted,bool direct,const std::string& model) {
-    std::lock_guard<std::mutex> lock(targetMutex);
-    auto& stat=targets[target.className+" modelIndex="+std::to_string(target.identity.modelIndex)];
-    if(accepted)++stat.accepted;else ++stat.rejected;
-    if(direct)++stat.direct;
-    stat.reason=accepted?"accepted":poseReason.load();if(!model.empty())stat.model=model;
+    // Shared registry is only touched on the first draw of each class/model on a thread.
+    const auto key=(std::uint64_t(target.identity.epoch)<<32)|(std::uint64_t(std::uint16_t(target.classId))<<16)|std::uint16_t(target.identity.modelIndex);
+    static thread_local std::unordered_map<std::uint64_t,TargetStats*> slots;
+    auto found=slots.find(key);
+    if(found==slots.end()) {
+        std::lock_guard<std::mutex> lock(targetMutex);
+        if(targets.size()>=4096)return; // Bound diagnostic memory; rendering continues.
+        auto& stat=targets[key];stat.classId=target.classId;stat.modelIndex=target.identity.modelIndex;stat.epoch=target.identity.epoch;
+        if(stat.model.empty())stat.model=model;
+        found=slots.emplace(key,&stat).first;
+    }
+    auto& stat=*found->second;
+    if(accepted)stat.accepted.fetch_add(1,std::memory_order_relaxed);
+    else stat.rejected.fetch_add(1,std::memory_order_relaxed);
+    if(direct)stat.direct.fetch_add(1,std::memory_order_relaxed);
+    stat.reason.store(accepted?"accepted":poseReason.load(std::memory_order_relaxed),std::memory_order_relaxed);
 }
 inline std::string targetSummary() {
     std::lock_guard<std::mutex> lock(targetMutex);std::string out;
-    for(const auto& pair:targets)out+=" ["+pair.first+" model="+pair.second.model+
-        " accepted="+std::to_string(pair.second.accepted)+" rejected="+std::to_string(pair.second.rejected)+
-        " direct="+std::to_string(pair.second.direct)+" reason="+pair.second.reason+"]";
+    for(const auto& pair:targets){const auto& s=pair.second;
+        out+=" [epoch="+std::to_string(s.epoch)+" classId="+std::to_string(s.classId)+" modelIndex="+std::to_string(s.modelIndex)+" model="+s.model+
+        " accepted="+std::to_string(s.accepted.load(std::memory_order_relaxed))+
+        " rejected="+std::to_string(s.rejected.load(std::memory_order_relaxed))+
+        " direct="+std::to_string(s.direct.load(std::memory_order_relaxed))+" reason="+s.reason.load(std::memory_order_relaxed)+"]";
+    }
     return out;
 }
 inline void __fastcall engineHook(void* self,void*,const DrawState& state,const ModelInfo& info,Matrix3x4* bones) {
-    ++engineCalls;
+    engineCalls.fetch_add(1,std::memory_order_relaxed);
     Context current;
-    if(enabled.load())try{current=identify(state,info);}catch(...){++rejected;}
-    if(current.valid)++identified;
+    if(enabled.load())try{current=identify(state,info);}catch(...){rejected.fetch_add(1,std::memory_order_relaxed);}
+    if(current.valid)identified.fetch_add(1,std::memory_order_relaxed);
     struct Scope {Context* previous;~Scope(){context=previous;}} scope{context};
     context=&current;
     // Keep the original engine pose intact, including hitbox/debug consumers.
     engineOriginal(self,state,info,bones);
 }
+template<std::size_t Capacity> __declspec(noinline) void studioTargetDraw(
+    void* self,void* results,const void* info,Matrix3x4* bones,float* flex,float* delayed,
+    const Vec3& origin,int flags,Context* target,bool direct) {
+    BasicPoseCopy<Capacity> source,copy;
+    std::uint32_t header{},renderable{};
+    const auto ptr=std::uint32_t(reinterpret_cast<std::uintptr_t>(info));const StudioPose* studio=nullptr;
+    static thread_local StudioCache cache;
+    const char* studioFailure="Studio metadata rejected";bool changed=false;
+    try {
+        if(enabled.load() && (target && target->valid) && (poseReason.store("Missing draw bone pointer",std::memory_order_relaxed),bones) &&
+           source_entities::wire::load(source_entities::reader,ptr,header) &&
+           source_entities::wire::load(source_entities::reader,ptr+24,renderable) &&
+           (poseReason.store("Studio header/renderable context mismatch",std::memory_order_relaxed),header==target->header && renderable==target->renderable) &&
+           (poseReason.store("Studio header / bone names / hierarchy rejected",std::memory_order_relaxed), (studio=cache.find(source_entities::reader,header,target->identity.epoch,&studioFailure))) &&
+           (poseReason.store("Model exceeds selected bone limit",std::memory_order_relaxed),studio->count<=Capacity) &&
+           (poseReason.store("Bone matrix memory unreadable",std::memory_order_relaxed),readDrawPose(source_entities::reader,std::uint32_t(reinterpret_cast<std::uintptr_t>(bones)),*studio,source))) {
+            poseReason.store("Foot anchor invalid",std::memory_order_relaxed);float anchor{};
+            if(poseAnchor(*studio,source.bones.data(),anchor)) {
+                const auto elapsed=GetTickCount64()-startedAt.load();
+                auto parameters=std::atomic_load(&animation);
+                RenderInput input{target->identity,target->identity,source.bones.data(),studio->count,
+                                  anchor,elapsed,target->age,true,true,false,true,true,parameters->periodMs,parameters->minTenths,parameters->maxTenths,parameters->preset};
+                poseReason.store("Nonfinite bone matrix / draw contract rejected",std::memory_order_relaxed);changed=prepareDraw(input,copy);
+                if(changed)poseReason.store("Pose accepted",std::memory_order_relaxed);
+                if(changed)preserveFeet(*studio,source.bones.data(),copy);
+            }
+            if(!changed)rejected.fetch_add(1,std::memory_order_relaxed);
+        }
+    }catch(...){rejected.fetch_add(1,std::memory_order_relaxed);}
+    if(!changed && std::strcmp(poseReason.load(),"Studio header / bone names / hierarchy rejected")==0)poseReason.store(studioFailure,std::memory_order_relaxed);
+    static const std::string emptyModel;
+    if(enabled.load() && target && target->valid)targetResult(*target,changed,direct,studio?studio->name:emptyModel);
+    // The verified studio implementation copies non-render-arena matrices for
+    // queued draws (66e50). Our local copy survives until that copy completes.
+    studioOriginal(self,results,info,changed?copy.bones.data():bones,flex,delayed,origin,flags);
+    if(changed) {
+        if(drawn.fetch_add(1,std::memory_order_relaxed)==0)source_camera::log("First visual stretch submitted; original entity and bone cache untouched");
+        status="Stretch draws submitted; inspect feet and animation in game";
+    }
+}
 inline void __fastcall studioHook(void* self,void*,void* results,const void* info,Matrix3x4* bones,
                                   float* flex,float* delayed,const Vec3& origin,int flags) {
-    ++studioCalls;
+    studioCalls.fetch_add(1,std::memory_order_relaxed);
     if(!enabled.load()){studioOriginal(self,results,info,bones,flex,delayed,origin,flags);return;}
     Context fallback;Context* target=context;bool direct=false;
     std::uint32_t header{},renderable{};
@@ -163,45 +242,16 @@ inline void __fastcall studioHook(void* self,void*,void* results,const void* inf
            source_entities::wire::load(source_entities::reader,ptr,header) &&
            source_entities::wire::load(source_entities::reader,ptr+24,renderable)) {
             fallback=identifyStudio(header,renderable);
-            if(fallback.valid){target=&fallback;direct=true;++identified;}
+            if(fallback.valid){target=&fallback;direct=true;identified.fetch_add(1,std::memory_order_relaxed);}
         }
-    }catch(...){++rejected;target=nullptr;}
+    }catch(...){rejected.fetch_add(1,std::memory_order_relaxed);target=nullptr;}
     // Ordinary props/non-target draws must not zero two 12KB pose buffers.
     if(!target || !target->valid){studioOriginal(self,results,info,bones,flex,delayed,origin,flags);return;}
-    PoseCopy source,copy;const StudioPose* studio=nullptr;
-    static thread_local StudioCache cache;
-    const char* studioFailure="Studio metadata rejected";bool changed=false;
-    try {
-        if(enabled.load() && (target && target->valid) && (poseReason="Missing draw bone pointer",bones) &&
-           source_entities::wire::load(source_entities::reader,ptr,header) &&
-           source_entities::wire::load(source_entities::reader,ptr+24,renderable) &&
-           (poseReason="Studio header/renderable context mismatch",header==target->header && renderable==target->renderable) &&
-           (poseReason="Studio header / bone names / hierarchy rejected", (studio=cache.find(source_entities::reader,header,target->identity.epoch,&studioFailure))) &&
-           (poseReason="Bone matrix memory unreadable",source_entities::reader.read(std::uint32_t(reinterpret_cast<std::uintptr_t>(bones)),
-                                       source.bones.data(),studio->count*sizeof(Matrix3x4)))) {
-            poseReason="Foot anchor invalid";float anchor{};
-            if(footAnchor(*studio,source.bones.data(),anchor)) {
-                const auto elapsed=GetTickCount64()-startedAt.load();
-                auto parameters=std::atomic_load(&animation);
-                RenderInput input{target->identity,target->identity,source.bones.data(),studio->count,
-                                  anchor,elapsed,target->age,true,true,false,true,true,parameters->periodMs,parameters->minTenths,parameters->maxTenths,parameters->preset};
-                poseReason="Nonfinite bone matrix / draw contract rejected";changed=prepareDraw(input,copy);
-                if(changed)poseReason="Pose accepted";
-                if(changed)preserveFeet(*studio,source.bones.data(),copy);
-            }
-            if(!changed)++rejected;
-        }
-    }catch(...){++rejected;}
-    if(!changed && std::string(poseReason.load())=="Studio header / bone names / hierarchy rejected")poseReason=studioFailure;
-    if(enabled.load() && target && target->valid)targetResult(*target,changed,direct,studio?studio->name:std::string{});
-    // The verified studio implementation copies non-render-arena matrices for
-    // queued draws (66e50). Our local copy survives until that copy completes.
-    studioOriginal(self,results,info,changed?copy.bones.data():bones,flex,delayed,origin,flags);
-    if(changed) {
-        if(drawn.fetch_add(1)==0)source_camera::log("First visual stretch submitted; original entity and bone cache untouched");
-        status="Stretch draws submitted; inspect feet and animation in game";
-    }
+    if(boneLimit.load(std::memory_order_relaxed)==256)
+        studioTargetDraw<256>(self,results,info,bones,flex,delayed,origin,flags,target,direct);
+    else studioTargetDraw<128>(self,results,info,bones,flex,delayed,origin,flags,target,direct);
 }
+
 inline void connect() {
     using namespace source_camera;
     if(bound.load())return;
