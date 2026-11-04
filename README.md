@@ -4,26 +4,31 @@
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 当前测试版 0.5.1-test
+## 当前测试版 0.5.2-test
 
-**[下载 L4D2Visual-0.5.1-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.1-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/ffb73e1) · [完整指南](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)
+**[下载 L4D2Visual-0.5.2-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.2-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/5e82397) · [完整指南](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)
 
-- 实体开关整理为特感、求生者、场景可拾取武器与物品、手上道具、其他，各分类支持全开 / 全关。
-- 保留“一键全部关闭（含实验）”，翻页恢复为 `- / =`。
-- 独立手动识别页面，识别后明确选择开启或关闭同一 Class ID 的所有实体。
-- 新增默认关闭的范围实验：默认 Tank / 500 游戏单位，可选择触发类别，范围 100～5000，支持 ±100 / ±10。
-- 进入范围后临时拉伸全部可处理实体，退出恢复手动规则；实验排除手持武器与可关联附件，普通感染者默认不参与并可单独开启。
-- 保留 128 / 256 骨骼容量切换、完整兼容 / 实验快速模式和旧版配置兼容。
+- 修正菜单：固定列出全部八种特感，以及求生者、武器 / 物品、手持模型等预定义类型，无需刷出即可预先设置并保存。
+- 修正范围实验：逐个判断实体到 Tank / 所选中心的距离；只有范围内实体拉伸，玩家和镜头位置不参与判断。
+- 同一类别的多个实例可分别处于范围内外；多个范围中心取并集。实验开启时范围外始终关闭，关闭实验后恢复手动分类规则。
+- 保留分类批量开关、一键全部关闭、独立手动识别与开关、`- / =` 翻页、128 / 256 切换。
+- 实验默认关闭，默认 Tank / 500 游戏单位，范围 100～5000；继续排除手持物，普通感染者另设默认关闭的参与开关。
 
-距离以当前视角位置计算。普通感染者衣物不随身体变形的问题尚未修复；实验范围覆盖仍受绘制路径限制。识别沿用 DangoMusic 的附近候选排序，不检测墙体遮挡。
+八组回归覆盖空场景完整菜单、预先保存类型、镜头无关、同类型内外分离、多个中心、目标失效及排除规则。Windows x86 交叉编译通过，仍需游戏内验收。
 
-八组本地回归与 Windows x86 交叉编译通过，游戏内体验和性能仍需实测。包内含 DLL 和对应完整源码。
+普通感染者衣物不随动的问题尚未修复；静态物件和未接入的批量绘制仍不保证覆盖。准星识别仍采用 DangoMusic 的附近候选排序，不检查墙体遮挡。位置判断沿用约 200ms 的网络快照。
 
-SHA-256：
+安装包包含 DLL 与对应完整源码。SHA-256：
 
 ```text
-9cb08e89bf0dd6cdd323039936f79a7dfc99cbd55edf038b4701e83e45fc4a2b
+fab9b14ad74ebd27ae14a7e73d1e59e08242f614f0df60252938e5c443f69460
 ```
+
+## 历史测试版 0.5.1-test（请升级至 0.5.2）
+
+[归档包 L4D2Visual-0.5.1-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.1-test.zip)
+
+该版本的菜单仍依赖已观察类别，范围实验误按视角距离触发全局效果。这两项问题已在 0.5.2 修正；此包仅保留用于回退 / 复现。
 
 ## 历史测试版 0.5.0-test
 
@@ -59,4 +64,4 @@ SHA-256：
 f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 ```
 
-除当前 0.5.1-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
+除当前 0.5.2-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
