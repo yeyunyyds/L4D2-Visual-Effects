@@ -1,10 +1,10 @@
-# L4D2 Visual Stretch
+# L4D2 Visual Effects
 
-**求生之路 2 特殊感染者视觉拉伸插件 · 0.4.0**
+**求生之路 2 视觉效果插件 · 0.4.0**
 
-基于 **L4N v2 / Windows x86**，让特殊感染者随周期竖直伸缩，保留双脚、脚趾的原始位置与朝向，以及原有走路动画。插件在绘制阶段使用骨骼矩阵副本，不写入实体位置、碰撞边界或命中骨骼缓存。
+基于 **L4N v2 / Windows x86** 的求生之路 2 视觉效果项目。当前 0.4.0 实现特殊感染者周期性竖直拉伸，保留双脚、脚趾的原始位置与朝向，以及原有走路动画。当前效果在绘制阶段使用骨骼矩阵副本，不写入实体位置、碰撞边界或命中骨骼缓存。
 
-项目展示名为 **L4D2 Visual Stretch**；现有插件标识、游戏内菜单、DLL 和安装包继续使用 `L4D2Visual`，配置路径保持兼容。
+项目名称为 **L4D2 Visual Effects（求生之路 2 视觉效果）**，覆盖项目整体的视觉效果方向；拉伸是当前实现的功能。插件标识、游戏内菜单、DLL 和安装包使用 `L4D2Visual`。
 
 [下载正式版](https://github.com/yeyunyyds/L4D2-visual/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-visual/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
 
