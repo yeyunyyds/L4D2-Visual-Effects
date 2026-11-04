@@ -7,18 +7,32 @@ namespace visual {
 struct EntitySelection {
  bool all=false;
  std::map<int,bool> classes;
+ std::map<std::string,bool> types;
  std::map<unsigned,bool> groups;
  std::map<int,std::string> names;
  bool selected(int classId,std::string_view name={})const {
   if(classId<0 || classId>4096)return false;
   auto c=classes.find(classId);if(c!=classes.end())return c->second;
   if(name.empty()){auto label=names.find(classId);if(label!=names.end())name=label->second;}
+  return selectedType(name);
+ }
+ bool selectedType(std::string_view name)const {
+  auto type=types.find(std::string(name));if(type!=types.end())return type->second;
   auto group=groups.find(unsigned(groupForName(name)));return group==groups.end()?all:group->second;
  }
- void setAll(bool value){all=value;classes.clear();groups.clear();}
+ void setType(const std::string& name,bool enabled){
+  if(!validTypeName(name))return;
+  types[name]=enabled;
+  for(auto c=classes.begin();c!=classes.end();){auto label=names.find(c->first);
+   if(label!=names.end()&&label->second==name)c=classes.erase(c);else ++c;
+  }
+ }
+ void setClass(int id,const std::string& name,bool enabled){classes[id]=enabled;names[id]=name;types.erase(name);}
+ void setAll(bool value){all=value;classes.clear();types.clear();groups.clear();}
  void setGroup(EntityGroup group,bool value){
   if(unsigned(group)>=EntityGroupCount)return;
   groups[unsigned(group)]=value;
+  for(auto t=types.begin();t!=types.end();){if(groupForName(t->first)==group)t=types.erase(t);else ++t;}
   for(auto i=classes.begin();i!=classes.end();){
    auto label=names.find(i->first);auto current=groupForName(label==names.end()?std::string_view{}:std::string_view(label->second));
    if(current==group)i=classes.erase(i);else ++i;
@@ -26,6 +40,7 @@ struct EntitySelection {
  }
  bool anyEnabled()const {
   if(all)return true;
+  for(const auto& t:types)if(t.second)return true;
   for(const auto& g:groups)if(g.second)return true;
   for(const auto& c:classes)if(c.second)return true;
   return false;
@@ -43,6 +58,10 @@ template<class Json> EntitySelection readEntitySelection(const Json& j){
    int id=-1;if(c.value().is_boolean()&&parseClassId(c.key(),id))result.classes[id]=c.value().template get<bool>();
   }
  }
+ auto types=i->find("types");if(types!=i->end()&&types->is_object()){
+  for(auto t=types->begin();t!=types->end()&&result.types.size()<4096;++t)
+   if(validTypeName(t.key())&&t.value().is_boolean())result.types[t.key()]=t.value().template get<bool>();
+ }
  auto groups=i->find("groups");if(groups!=i->end()&&groups->is_object()){
   for(auto g=groups->begin();g!=groups->end();++g){int id=-1;if(parseClassId(g.key(),id)&&unsigned(id)<EntityGroupCount&&g.value().is_boolean())result.groups[unsigned(id)]=g.value().template get<bool>();}
  }
@@ -56,10 +75,11 @@ template<class Json> EntitySelection readEntitySelection(const Json& j){
  return result;
 }
 template<class Json> void writeEntitySelection(Json& j,const EntitySelection& s){
- Json classes=Json::object(),names=Json::object(),groups=Json::object();
+ Json classes=Json::object(),names=Json::object(),groups=Json::object(),types=Json::object();
  for(const auto& c:s.classes)classes[std::to_string(c.first)]=c.second;
  for(const auto& c:s.names)names[std::to_string(c.first)]=c.second;
  for(const auto& g:s.groups)groups[std::to_string(g.first)]=g.second;
- j["entitySelection"]={{"all",s.all},{"classes",classes},{"names",names},{"groups",groups}};
+ for(const auto& t:s.types)types[t.first]=t.second;
+ j["entitySelection"]={{"all",s.all},{"classes",classes},{"names",names},{"groups",groups},{"types",types}};
 }
 } // namespace visual

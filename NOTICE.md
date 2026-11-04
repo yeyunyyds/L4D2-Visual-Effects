@@ -49,3 +49,8 @@ Entity inventory also publishes a bounded Class ID/name catalog by following ver
 proximity experiment. Actor health/life-state network fields are captured
 for trigger validation. HUD pagination uses minus/equal again; arrows remain
 reserved for the existing menu-position editor.
+
+0.5.2 uses a predefined type catalog based on DangoMusic's declared entity
+filters, with name-based settings available before entities spawn. The proximity
+experiment now creates a per-entity distance mask around target entities;
+viewer position is not used.

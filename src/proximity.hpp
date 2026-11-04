@@ -2,6 +2,7 @@
 #include "entity_selection.hpp"
 #include "aim_selection.hpp"
 #include <set>
+#include <memory>
 namespace visual {
 struct ProximitySettings {
  bool enabled=false,includeCommon=false;
@@ -27,24 +28,14 @@ template<class Json> void writeProximity(Json& j,const ProximitySettings& settin
  j["proximityStretch"]={{"enabled",settings.enabled},{"includeCommon",settings.includeCommon},
   {"triggerClassId",settings.triggerClassId},{"triggerName",settings.triggerName},{"radius",normalizedRadius(settings.radius)}};
 }
-struct ProximityResult {bool active=false;float nearest=-1;};
-inline ProximityResult evaluateProximity(const dango::inventory::Frame& frame,const dango::GameCameraFrame& camera,
-                                        const ProximitySettings& settings,std::uint64_t tick){
- ProximityResult result;dango::CameraPose eye;
- if(!settings.enabled||!dango::usableCamera(camera,tick)||!dango::cameraPose(camera,eye)||
-    frame.epoch!=camera.epoch||!frame.tick||tick<frame.tick||tick-frame.tick>250)return result;
- for(const auto& r:frame.records){
-  bool matches=settings.triggerClassId>=0?r.classId==settings.triggerClassId:r.className==settings.triggerName;
-  if(!matches)continue;
-  auto group=groupForName(r.className);bool actor=group==EntityGroup::Special||group==EntityGroup::Survivors||r.className=="Infected";
-  if(actor&&((r.health&&*r.health<=0)||(r.lifeState&&*r.lifeState!=0)))continue;
-  auto pose=dango::follow::pose(frame,r.handle);if(!pose.ready)continue;
-  float distance=dango::length(dango::scene::point(pose.matrix,{})-eye.eye);
-  if(!std::isfinite(distance))continue;
-  if(result.nearest<0||distance<result.nearest)result.nearest=distance;
- }
- result.active=result.nearest>=0&&result.nearest<=float(normalizedRadius(settings.radius));return result;
-}
+// Immutable per-snapshot mask; membership is by full handle, never by viewer distance.
+struct ProximityResult {
+ bool active=false;
+ std::uint32_t epoch=0;std::uint64_t tick=0;
+ unsigned sources=0;
+ std::set<std::uint32_t> inRange;
+ std::shared_ptr<const ProximitySettings> options;
+};
 using HeldHandles=std::set<std::uint32_t>;
 inline HeldHandles experimentExcludedHandles(const dango::inventory::Frame& frame,bool includeCommon){
  HeldHandles held;
@@ -60,11 +51,35 @@ inline HeldHandles experimentExcludedHandles(const dango::inventory::Frame& fram
  }
  return held;
 }
+inline ProximityResult evaluateProximity(const dango::inventory::Frame& frame,const dango::GameCameraFrame& camera,
+                                        const ProximitySettings& settings,std::uint64_t tick){
+ ProximityResult result;result.epoch=frame.epoch;result.tick=frame.tick;
+ if(!settings.enabled||!camera.active||frame.epoch!=camera.epoch||!frame.tick||tick<frame.tick||tick-frame.tick>250)return result;
+ std::vector<dango::Vec3> centers;
+ for(const auto& r:frame.records){
+  bool matches=settings.triggerClassId>=0?r.classId==settings.triggerClassId:r.className==settings.triggerName;
+  if(!matches)continue;
+  auto group=groupForName(r.className);bool actor=group==EntityGroup::Special||group==EntityGroup::Survivors||r.className=="Infected";
+  if(actor&&((r.health&&*r.health<=0)||(r.lifeState&&*r.lifeState!=0)))continue;
+  auto pose=dango::follow::pose(frame,r.handle);if(pose.ready)centers.push_back(dango::scene::point(pose.matrix,{}));
+ }
+ result.sources=unsigned(centers.size());if(centers.empty())return result;
+ const auto excluded=experimentExcludedHandles(frame,settings.includeCommon);
+ const double radius=normalizedRadius(settings.radius),radiusSquared=radius*radius;
+ for(const auto& r:frame.records){
+  if(!eligibleRecord(r)||r.classId<0||r.classId>4096||excluded.count(r.handle))continue;
+  auto pose=dango::follow::pose(frame,r.handle);if(!pose.ready)continue;
+  auto point=dango::scene::point(pose.matrix,{});
+  for(auto center:centers){auto delta=point-center;
+   double squared=double(delta.x)*delta.x+double(delta.y)*delta.y+double(delta.z)*delta.z;
+   if(std::isfinite(squared)&&squared<=radiusSquared){result.inRange.insert(r.handle);break;}
+  }
+ }
+ result.active=!result.inRange.empty();return result;
+}
 inline bool selectedForEffect(const dango::inventory::Record& r,const EntitySelection& selection,
-                              const ProximitySettings& proximity,bool active,const HeldHandles& held){
- if(!active)return selection.selected(r.classId,r.className);
- if(r.classId<0||r.classId>4096||handModelClass(r.className)||held.count(r.handle))return false;
- if(r.className=="Infected"&&!proximity.includeCommon)return false;
- return true;
+                              const ProximitySettings& proximity,const ProximityResult& targets){
+ if(!proximity.enabled)return selection.selected(r.classId,r.className);
+ return targets.inRange.count(r.handle)!=0;
 }
 } // namespace visual

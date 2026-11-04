@@ -27,19 +27,24 @@ void onFrame(const dango::GameCameraFrame& frame){
  source_entities::browseRequested=visual::hudruntime::hud.isOpen()||(requested&&(selection->anyEnabled()||proximity->enabled));
  source_entities::onFrame(frame);
  auto inventory=std::atomic_load(&source_entities::snapshot);
- auto proximityResult=visual::evaluateProximity(*inventory,frame,*proximity,frame.tick);
- bool experimental=requested&&proximityResult.active;
- bool wasNear=visual::render::proximityActive.exchange(experimental,std::memory_order_relaxed);
- if(experimental&&!wasNear)visual::render::startedAt=GetTickCount64();
- visual::render::proximityDistance.store(proximityResult.nearest,std::memory_order_relaxed);
  static std::shared_ptr<const source_entities::Frame> previous;
  static std::shared_ptr<const visual::EntitySelection> previousSelection;
  static std::shared_ptr<const visual::ProximitySettings> previousProximity;
- static bool previousActive=false,selected=false;
- if(previous!=inventory||previousSelection!=selection||previousProximity!=proximity||previousActive!=experimental){
-  previous=inventory;previousSelection=selection;previousProximity=proximity;previousActive=experimental;selected=false;
-  const auto held=experimental?visual::experimentExcludedHandles(*inventory,proximity->includeCommon):visual::HeldHandles{};
-  for(const auto& r:inventory->records)if(visual::eligibleRecord(r)&&visual::selectedForEffect(r,*selection,*proximity,experimental,held)){selected=true;break;}
+ static std::uint32_t previousEpoch=0;static bool previousGameActive=false,selected=false;
+ if(previous!=inventory||previousProximity!=proximity||previousEpoch!=frame.epoch||previousGameActive!=bool(frame.active)){
+  auto targets=std::make_shared<visual::ProximityResult>(visual::evaluateProximity(*inventory,frame,*proximity,frame.tick));
+  targets->options=proximity;
+  std::atomic_store(&visual::render::proximityTargets,std::shared_ptr<const visual::ProximityResult>(std::move(targets)));
+ }
+ auto targets=std::atomic_load(&visual::render::proximityTargets);
+ bool experimental=requested&&frame.active&&targets->epoch==frame.epoch&&frame.tick>=targets->tick&&frame.tick-targets->tick<=250&&proximity->enabled&&targets->active;
+ bool wasSpatial=visual::render::proximityActive.exchange(experimental,std::memory_order_relaxed);
+ if(experimental&&!wasSpatial)visual::render::startedAt=GetTickCount64();
+ visual::render::proximityCount.store(unsigned(targets->inRange.size()),std::memory_order_relaxed);
+ visual::render::proximitySources.store(targets->sources,std::memory_order_relaxed);
+ if(previous!=inventory||previousSelection!=selection||previousProximity!=proximity||previousEpoch!=frame.epoch||previousGameActive!=bool(frame.active)){
+  previous=inventory;previousSelection=selection;previousProximity=proximity;previousEpoch=frame.epoch;previousGameActive=bool(frame.active);selected=false;
+  for(const auto& r:inventory->records)if(visual::eligibleRecord(r)&&visual::selectedForEffect(r,*selection,*proximity,*targets)){selected=true;break;}
  }
  bool active=requested&&frame.active&&inventory->epoch==frame.epoch&&frame.tick>=inventory->tick&&frame.tick-inventory->tick<=250&&selected;
  visual::render::enabled=active;
@@ -65,7 +70,7 @@ bool entityAction(uintptr_t id){
   return true;
  }
  if(id==126){entityMenus.aimed={};return true;}
- if((id>=180&&id<=186)||id==190||id==191||(id>=0x20000&&id<=0x21000)){
+ if((id>=180&&id<=186)||id==190||id==191||(id>=0x20000&&id<=0x21000)||(id>=0x40000&&id<0x40000+visual::BuiltinEntityClassCount)){
   auto settings=*std::atomic_load(&visual::render::proximity);
   if(id==180){settings.enabled=!settings.enabled;if(settings.enabled&&!requested)toggle();}
   if(id>=181&&id<=184){int delta=id==181?-100:id==182?100:id==183?-10:10;settings.radius=unsigned(std::clamp(int(settings.radius)+delta,100,5000));}
@@ -74,7 +79,17 @@ bool entityAction(uintptr_t id){
   if(id==190){settings.triggerClassId=-1;settings.triggerName="Tank";}
   if(id==191){if(entityMenus.aimed.classId<0)return true;settings.triggerClassId=entityMenus.aimed.classId;settings.triggerName=entityMenus.aimed.name;}
   if(id>=0x20000&&id<=0x21000){int key=int(id-0x20000);auto label=entityMenus.known.find(key);if(label==entityMenus.known.end())return true;settings.triggerClassId=key;settings.triggerName=label->second;}
+  if(id>=0x40000&&id<0x40000+visual::BuiltinEntityClassCount){settings.triggerClassId=-1;settings.triggerName=visual::BuiltinEntityClasses[id-0x40000];}
   storeProximity(std::move(settings));return true;
+ }
+ if(id>=0x30000&&id<0x30000+visual::BuiltinEntityClassCount){
+  auto selection=*std::atomic_load(&visual::render::selection);
+  for(const auto& c:entityMenus.known)selection.names[c.first]=c.second;
+  std::string name=visual::BuiltinEntityClasses[id-0x30000];
+  auto known=std::find_if(entityMenus.known.begin(),entityMenus.known.end(),[&](const auto& c){return c.second==name;});
+  bool current=known==entityMenus.known.end()?selection.selectedType(name):selection.selected(known->first,name);
+  selection.setType(name,!current);std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(std::move(selection)));
+  saveMessage=u8"实体类型设置未保存";return true;
  }
  bool aimed=id==124||id==125;
  if(aimed&&entityMenus.aimed.classId<0)return true;
@@ -90,7 +105,7 @@ bool entityAction(uintptr_t id){
  }else{
   int classId=aimed?entityMenus.aimed.classId:int(id-0x10000);auto label=entityMenus.known.find(classId);
   if(label==entityMenus.known.end())return true;
-  selection.classes[classId]=aimed?id==124:!selection.selected(classId,label->second);selection.names[classId]=label->second;
+  bool value=aimed?id==124:!selection.selected(classId,label->second);selection.setClass(classId,label->second,value);
  }
  std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(std::move(selection)));
  saveMessage=u8"实体类别设置未保存";return true;
@@ -100,9 +115,9 @@ std::string buildMenu(uintptr_t id){
  auto f=std::atomic_load(&source_entities::snapshot);
  auto selection=std::atomic_load(&visual::render::selection);entityMenus.observe(*f,*selection);
  if(id==103)return entityMenus.root();
- if(id==104)return entityMenus.recognition(*selection,visual::render::proximityActive.load());
+ if(id==104)return entityMenus.recognition(*selection,std::atomic_load(&visual::render::proximity)->enabled);
  if(id>=1000&&id<1000+visual::EntityGroupCount)return entityMenus.group(visual::EntityGroup(id-1000),*selection);
- if(id==108)return visual::proximityMenu(*std::atomic_load(&visual::render::proximity),visual::render::proximityActive.load(),visual::render::proximityDistance.load());
+ if(id==108)return visual::proximityMenu(*std::atomic_load(&visual::render::proximity),visual::render::proximityActive.load(),visual::render::proximityCount.load(),visual::render::proximitySources.load());
  if(id==109)return entityMenus.triggers();
  if(id==107)return "\"性能与兼容\" {"+
   item(u8"骨骼上限："+std::to_string(visual::render::boneLimit.load())+u8"（切换128/256）",118)+
@@ -118,7 +133,7 @@ std::string buildMenu(uintptr_t id){
  if(id==24){std::string body=row(visual::render::status.load());body+=row("Camera: "+std::string(source_camera::status()));body+=row("Entities: "+f->status);body+=row("Identify: "+std::string(visual::render::identifyReason.load()));body+=row("Pose: "+std::string(visual::render::poseReason.load()));body+=row("Engine/Studio: "+std::to_string(visual::render::engineCalls.load())+" / "+std::to_string(visual::render::studioCalls.load()));body+=row("Matched/Drawn: "+std::to_string(visual::render::identified.load())+" / "+std::to_string(visual::render::drawn.load()));body+=row(visual::diagnostics::writable?u8"日志已写入 L4D2Visual/L4D2Visual.log":u8"日志写入失败，请检查目录权限");return "\"L4D2Visual · 诊断\" {"+body+"}";}
  auto proximity=std::atomic_load(&visual::render::proximity);
  std::string experimental=!proximity->enabled?u8"范围实验：关":visual::render::proximityActive.load()?u8"范围实验：已触发":u8"范围实验：待机";
- return "\"L4D2Visual 0.5.1-test\" {"+item(requested?u8"拉伸总开关：开":u8"拉伸总开关：关",100)+
+ return "\"L4D2Visual 0.5.2-test\" {"+item(requested?u8"拉伸总开关：开":u8"拉伸总开关：关",100)+
  item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
  item(experimental,108)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+item(u8"接口与日志诊断",24)+"}";
 }
@@ -134,7 +149,7 @@ class Plugin final:public IL4NPlugin {
   std::string previous;ULONGLONG last=0;
   while(!stopping){
    if(saveRequested.exchange(false)){try{dango::hud::Appearance a;{std::lock_guard<std::mutex> l(appearanceMutex);a=appearance;}auto anim=std::atomic_load(&visual::render::animation);nlohmann::json j={{"preset",a.preset},{"step",a.step},{"opacity",a.opacity},{"font",a.font},{"x",a.x},{"y",a.y},{"f10",a.f10},{"centerY",a.centerY}};visual::writeAnimationSettings(j,*anim);visual::writeBoneLimit(j,visual::render::boneLimit.load());visual::writeRenderCompatibility(j,visual::render::compatibility.load());visual::writeEntitySelection(j,*std::atomic_load(&visual::render::selection));visual::writeProximity(j,*std::atomic_load(&visual::render::proximity));auto path=visual::diagnostics::path.parent_path()/L"hud.json";auto tmp=path;tmp+=L".tmp";{std::ofstream o(tmp);o<<j.dump(2);o.flush();if(!o)throw std::runtime_error("HUD settings write failed");}if(!MoveFileExW(tmp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("HUD settings rename failed");saveMessage=u8"菜单设置已保存";note("HUD appearance saved");}catch(const std::exception& e){saveMessage=u8"保存失败，请查看日志";note(e.what());}}
-   auto f=std::atomic_load(&source_entities::snapshot);std::ostringstream state;state<<"enabled="<<requested<<" render="<<visual::render::status.load()<<" camera="<<source_camera::status()<<" entities="<<f->status<<" records="<<f->records.size()<<" modelLookup="<<f->modelLookup<<" engine="<<visual::render::engineCalls<<" studio="<<visual::render::studioCalls<<" matched="<<visual::render::identified<<" drawn="<<visual::render::drawn<<" identify="<<visual::render::identifyReason.load()<<" pose="<<visual::render::poseReason.load()<<" proximity="<<visual::render::proximityActive.load()<<" proximityDistance="<<visual::render::proximityDistance.load()<<" compatibility="<<visual::render::compatibility.load()<<" boneLimit="<<visual::render::boneLimit.load()<<" fastpath="<<visual::modelpath::current<<" periodMs="<<std::atomic_load(&visual::render::animation)->periodMs<<" HUD="<<visual::hudruntime::paintStatus.load()<<" presents="<<visual::hudruntime::presents<<" hudFrames="<<visual::hudruntime::frames;
+   auto f=std::atomic_load(&source_entities::snapshot);std::ostringstream state;state<<"enabled="<<requested<<" render="<<visual::render::status.load()<<" camera="<<source_camera::status()<<" entities="<<f->status<<" records="<<f->records.size()<<" modelLookup="<<f->modelLookup<<" engine="<<visual::render::engineCalls<<" studio="<<visual::render::studioCalls<<" matched="<<visual::render::identified<<" drawn="<<visual::render::drawn<<" identify="<<visual::render::identifyReason.load()<<" pose="<<visual::render::poseReason.load()<<" proximity="<<visual::render::proximityActive.load()<<" proximityCount="<<visual::render::proximityCount.load()<<" proximitySources="<<visual::render::proximitySources.load()<<" compatibility="<<visual::render::compatibility.load()<<" boneLimit="<<visual::render::boneLimit.load()<<" fastpath="<<visual::modelpath::current<<" periodMs="<<std::atomic_load(&visual::render::animation)->periodMs<<" HUD="<<visual::hudruntime::paintStatus.load()<<" presents="<<visual::hudruntime::presents<<" hudFrames="<<visual::hudruntime::frames;
    auto now=GetTickCount64();if(now-last>=2000 && (requested||state.str()!=previous)){note(state.str());for(const auto& check:f->bindingChecks)note("Entity binding: "+check);std::map<std::string,unsigned> inventory;
     for(const auto& r:f->records)if(visual::eligibleRecord(r))++inventory[r.className];
     std::string classes;for(const auto& pair:inventory)classes+=" "+pair.first+"="+std::to_string(pair.second);
@@ -144,15 +159,15 @@ class Plugin final:public IL4NPlugin {
   }
  }
 public:
- Plugin(){note("=== L4D2Visual 0.5.1-test startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);
+ Plugin(){note("=== L4D2Visual 0.5.2-test startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);
   try{std::ifstream file(visual::diagnostics::path.parent_path()/L"hud.json");if(file){nlohmann::json j;file>>j;std::atomic_store(&visual::render::proximity,std::make_shared<const visual::ProximitySettings>(visual::readProximity(j)));visual::render::compatibility=visual::readRenderCompatibility(j);std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(visual::readEntitySelection(j)));visual::render::boneLimit=visual::readBoneLimit(j);std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(visual::readAnimationSettings(j)));appearance.preset=std::min(3u,j.value("preset",0u));appearance.step=std::clamp(j.value("step",8u),1u,64u);appearance.opacity=std::clamp(j.value("opacity",.48f),.05f,1.f);appearance.font=std::clamp(j.value("font",22.f),12.f,48.f);appearance.x=j.value("x",8.f);appearance.y=j.value("y",14.f);appearance.f10=j.value("f10",false);appearance.centerY=j.value("centerY",true);visual::hudruntime::hud.loadAppearance(appearance);}}catch(const std::exception& e){note(std::string("HUD settings load failed: ")+e.what());}
   worker=std::thread([this]{diagnostics();});}
  const char* GetName()override{return "L4D2Visual";}
- const char* GetVersion()override{return "0.5.1-test";}
+ const char* GetVersion()override{return "0.5.2-test";}
  void OnModuleLoaded(const char* name,uintptr_t handle)override{if(!name)return;std::string n(name);if(n=="client"||n=="client.dll")source_camera::clientModule=reinterpret_cast<HMODULE>(handle);if(n=="engine"||n=="engine.dll")source_camera::engineModule=reinterpret_cast<HMODULE>(handle);note("Module loaded: "+n);connect();}
  void OnGameLaunch()override{note("OnGameLaunch");connect();}
  void OnD3DDeviceCreated(void* d,bool dxvk)override{note(std::string("OnD3DDeviceCreated dxvk=")+(dxvk?"yes":"no"));visual::hudruntime::created(static_cast<IDirect3DDevice9*>(d));}
- const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.5.1-test";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开拉伸控制面板\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
+ const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.5.2-test";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开拉伸控制面板\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
  void stop(){stopping=true;if(worker.joinable())worker.join();requested=false;visual::modelpath::apply(false);visual::hudruntime::stop();visual::render::stop();source_entities::browseRequested=false;source_camera::frameListener=nullptr;source_camera::stop();}
  ~Plugin()override{stop();}
 };
