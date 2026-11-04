@@ -1,4 +1,6 @@
-# L4D2 Visual Stretch · 安装包下载
+# L4D2 Visual Effects · 安装包下载
+
+求生之路 2 视觉效果项目；当前版本提供特殊感染者拉伸效果。
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-visual/tree/main)**。
 
