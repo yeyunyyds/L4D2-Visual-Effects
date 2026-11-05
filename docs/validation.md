@@ -1,3 +1,10 @@
+# 0.7.0-test：喷漆裁剪、交互与联机实验
+
+- 十二组 ASan/UBSan 本地回归通过，新增 / 更新近面裁剪、尺寸迁移、同文件即时大小、FIFO、SteamID白名单、几何和分片边界测试。
+- Windows x86 MinGW交叉编译通过；新增 WIC PNG 编码、CryptoAPI SHA-256、Steam P2P 适配。
+- 0.6.0-test 本地基础效果由用户确认可用；0.7.0 的游戏显示、T输入和真实双 Steam 账号收发尚未验收。
+- 详细边界与双客户端步骤见 [自定义喷漆说明](wall-pictures.md)。
+
 # 0.2.0-test 验证记录
 
 已执行：

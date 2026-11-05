@@ -1,6 +1,8 @@
 #pragma once
 #include "image_assets.hpp"
 #include "image_trace.hpp"
+#include "image_projection.hpp"
+#include "spray_bridge.hpp"
 namespace visual::pictures {
 struct Frame {std::uint32_t epoch=0;std::uint64_t tick=0;std::vector<Placement> items;std::string message=u8"图片挂画关闭";};
 inline std::shared_ptr<const Frame> sceneFrame=std::make_shared<const Frame>();
@@ -13,11 +15,14 @@ inline void onFrame(const dango::GameCameraFrame& camera)noexcept{
  static Scene scene;static bool wasEnabled=false;static std::uint64_t consumed=0,nextVisibility=0;static unsigned cursor=0;static std::string message=u8"图片挂画关闭";
  static std::shared_ptr<const Settings> previous;bool changed=false;
  try{
-  auto settings=std::atomic_load(&options);if(previous!=settings){previous=settings;changed=true;}
+  auto settings=std::atomic_load(&options);
   if(scene.epoch!=camera.epoch){scene.observe(camera.epoch);picturetrace::reset();nextVisibility=0;changed=true;}
+  if(previous!=settings){previous=settings;scene.limit(settings->maximum);if(settings->enabled&&camera.active&&picturetrace::object&&!picturetrace::faulted){unsigned pending=0;for(const auto& p:scene.items)if(!p.owner&&std::abs(std::max(p.panel.width,p.panel.height)-float(effectiveSize(*settings,p.key)))>.001f)++pending;
+   auto resized=scene.resize(*settings,picturetrace::cast);if(resized<pending)message=u8"部分图片扩大后超出墙面，保留原大小";else if(resized)message=u8"墙上图片大小已更新";}nextVisibility=0;changed=true;}
   bool clear=clearRequested.exchange(false),undo=undoRequested.exchange(false);
-  if(clear){scene.clear();message=u8"挂画已清空";changed=true;}
+  if(clear){scene.items.erase(std::remove_if(scene.items.begin(),scene.items.end(),[](const auto& p){return !p.owner;}),scene.items.end());message=u8"挂画已清空";changed=true;}
   if(undo){scene.undo();message=u8"已删除最后一张";changed=true;}
+  if(!std::atomic_load(&spraysync::options)->enabled){auto size=scene.items.size();scene.items.erase(std::remove_if(scene.items.begin(),scene.items.end(),[](const auto& p){return p.owner!=0;}),scene.items.end());changed|=size!=scene.items.size();}
   auto request=std::atomic_load(&placeRequest);
   if(!settings->enabled||!camera.active){
    if(wasEnabled||!scene.items.empty()){scene.clear();picturetrace::reset();changed=true;}
@@ -28,23 +33,38 @@ inline void onFrame(const dango::GameCameraFrame& camera)noexcept{
    dango::CameraPose eye;
    if(dango::cameraPose(camera,eye)){
     if(!picturetrace::object&&!picturetrace::faulted){if(!picturetrace::connect()){picturetrace::faulted=true;message=u8"墙面接口校验失败，请查看日志";source_camera::log("Picture TraceRay profile mismatch; no trace dispatched");changed=true;}}
+    if(!picturetrace::faulted){for(auto& batch:spraysync::take()){
+     if(batch.epoch!=camera.epoch)continue;
+     std::vector<Placement> accepted;
+     if(std::atomic_load(&spraysync::options)->enabled)for(auto& p:batch.items){
+      auto old=std::find_if(scene.items.begin(),scene.items.end(),[&](const auto& item){return item.owner==p.owner&&item.id==p.id;});
+      bool same=old!=scene.items.end()&&old->key==p.key&&old->opacity==p.opacity&&std::abs(old->panel.width-p.panel.width)<.001f&&std::abs(old->panel.height-p.panel.height)<.001f&&dango::length(old->panel.center-p.panel.center)<.001f&&dango::length(old->panel.right-p.panel.right)<.001f&&dango::length(old->panel.up-p.panel.up)<.001f;
+      if(same)accepted.push_back(*old);else if(dango::trace::supported(p.panel,picturetrace::cast))accepted.push_back(std::move(p));
+     }
+     scene.items.erase(std::remove_if(scene.items.begin(),scene.items.end(),[&](const auto& p){return p.owner==batch.owner;}),scene.items.end());
+     for(auto& p:accepted)scene.items.push_back(std::move(p));scene.limit(settings->maximum);nextVisibility=0;changed=true;
+    }}
     if(request->tick!=consumed){
      consumed=request->tick;changed=true;auto decoded=std::atomic_load(&assets);auto pixels=decoded->decoded.find(request->settings.selected);
      if(request->epoch!=camera.epoch||camera.tick<request->tick||camera.tick-request->tick>2000)message=u8"放置请求已过期，请重新对准墙面";
      else if(picturetrace::faulted)message=u8"墙面接口不可用，请关闭后重开";
      else if(!request->settings.enabled||pixels==decoded->decoded.end())message=u8"图片尚未加载，请选择图片并稍等";
-     else if(scene.items.size()>=MaxPictures)message=u8"挂画已达8张，请先删除";
      else{
       dango::trace::Result hit;
       if(picturetrace::cast(eye.eye,eye.eye+eye.forward*1024,hit)&&dango::trace::wallHit(hit)&&
          scene.place(request->settings,pixels->second->width,pixels->second->height,hit.end,hit.plane.normal,picturetrace::cast)){
-       message=u8"图片已放置（仅本机可见）";nextVisibility=0;source_camera::log("Local wall picture placed: "+request->settings.selected+" count="+std::to_string(scene.items.size()));
+       message=u8"图片已放置";nextVisibility=0;
+       if(settings->autoNext&&settings->selected==request->settings.selected&&!decoded->files.empty()){
+        auto found=std::find(decoded->files.begin(),decoded->files.end(),settings->selected);std::size_t index=found==decoded->files.end()?0:(std::size_t(found-decoded->files.begin())+1)%decoded->files.size();
+        auto advanced=*settings;advanced.selected=decoded->files[index];auto expected=settings;
+        std::atomic_compare_exchange_strong(&options,&expected,std::make_shared<const Settings>(std::move(advanced)));
+       }source_camera::log("Local wall picture placed: "+request->settings.selected+" count="+std::to_string(scene.items.size()));
       }else message=u8"未找到足够平整的墙面，请调整位置或缩小图片";
      }
     }
     if(!picturetrace::faulted&&camera.tick>=nextVisibility&&!scene.items.empty()){
-     nextVisibility=camera.tick+50;unsigned count=std::min<unsigned>(2,unsigned(scene.items.size()));
-     for(unsigned i=0;i<count;++i){auto& item=scene.items[cursor++%scene.items.size()];item.visible=dango::trace::visible(item.panel,eye.eye,picturetrace::cast);item.visibleTick=camera.tick;}
+     nextVisibility=camera.tick+50;unsigned count=std::min<unsigned>(std::max(2u,unsigned((scene.items.size()+5)/6)),unsigned(scene.items.size()));
+     for(unsigned i=0;i<count;++i){auto& item=scene.items[cursor++%scene.items.size()];item.visible=pictureVisible(item.panel,eye.eye,picturetrace::cast);item.visibleTick=camera.tick;}
      changed=true;
     }
     if(picturetrace::faulted){

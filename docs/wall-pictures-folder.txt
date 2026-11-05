@@ -1,7 +1,6 @@
-L4D2 Visual Effects - local wall pictures
-Put PNG, JPG/JPEG or BMP files in this folder.
-In game: Pictures -> Refresh folder -> Enable -> Select picture -> Aim at a flat wall -> Place.
-Only this client sees the pictures. Nothing is uploaded to a game server.
-Up to 8 pictures per map. Map changes and disabling this module clear the placed pictures.
-Maximum decoded image edge: 2048 pixels (larger files are scaled down).
-Source files: at most 32 MiB and 32 megapixels. CPU/GPU caches: 64 MiB each.
+L4D2Visual 自定义喷漆
+
+将 PNG、JPG/JPEG 或 BMP 放到此目录，进入 自定义喷漆 → 刷新目录 → 选择图片。
+默认关闭；默认最多两张，超出时删除最早图片。T 键、自动切图与联机均默认关闭。
+尺寸默认60，支持即时调整已喷图片及按文件保存大小。文件名 p2p_ 前缀保留。
+联机配置和说明请阅读安装包 README.md 与 source/docs/wall-pictures.md。

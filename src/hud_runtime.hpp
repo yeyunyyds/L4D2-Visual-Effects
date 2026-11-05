@@ -5,6 +5,7 @@
 #include "dango/native_hud.hpp"
 #include "diagnostics.hpp"
 #include "image_renderer.hpp"
+#include "image_keys.hpp"
 namespace visual::hudruntime {
 inline dango::hud::NativeHud hud;
 struct Hook{void** table;unsigned slot;void* before;void* after;};
@@ -28,7 +29,7 @@ inline void attach(void* object,unsigned slot,void* after){if(!object)return;aut
 template<class Present> HRESULT paint(IDirect3DDevice9* device,IDirect3DSwapChain9* chain,Present present){
  std::lock_guard<std::recursive_mutex> lock(paintMutex);
  if(depth++) {auto hr=present();--depth;return hr;}
- ++presents;picturerender::maintain(device);hud.pollHotkey(device);if(!hud.isOpen()&&!picturerender::needed())releaseBackup();paintStatus=hud.isOpen()?"HUD requested":"HUD closed";
+ ++presents;picturerender::maintain(device);hud.pollHotkey(device);picturekeys::poll(device,hud.isOpen());if(!hud.isOpen()&&!picturerender::needed())releaseBackup();paintStatus=hud.isOpen()?"HUD requested":"HUD closed";
  IDirect3DSurface9* back=nullptr;IDirect3DSurface9* backup=nullptr;D3DSURFACE_DESC desc{};
  bool ready=(hud.isOpen()||picturerender::needed()) && SUCCEEDED(chain?chain->GetBackBuffer(0,D3DBACKBUFFER_TYPE_MONO,&back):device->GetBackBuffer(0,0,D3DBACKBUFFER_TYPE_MONO,&back));
  if(ready)ready=SUCCEEDED(back->GetDesc(&desc))&&acquireBackup(device,desc,&backup)&&SUCCEEDED(device->StretchRect(back,nullptr,backup,nullptr,D3DTEXF_NONE));
@@ -57,5 +58,5 @@ inline HRESULT WINAPI reset(IDirect3DDevice9* d,D3DPRESENT_PARAMETERS* p){auto f
 inline HRESULT WINAPI presentEx(IDirect3DDevice9Ex* d,const RECT* s,const RECT* t,HWND w,const RGNDATA* r,DWORD flags){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9Ex*,const RECT*,const RECT*,HWND,const RGNDATA*,DWORD)>(original(d,121));return paint(d,nullptr,[&]{return f(d,s,t,w,r,flags);});}
 inline HRESULT WINAPI resetEx(IDirect3DDevice9Ex* d,D3DPRESENT_PARAMETERS* p,D3DDISPLAYMODEEX* mode){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9Ex*,D3DPRESENT_PARAMETERS*,D3DDISPLAYMODEEX*)>(original(d,132));std::lock_guard<std::recursive_mutex> lock(paintMutex);releaseBackup();picturerender::release();hud.beforeReset();auto hr=f(d,p,mode);hud.afterReset(hr);return hr;}
 inline void created(IDirect3DDevice9* d){if(!d)return;std::lock_guard<std::recursive_mutex> lock(paintMutex);releaseBackup();picturerender::release();hud.release();attach(d,17,reinterpret_cast<void*>(&devicePresent));attach(d,16,reinterpret_cast<void*>(&reset));attach(d,14,reinterpret_cast<void*>(&getChain));attach(d,13,reinterpret_cast<void*>(&addChain));IDirect3DSwapChain9* c=nullptr;if(SUCCEEDED(d->GetSwapChain(0,&c))){attachChain(c);c->Release();}IDirect3DDevice9Ex* ex=nullptr;if(SUCCEEDED(d->QueryInterface(__uuidof(IDirect3DDevice9Ex),reinterpret_cast<void**>(&ex)))){attach(ex,121,reinterpret_cast<void*>(&presentEx));attach(ex,132,reinterpret_cast<void*>(&resetEx));ex->Release();}diagnostics::write("D3D9 HUD Present/Reset callbacks installed");}
-inline void stop(){std::lock_guard<std::recursive_mutex> paintLock(paintMutex);releaseBackup();picturerender::release();hud.shutdown();std::lock_guard<std::mutex> lock(hookMutex);for(auto it=hooks.rbegin();it!=hooks.rend();++it){DWORD old{};if(VirtualProtect(it->table+it->slot,4,PAGE_READWRITE,&old)){InterlockedCompareExchangePointer(it->table+it->slot,it->before,it->after);DWORD ignored{};VirtualProtect(it->table+it->slot,4,old,&ignored);}}hooks.clear();}
+inline void stop(){picturekeys::stop();std::lock_guard<std::recursive_mutex> paintLock(paintMutex);releaseBackup();picturerender::release();hud.shutdown();std::lock_guard<std::mutex> lock(hookMutex);for(auto it=hooks.rbegin();it!=hooks.rend();++it){DWORD old{};if(VirtualProtect(it->table+it->slot,4,PAGE_READWRITE,&old)){InterlockedCompareExchangePointer(it->table+it->slot,it->before,it->after);DWORD ignored{};VirtualProtect(it->table+it->slot,4,old,&ignored);}}hooks.clear();}
 }

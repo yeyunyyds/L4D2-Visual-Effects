@@ -71,3 +71,10 @@ from LDBDangoMusic main commit 54ed4046e3a5dc9ecc762b133714fea8090d432c
 TraceRay binding, world-only filter, and result checks.
 Image decoding uses the Windows Imaging Component system API; no third-party
 image decoder or game assets are bundled.
+
+Steam P2P transport in src/spray_steam.hpp is adapted from LDBDangoMusic
+experiment/steam-progress-sync commit ca9f3bcc70a2f0ea982526bf22de31d42c871100,
+src/sync/steam_transport.hpp (GPL-3.0). It preserves the borrowed game Steam
+context and explicit x86 CSteamID return adapter. Visual Effects uses channel
+45632 and its own versioned spray protocol, not the music synchronization wire
+format. PNG encoding and SHA-256 use Windows WIC and CryptoAPI.

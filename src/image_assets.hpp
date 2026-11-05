@@ -59,7 +59,7 @@ inline void pollAssets(){
    else{
     std::filesystem::directory_iterator it(folder,error),end;
     for(unsigned visited=0;it!=end&&!error&&visited<1024;it.increment(error),++visited){
-     if(it->is_regular_file(error)){auto key=it->path().filename().u8string();if(imageKey(key))state.files.push_back(std::move(key));}
+     if(it->is_regular_file(error)){auto key=it->path().filename().u8string();if(imageKey(key)&&key.rfind("p2p_",0)!=0)state.files.push_back(std::move(key));}
     }
     std::sort(state.files.begin(),state.files.end());if(state.files.size()>128)state.files.resize(128);
     state.message=error?u8"图片目录读取不完整":u8"图片目录已刷新";changed=true;
@@ -72,8 +72,9 @@ inline void pollAssets(){
   std::size_t used=0;for(const auto& p:state.decoded)used+=p.second->bgra.size();
   for(const auto& key:needed){
    if(state.decoded.count(key)||state.errors.count(key))continue;
-   if(std::find(state.files.begin(),state.files.end(),key)==state.files.end()){state.errors[key]=u8"未找到图片，请刷新目录";changed=true;continue;}
-   auto path=folder/std::filesystem::u8path(key);std::error_code error;auto bytes=std::filesystem::file_size(path,error);
+   bool remote=key.size()==72&&key.rfind("p2p_",0)==0&&key.substr(68)==".png"&&std::all_of(key.begin()+4,key.begin()+68,[](char c){return (c>='0'&&c<='9')||(c>='a'&&c<='f');});
+   if(!remote&&std::find(state.files.begin(),state.files.end(),key)==state.files.end()){state.errors[key]=u8"未找到图片，请刷新目录";changed=true;continue;}
+   auto path=(remote?folder.parent_path()/L"spray-cache":folder)/std::filesystem::u8path(key);std::error_code error;auto bytes=std::filesystem::file_size(path,error);
    if(error||bytes>32u*1024u*1024u){state.errors[key]=u8"图片读取失败或文件超过32MB";changed=true;continue;}
    auto pixels=decode(path,++revision);
    if(!pixels){state.errors[key]=u8"图片解码失败或尺寸过大";source_camera::log("Wall picture decode failed: "+key+" stage="+decodeStage);}

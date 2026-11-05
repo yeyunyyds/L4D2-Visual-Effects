@@ -2,6 +2,7 @@
 #include <d3d9.h>
 #include <mutex>
 #include "image_runtime.hpp"
+#include "image_projection.hpp"
 namespace visual::picturerender {
 inline std::atomic<const char*> status{u8"挂画渲染关闭"};
 struct Texture {IDirect3DTexture9* texture=nullptr;unsigned width=0,height=0;std::uint64_t revision=0;std::size_t bytes=0;};
@@ -67,12 +68,12 @@ inline void draw(IDirect3DDevice9* device,float width,float height){
  for(const auto& item:scene->items){
   if(!pictures::visibleLease(item,*camera,now))continue;
   auto pixels=decoded->decoded.find(item.key);if(pixels==decoded->decoded.end())continue;
-  std::array<dango::wall::Vertex,4> projected;if(!dango::wall::projectPanel(item.panel,*camera,width,height,projected))continue;
+  auto projected=pictures::clippedPanel(item.panel,*camera,width,height);if(projected.empty())continue;
   auto tex=texture(device,item.key,*pixels->second,now);if(!tex)continue;
-  DWORD alpha=DWORD(item.opacity*255/10),color=alpha*0x01010101u;Vertex vertices[4];
-  for(unsigned i=0;i<4;++i){const auto& p=projected[i];vertices[i]={p.x-.5f,p.y-.5f,p.z,p.rhw,color,p.u*float(pixels->second->width)/tex->width,p.v*float(pixels->second->height)/tex->height};}
+  DWORD alpha=DWORD(item.opacity*255/10),color=alpha*0x01010101u;std::vector<Vertex> vertices(projected.size());
+  for(unsigned i=0;i<projected.size();++i){const auto& p=projected[i];vertices[i]={p.x-.5f,p.y-.5f,p.z,p.rhw,color,p.u*float(pixels->second->width)/tex->width,p.v*float(pixels->second->height)/tex->height};}
   device->SetTexture(0,tex->texture);
-  if(SUCCEEDED(device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP,2,vertices,sizeof(Vertex))))status=u8"挂画已绘制（仅本机可见）";
+  if(SUCCEEDED(device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN,UINT(vertices.size()-2),vertices.data(),sizeof(Vertex))))status=u8"图片已绘制";
  }
 }
 } // namespace visual::picturerender

@@ -15,6 +15,7 @@
 #include "aim_selection.hpp"
 #include "entity_menu.hpp"
 #include "image_menu.hpp"
+#include "spray_network.hpp"
 static_assert(sizeof(void*)==4,"L4N requires Windows x86");
 namespace {
 std::atomic<bool> requested{false},saveRequested{false};
@@ -128,7 +129,7 @@ std::string buildMenu(uintptr_t id){
  auto parameters=std::atomic_load(&visual::render::animation);
  auto f=std::atomic_load(&source_entities::snapshot);
  auto selection=std::atomic_load(&visual::render::selection);entityMenus.observe(*f,*selection);
- if(id==150||id==151||id==152)return visual::picturemenu::page(id);
+ if(id>=150&&id<=154)return visual::picturemenu::page(id);
  if(id==103)return entityMenus.root();
  if(id==104)return entityMenus.recognition(*selection,std::atomic_load(&visual::render::proximity)->enabled);
  if(id>=1000&&id<1000+visual::EntityGroupCount)return entityMenus.group(visual::EntityGroup(id-1000),*selection);
@@ -148,9 +149,11 @@ std::string buildMenu(uintptr_t id){
  if(id==24){std::string body=row(visual::render::status.load());body+=row("Camera: "+std::string(source_camera::status()));body+=row("Entities: "+f->status);body+=row("Identify: "+std::string(visual::render::identifyReason.load()));body+=row("Pose: "+std::string(visual::render::poseReason.load()));body+=row("Engine/Studio: "+std::to_string(visual::render::engineCalls.load())+" / "+std::to_string(visual::render::studioCalls.load()));body+=row("Matched/Drawn: "+std::to_string(visual::render::identified.load())+" / "+std::to_string(visual::render::drawn.load()));body+=row(visual::diagnostics::writable?u8"日志已写入 L4D2Visual/L4D2Visual.log":u8"日志写入失败，请检查目录权限");return "\"L4D2Visual · 诊断\" {"+body+"}";}
  auto proximity=std::atomic_load(&visual::render::proximity);
  std::string experimental=!proximity->enabled?u8"范围实验：关":visual::render::proximityActive.load()?u8"范围实验：已触发":u8"范围实验：待机";
- return "\"L4D2Visual 0.6.0-test\" {"+item(requested?u8"拉伸总开关：开":u8"拉伸总开关：关",100)+
- item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"图片挂画（本地）",150)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
- item(experimental,108)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+item(u8"接口与日志诊断",24)+"}";
+ if(id==300)return "\"邦友的酒\" {"+item(requested?u8"邦友的酒：开":u8"邦友的酒：关",100)+
+ item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
+ item(experimental,108)+item(u8"接口与日志诊断",24)+item(u8"保存设置",101)+"}";
+ return "\"L4D2Visual 0.7.0-test\" {"+item(requested?u8"邦友的酒[开]":u8"邦友的酒[关]",300)+
+ item(u8"自定义喷漆",150)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+"}";
 }
 void action(uintptr_t id){if(visual::picturemenu::action(id)){saveMessage=visual::picturemenu::notice.load();return;}if(entityAction(id))return;if(id==100)toggle();if(id>=110&&id<=117){auto a=*std::atomic_load(&visual::render::animation);a=visual::adjustAnimation(a,unsigned(id));std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(a));visual::render::startedAt=GetTickCount64();saveMessage=u8"动画设置未保存";}if(id==119){visual::render::compatibility=!visual::render::compatibility.load();saveMessage=u8"渲染模式未保存";}if(id==118){visual::render::boneLimit=visual::nextBoneLimit(visual::render::boneLimit.load());saveMessage=u8"骨骼上限未保存";}if(id==101){saveRequested=true;saveMessage=u8"已提交保存";}}
 void closed(){}
@@ -161,31 +164,33 @@ class Plugin final:public IL4NPlugin {
  std::atomic<bool> stopping{false};std::thread worker;
  void connect(){source_camera::logger=note;source_camera::frameListener=onFrame;if(!source_camera::clientModule)source_camera::clientModule=GetModuleHandleW(L"client.dll");if(!source_camera::engineModule)source_camera::engineModule=GetModuleHandleW(L"engine.dll");source_camera::connect();visual::render::connect();}
  void diagnostics(){
-  std::string previous;ULONGLONG last=0;
+  std::string previous;ULONGLONG last=0,nextAssets=0,nextDiagnostics=0;
   while(!stopping){
-   visual::pictures::pollAssets();
-   if(saveRequested.exchange(false)){try{dango::hud::Appearance a;{std::lock_guard<std::mutex> l(appearanceMutex);a=appearance;}auto anim=std::atomic_load(&visual::render::animation);nlohmann::json j={{"preset",a.preset},{"step",a.step},{"opacity",a.opacity},{"font",a.font},{"x",a.x},{"y",a.y},{"f10",a.f10},{"centerY",a.centerY}};visual::writeAnimationSettings(j,*anim);visual::writeBoneLimit(j,visual::render::boneLimit.load());visual::writeRenderCompatibility(j,visual::render::compatibility.load());visual::writeEntitySelection(j,*std::atomic_load(&visual::render::selection));visual::writeProximity(j,*std::atomic_load(&visual::render::proximity));visual::pictures::writeSettings(j,*std::atomic_load(&visual::pictures::options));auto path=visual::diagnostics::path.parent_path()/L"hud.json";auto tmp=path;tmp+=L".tmp";{std::ofstream o(tmp);o<<j.dump(2);o.flush();if(!o)throw std::runtime_error("HUD settings write failed");}if(!MoveFileExW(tmp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("HUD settings rename failed");saveMessage=u8"菜单设置已保存";note("HUD appearance saved");}catch(const std::exception& e){saveMessage=u8"保存失败，请查看日志";note(e.what());}}
+   if(GetTickCount64()>=nextAssets||visual::pictures::refreshRequested){visual::pictures::pollAssets();nextAssets=GetTickCount64()+200;}visual::spraysync::network.tick(GetTickCount64());
+   if(saveRequested.exchange(false)){try{dango::hud::Appearance a;{std::lock_guard<std::mutex> l(appearanceMutex);a=appearance;}auto anim=std::atomic_load(&visual::render::animation);nlohmann::json j={{"preset",a.preset},{"step",a.step},{"opacity",a.opacity},{"font",a.font},{"x",a.x},{"y",a.y},{"f10",a.f10},{"centerY",a.centerY}};visual::writeAnimationSettings(j,*anim);visual::writeBoneLimit(j,visual::render::boneLimit.load());visual::writeRenderCompatibility(j,visual::render::compatibility.load());visual::writeEntitySelection(j,*std::atomic_load(&visual::render::selection));visual::writeProximity(j,*std::atomic_load(&visual::render::proximity));visual::spraysync::writeSettings(j,*std::atomic_load(&visual::spraysync::options));visual::pictures::writeSettings(j,*std::atomic_load(&visual::pictures::options));auto path=visual::diagnostics::path.parent_path()/L"hud.json";auto tmp=path;tmp+=L".tmp";{std::ofstream o(tmp);o<<j.dump(2);o.flush();if(!o)throw std::runtime_error("HUD settings write failed");}if(!MoveFileExW(tmp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("HUD settings rename failed");saveMessage=u8"菜单设置已保存";note("HUD appearance saved");}catch(const std::exception& e){saveMessage=u8"保存失败，请查看日志";note(e.what());}}
+   if(GetTickCount64()>=nextDiagnostics){nextDiagnostics=GetTickCount64()+200;
    auto f=std::atomic_load(&source_entities::snapshot);std::ostringstream state;state<<"enabled="<<requested<<" render="<<visual::render::status.load()<<" camera="<<source_camera::status()<<" entities="<<f->status<<" records="<<f->records.size()<<" modelLookup="<<f->modelLookup<<" engine="<<visual::render::engineCalls<<" studio="<<visual::render::studioCalls<<" matched="<<visual::render::identified<<" drawn="<<visual::render::drawn<<" identify="<<visual::render::identifyReason.load()<<" pose="<<visual::render::poseReason.load()<<" pictures="<<std::atomic_load(&visual::pictures::sceneFrame)->items.size()<<" pictureRender="<<visual::picturerender::status.load()<<" proximity="<<visual::render::proximityActive.load()<<" proximityCount="<<visual::render::proximityCount.load()<<" proximitySources="<<visual::render::proximitySources.load()<<" compatibility="<<visual::render::compatibility.load()<<" boneLimit="<<visual::render::boneLimit.load()<<" fastpath="<<visual::modelpath::current<<" periodMs="<<std::atomic_load(&visual::render::animation)->periodMs<<" HUD="<<visual::hudruntime::paintStatus.load()<<" presents="<<visual::hudruntime::presents<<" hudFrames="<<visual::hudruntime::frames;
    auto now=GetTickCount64();if(now-last>=2000 && (requested||state.str()!=previous)){note(state.str());for(const auto& check:f->bindingChecks)note("Entity binding: "+check);std::map<std::string,unsigned> inventory;
     for(const auto& r:f->records)if(visual::eligibleRecord(r))++inventory[r.className];
     std::string classes;for(const auto& pair:inventory)classes+=" "+pair.first+"="+std::to_string(pair.second);
     note("Modeled entity inventory:"+classes);
     note("Per-target draw stats:"+visual::render::targetSummary());previous=state.str();last=now;}
-   std::this_thread::sleep_for(std::chrono::milliseconds(200));
+   }
+   std::this_thread::sleep_for(std::chrono::milliseconds(std::atomic_load(&visual::spraysync::options)->enabled?20:200));
   }
  }
 public:
- Plugin(){note("=== L4D2Visual 0.6.0-test startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);
-  try{std::ifstream file(visual::diagnostics::path.parent_path()/L"hud.json");if(file){nlohmann::json j;file>>j;std::atomic_store(&visual::pictures::options,std::make_shared<const visual::pictures::Settings>(visual::pictures::readSettings(j)));std::atomic_store(&visual::render::proximity,std::make_shared<const visual::ProximitySettings>(visual::readProximity(j)));visual::render::compatibility=visual::readRenderCompatibility(j);std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(visual::readEntitySelection(j)));visual::render::boneLimit=visual::readBoneLimit(j);std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(visual::readAnimationSettings(j)));appearance.preset=std::min(3u,j.value("preset",0u));appearance.step=std::clamp(j.value("step",8u),1u,64u);appearance.opacity=std::clamp(j.value("opacity",.48f),.05f,1.f);appearance.font=std::clamp(j.value("font",22.f),12.f,48.f);appearance.x=j.value("x",8.f);appearance.y=j.value("y",14.f);appearance.f10=j.value("f10",false);appearance.centerY=j.value("centerY",true);visual::hudruntime::hud.loadAppearance(appearance);}}catch(const std::exception& e){note(std::string("HUD settings load failed: ")+e.what());}
+ Plugin(){note("=== L4D2Visual 0.7.0-test startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);
+  try{std::ifstream file(visual::diagnostics::path.parent_path()/L"hud.json");if(file){nlohmann::json j;file>>j;std::atomic_store(&visual::spraysync::options,std::make_shared<const visual::spraysync::Settings>(visual::spraysync::readSettings(j)));std::atomic_store(&visual::pictures::options,std::make_shared<const visual::pictures::Settings>(visual::pictures::readSettings(j)));std::atomic_store(&visual::render::proximity,std::make_shared<const visual::ProximitySettings>(visual::readProximity(j)));visual::render::compatibility=visual::readRenderCompatibility(j);std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(visual::readEntitySelection(j)));visual::render::boneLimit=visual::readBoneLimit(j);std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(visual::readAnimationSettings(j)));appearance.preset=std::min(3u,j.value("preset",0u));appearance.step=std::clamp(j.value("step",8u),1u,64u);appearance.opacity=std::clamp(j.value("opacity",.48f),.05f,1.f);appearance.font=std::clamp(j.value("font",22.f),12.f,48.f);appearance.x=j.value("x",8.f);appearance.y=j.value("y",14.f);appearance.f10=j.value("f10",false);appearance.centerY=j.value("centerY",true);visual::hudruntime::hud.loadAppearance(appearance);}}catch(const std::exception& e){note(std::string("HUD settings load failed: ")+e.what());}
   visual::pictures::folder=visual::diagnostics::path.parent_path()/L"images";
   worker=std::thread([this]{diagnostics();});}
  const char* GetName()override{return "L4D2Visual";}
- const char* GetVersion()override{return "0.6.0-test";}
+ const char* GetVersion()override{return "0.7.0-test";}
  void OnModuleLoaded(const char* name,uintptr_t handle)override{if(!name)return;std::string n(name);if(n=="client"||n=="client.dll")source_camera::clientModule=reinterpret_cast<HMODULE>(handle);if(n=="engine"||n=="engine.dll")source_camera::engineModule=reinterpret_cast<HMODULE>(handle);note("Module loaded: "+n);connect();}
  void OnGameLaunch()override{note("OnGameLaunch");connect();}
  void OnD3DDeviceCreated(void* d,bool dxvk)override{note(std::string("OnD3DDeviceCreated dxvk=")+(dxvk?"yes":"no"));visual::hudruntime::created(static_cast<IDirect3DDevice9*>(d));}
- const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.6.0-test";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开拉伸控制面板\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
- void stop(){stopping=true;if(worker.joinable())worker.join();requested=false;visual::modelpath::apply(false);visual::hudruntime::stop();visual::render::stop();source_entities::browseRequested=false;source_camera::frameListener=nullptr;source_camera::stop();}
+ const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.7.0-test";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开视觉效果菜单\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
+ void stop(){stopping=true;if(worker.joinable())worker.join();visual::spraysync::network.stop();requested=false;visual::modelpath::apply(false);visual::hudruntime::stop();visual::render::stop();source_entities::browseRequested=false;source_camera::frameListener=nullptr;source_camera::stop();}
  ~Plugin()override{stop();}
 };
 Plugin& instance(){static Plugin object;return object;}
