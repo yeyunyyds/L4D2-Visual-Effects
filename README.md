@@ -1,10 +1,28 @@
 # L4D2 Visual Effects · 安装包下载
 
-求生之路 2 视觉效果项目；当前提供模型竖直拉伸效果。
+求生之路 2 视觉效果项目；当前提供邦友的酒（模型拉伸）与自定义喷漆。
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 当前测试版 0.6.0-test
+## 当前测试版 0.7.0-test
+
+**[下载 L4D2Visual-0.7.0-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.0-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/1e7ad80) · [喷漆使用与联机配置](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
+
+- 修复图片与近裁剪面相交时整张消失：保留仍在视野内的多边形。
+- 拉伸相关控制全部进入 **邦友的酒[开/关]**，图片功能进入 **自定义喷漆**。
+- **绑定T键**、**喷后自动下一张** 默认关闭；每人默认最多 **2张**，可调1～8，超出自动删除最早图片。
+- 默认大小减半至60，旧配置减半迁移一次；按文件保存尺寸，修改立即作用于同文件已喷图片，支持“仅当前”与“应用所有”。扩大后超出墙面支撑范围则保留原尺寸。
+- 新增默认关闭的 **Steam P2P 联机喷漆实验**，参考DangoMusic一起听分支，独立通道45632；图片、位置、大小与删除同步。双方须安装本版L4D2Visual、互填SteamID64、配置相同room并位于同地图。只有L4N的普通用户不能接收本协议。详细配置见源码README。
+
+十二组ASan/UBSan回归及Windows x86交叉编译通过。**双Steam账号互传和新版游戏显示仍需实机验收**。世界采样遮挡仍有局限，动态人物遮挡未覆盖。
+
+包内含DLL、图片目录说明和完整对应源码；不覆盖个人配置。SHA-256：
+
+```text
+ca4d32d9349307569d30b859fc28d1c4bbdcf160011d0a1480a59e0918eaa530
+```
+
+## 历史测试版 0.6.0-test
 
 **[下载 L4D2Visual-0.6.0-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.6.0-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/338f1d7) · [图片挂画指南](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
 
