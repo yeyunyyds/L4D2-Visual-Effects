@@ -4,7 +4,27 @@
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 当前热修复测试版 0.7.2-test
+## 当前正式版 0.7.2
+
+**免责声明：联机功能未经测试，不保障 VAC 安全。**
+
+**[下载 L4D2Visual-0.7.2.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.2.zip)** · [正式Release](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.7.2) · [对应完整源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.7.2)
+
+安装包顶层只有 **bin/** 和 **README.md**，许可文件保留在bin内。源码独立下载，不塞进安装包。退出游戏后合并bin目录即可，需L4N v2 / Windows x86，不覆盖个人配置。
+
+用户已确认0.7.2基础喷漆和T键正常。正式版保持同一路径，仅调整版本号、打包与文档；T绑定及联机总开关仍默认关闭。手部/武器深度遮挡尚未实现；Esc后在插件菜单手动恢复显示。0.7.1的DXVK渲染回归已撤回，请停用0.7.1。
+
+联机功能发布时未经实机验证，不承诺VAC安全。安装和开关说明均在包内README。
+
+SHA-256：
+
+```text
+6bdaf40a1eeff8dd57773dc819377ff562c7f34ac13e3ca507e063bae821a861
+```
+
+历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
+
+## 历史热修复测试版 0.7.2-test
 
 **[下载 L4D2Visual-0.7.2-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.2-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/ed9c177) · [使用与已知限制](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
 
