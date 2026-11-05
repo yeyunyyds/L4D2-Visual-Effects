@@ -24,6 +24,24 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
+## Tank行为预测实验 · 0.7.3-tank-preview
+
+**[下载独立实验包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-preview.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/cf53276) · [说明与单人验收](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experiment/tank-threat/docs/TANK-PREVIEW.md)
+
+仅依赖L4N，不需要SourceMod、Left4DHooks或服务端插件。功能默认关闭，在“Tank行为预测（实验）”开启。正式版继续使用上方0.7.2，本包不设为正式Release。
+
+- 只读尝试获取实时ConVar距离/角度参数、瞄准/身体朝向、基础动画、可读攻击计时，绘制参数估计区和短时间移动外推；参数未知时不代入固定手长。
+- 尝试读取m_lookatPlayer，明确标为注视目标；可用的敌对网络字段、注视目标和朝向推测分别标注，不把“看着谁”等同于AI真实锁敌。模糊目标、死者与失效句柄不当作有效目标。
+- 记录可能的朝向停滞，不凭空设定“投石后手长缩短”。每50ms定向更新当前战斗实体，在已验证模型钩子只读CPU元数据，不新增Source回调GPU调用或深度借用。
+- 开启诊断记录后生成有界tank-prediction.jsonl，可用于本地单人投石前后、贴身经过与挥空对照。详细步骤见包内README。
+
+十六组ASan/UBSan回归和Windows x86构建通过。**当前是字段验证/预测原型，未运行Windows游戏，不能宣称已经高准确率或读到所有字段。arc语义、实际碰撞/命中、动画层与AI状态仍需本地单人校准。** 线条沿用Present，有遮挡局限。安装前备份0.7.2 DLL，只加载一份。
+
+安装包顶层仅bin/与README.md，许可在bin内，源码独立提供。
+**免责声明：联机功能未经测试，不保障VAC安全；Tank实验同样不提供VAC保证。**
+
+SHA-256：`c008111caa10b7693e87f944afe83846ba4a3d62bbe6ed6224a29c1a88c3f33c`
+
 ## 历史热修复测试版 0.7.2-test
 
 **[下载 L4D2Visual-0.7.2-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.2-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/ed9c177) · [使用与已知限制](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
