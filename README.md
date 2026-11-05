@@ -4,7 +4,24 @@
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 当前测试版 0.7.0-test
+## 当前测试版 0.7.1-test
+
+**[下载 L4D2Visual-0.7.1-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.1-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/6741b05) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
+
+- 修复“邦友的酒”中“邦”显示问号：补全菜单字库并加入覆盖回归。
+- 跟进DangoMusic最新一起听分支6d327fc，新增默认开启的同局自动匹配。双方安装本版、进入同局并开启联机总开关，即可探测最多三名其他真人，不必手填ID/room；保留手动名单模式。联机总开关仍默认关闭。
+- 喷漆不再在Present顶层覆盖绘制，移到Source场景回调，使用现有深度测试且不写深度；界面显示鼠标、失焦或深度表面不可用时暂停图片，避免覆盖手部和Esc界面。HUD仍独立绘制。
+- 保留T绑定、自动下一张、逐文件即时尺寸、FIFO数量限制及P2P分片同步。
+
+十四组ASan/UBSan回归和Windows x86编译通过。**真实自动互传、D3D9/DXVK深度可用性、手部与Esc层级仍需实机验收。** 若图片不显示，请查看喷漆菜单中的渲染状态；无深度时不会回退成顶层覆盖。
+
+包内包含DLL和完整对应源码，不覆盖个人配置。SHA-256：
+
+```text
+4c77f52b3cd102138ff04d7b3f4e0d909f601dfd6a7c7445c42d71e3aa335132
+```
+
+## 历史测试版 0.7.0-test
 
 **[下载 L4D2Visual-0.7.0-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.0-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/1e7ad80) · [喷漆使用与联机配置](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
 
