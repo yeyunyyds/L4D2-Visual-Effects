@@ -1,5 +1,6 @@
 #pragma once
 #include "spray_bridge.hpp"
+#include "source_roster.hpp"
 #include "spray_steam.hpp"
 #include "spray_codec.hpp"
 #include "image_runtime.hpp"
@@ -62,12 +63,16 @@ class Network {
 public:
  void stop(){reset();}
  void tick(std::uint64_t now){
-  auto settings=std::atomic_load(&options);auto frame=std::atomic_load(&pictures::sceneFrame);auto camera=std::atomic_load(&source_camera::snapshot);
+  auto configured=std::atomic_load(&options);auto roster=std::atomic_load(&sprayroster::snapshot);auto resolved=*configured;
+  if(resolved.automatic){resolved.peers.clear();resolved.room.clear();if(roster->fresh(std::int64_t(now))){resolved.peers=roster->others();resolved.room="auto/"+std::to_string(roster->cohort());}}
+  std::shared_ptr<const Settings> settings=previous;
+  if(!settings||settings->enabled!=resolved.enabled||settings->automatic!=resolved.automatic||settings->room!=resolved.room||settings->peers!=resolved.peers)settings=std::make_shared<const Settings>(std::move(resolved));
+  auto frame=std::atomic_load(&pictures::sceneFrame);auto camera=std::atomic_load(&source_camera::snapshot);
   if(previous!=settings||epoch!=camera->epoch){reset();previous=settings;epoch=camera->epoch;retryAt=0;}
   if(!settings->enabled||!std::atomic_load(&pictures::options)->enabled||!camera->active){if(transport)reset();report(u8"联机喷漆关闭或未进入地图");return;}
-  if(settings->room.empty()||settings->peers.empty()){report(u8"请在 hud.json 配置相同 room 与双方 SteamID64");return;}
+  if(settings->room.empty()||settings->peers.empty()){if(transport)reset();report(settings->automatic?std::string(u8"自动匹配：")+roster->status:std::string(u8"请在 hud.json 配置相同 room 与双方 SteamID64"));return;}
   try{
-   prepareCache();if(!transport){if(now<retryAt)return;retryAt=now+5000;auto candidate=std::make_unique<steam::Transport>();candidate->connect();candidate->allow(settings->peers);ownId=candidate->self();transport=std::move(candidate);}
+   prepareCache();if(!transport){if(now<retryAt)return;retryAt=now+5000;auto candidate=std::make_unique<steam::Transport>();candidate->connect();if(settings->automatic&&candidate->self()!=roster->local)throw std::runtime_error("Game roster/Steam identity mismatch");candidate->allow(settings->peers);ownId=candidate->self();transport=std::move(candidate);}
    transport->pump(std::int64_t(now));Packet packet;for(unsigned budget=0;budget<32&&transport->receive(packet);++budget){try{receive(packet,now);}catch(const std::exception&){/* Invalid peer data is rejected without changing local state. */}}
    for(auto i=incoming.begin();i!=incoming.end();)if(now>i->second.data.deadline){requested.erase(i->first);i=incoming.erase(i);}else ++i;
    for(auto i=requested.begin();i!=requested.end();)if(!incoming.count(i->first)&&now>i->second.second)i=requested.erase(i);else ++i;

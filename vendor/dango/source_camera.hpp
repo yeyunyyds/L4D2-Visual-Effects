@@ -20,6 +20,7 @@ template<class Factory> std::string inventory(Factory factory,const char* prefix
 }
 
 inline std::shared_ptr<const GameCameraFrame> snapshot=std::make_shared<GameCameraFrame>();
+inline std::atomic<void(*)()> sceneListener{nullptr};
 inline void (*logger)(const std::string&)=nullptr;
 inline std::atomic<void(*)(const GameCameraFrame&)> frameListener{nullptr};
 inline void log(const std::string& s){if(logger)logger(s);}
@@ -38,7 +39,7 @@ inline void capture(bool active){
  captureState=state;unsigned bit=1u<<state;if(!(seenCaptureStates.fetch_or(bit)&bit))log(std::string("Source capture: ")+captureStatus(state));
  std::atomic_store(&snapshot,std::make_shared<const GameCameraFrame>(f));if(auto listener=frameListener.load(std::memory_order_acquire))listener(f);
 }
-inline void __fastcall renderHook(void* self,void*,void* rect){static thread_local int depth=0;++depth;originalRender(self,rect);if(depth==1)capture(true);--depth;}
+inline void __fastcall renderHook(void* self,void*,void* rect){static thread_local int depth=0;++depth;originalRender(self,rect);if(depth==1){capture(true);if(auto scene=sceneListener.load(std::memory_order_acquire))scene();}--depth;}
 inline void __fastcall shutdownHook(void* self,void*){++epoch;capture(false);originalShutdown(self);}
 inline void __fastcall levelHook(void* self,void*){++epoch;capture(false);originalLevelShutdown(self);}
 inline bool replace(size_t slot,void* expected,void* value){DWORD old=0;if(!VirtualProtect(table+slot,sizeof(void*),PAGE_READWRITE,&old))return false;void* actual=InterlockedCompareExchangePointer(table+slot,value,expected);DWORD ignored=0;VirtualProtect(table+slot,sizeof(void*),old,&ignored);return actual==expected;}

@@ -10,15 +10,16 @@ inline bool steamId(Peer id){return (id>>56)==1&&((id>>52)&15)==1&&((id>>32)&0xf
 inline Peer peer(const std::string& text){if(text.empty()||text.size()>20)return 0;Peer value=0;for(char c:text){if(c<'0'||c>'9'||value>(UINT64_MAX-unsigned(c-'0'))/10)return 0;value=value*10+unsigned(c-'0');}return steamId(value)?value:0;}
 struct Packet{Peer from;std::string bytes;};
 struct Transport{virtual ~Transport()=default;virtual Peer self()const=0;virtual bool send(Peer,const std::string&)=0;virtual bool receive(Packet&)=0;};
-struct Settings{bool enabled=false;std::string room;std::set<Peer> peers;};
+struct Settings{bool enabled=false,automatic=true;std::string room;std::set<Peer> peers;};
 template<class Json> Settings readSettings(const Json& j){Settings s;auto p=j.find("sprayP2P");if(p==j.end()||!p->is_object())return s;
  if(p->contains("enabled")&&(*p)["enabled"].is_boolean())s.enabled=(*p)["enabled"].template get<bool>();
+ if(p->contains("automatic")&&(*p)["automatic"].is_boolean())s.automatic=(*p)["automatic"].template get<bool>();
  if(p->contains("room")&&(*p)["room"].is_string())s.room=(*p)["room"].template get<std::string>();
  if(s.room.size()>64)s.room.clear();
  if(p->contains("peers")&&(*p)["peers"].is_array())for(const auto& x:(*p)["peers"])if(x.is_string()&&s.peers.size()<8){auto id=peer(x.template get<std::string>());if(id)s.peers.insert(id);}
  return s;
 }
-template<class Json> void writeSettings(Json& j,const Settings& s){std::vector<std::string> peers;for(auto id:s.peers)peers.push_back(std::to_string(id));j["sprayP2P"]={{"enabled",s.enabled},{"room",s.room},{"peers",peers}};}
+template<class Json> void writeSettings(Json& j,const Settings& s){std::vector<std::string> peers;for(auto id:s.peers)peers.push_back(std::to_string(id));j["sprayP2P"]={{"enabled",s.enabled},{"automatic",s.automatic},{"room",s.room},{"peers",peers}};}
 inline bool hashKey(const std::string& key){return key.size()==64&&std::all_of(key.begin(),key.end(),[](char c){return (c>='0'&&c<='9')||(c>='a'&&c<='f');});}
 inline std::string hex(const unsigned char* data,std::size_t size){static const char digits[]="0123456789abcdef";std::string out;out.reserve(size*2);for(std::size_t i=0;i<size;++i){out+=digits[data[i]>>4];out+=digits[data[i]&15];}return out;}
 inline std::vector<unsigned char> unhex(const std::string& text){if(text.size()>2800||text.size()%2)throw std::runtime_error("Invalid image chunk");std::vector<unsigned char> out;for(std::size_t i=0;i<text.size();i+=2){auto digit=[](char c){if(c>='0'&&c<='9')return c-'0';if(c>='a'&&c<='f')return c-'a'+10;throw std::runtime_error("Invalid hex digit");};out.push_back(static_cast<unsigned char>(digit(text[i])*16+digit(text[i+1])));}return out;}

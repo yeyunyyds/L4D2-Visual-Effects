@@ -78,3 +78,9 @@ src/sync/steam_transport.hpp (GPL-3.0). It preserves the borrowed game Steam
 context and explicit x86 CSteamID return adapter. Visual Effects uses channel
 45632 and its own versioned spray protocol, not the music synchronization wire
 format. PNG encoding and SHA-256 use Windows WIC and CryptoAPI.
+
+0.7.1 same-game spray discovery adapts src/source_roster.hpp and
+src/sync/roster.hpp from LDBDangoMusic experiment/steam-progress-sync commit
+6d327fcabe322771e5737165862a9db455998860 (GPL-3.0). The statically verified
+144-byte player-info contract and four-human roster bound are preserved.
+Sprays use cohort-scoped reciprocal handshakes, without music host election.

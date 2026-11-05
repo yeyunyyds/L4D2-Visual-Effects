@@ -1,3 +1,10 @@
+# 0.7.1-test：字库、自动匹配与渲染层
+
+- 新增菜单字库覆盖与真人名单 / SteamID / cohort 回归；共十四组ASan/UBSan测试。
+- Source 玩家信息接口复用 DangoMusic 6d327fc 的静态校验配置，Windows x86 编译检查。
+- 移除 Present 喷漆，使用 Source 场景回调、现有深度测试、全屏viewport和前台 / 鼠标守卫；无深度表面不绘制。
+- 真实自动互传、场景深度在 D3D9 / DXVK 下的可用性、手部与 Esc 菜单层级需要实机验收。
+
 # 0.7.0-test：喷漆裁剪、交互与联机实验
 
 - 十二组 ASan/UBSan 本地回归通过，新增 / 更新近面裁剪、尺寸迁移、同文件即时大小、FIFO、SteamID白名单、几何和分片边界测试。

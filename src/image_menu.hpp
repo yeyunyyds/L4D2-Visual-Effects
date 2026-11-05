@@ -16,8 +16,9 @@ inline std::string page(std::uintptr_t id){
   menuItem(u8"透明度 -10%",209)+menuItem(u8"透明度 +10%",210)+menuItem(u8"仅应用当前图片大小",217)+menuItem(u8"当前大小应用所有图片",216)+menuItem(u8"恢复图片参数默认",211)+menuItem(u8"保存设置",101)+menuRow(u8"尺寸立即应用于墙上同名图片"));
  if(id==153){auto network=std::atomic_load(&spraysync::options);return menuPage(u8"联机喷漆 · Steam P2P 实验",
   menuItem(network->enabled?u8"联机喷漆：开":u8"联机喷漆：关（默认）",218)+
+  menuItem(network->automatic?u8"同局自动匹配：开":u8"同局自动匹配：关（手动名单）",219)+
   menuRow(u8"本机 SteamID64："+std::to_string(spraysync::ownId.load()))+menuRow(*std::atomic_load(&spraysync::status))+
-  menuRow(u8"配置 hud.json 的 sprayP2P.room 与 peers")+menuRow(u8"双方同地图、同房间、互填 SteamID，均需本插件")+menuItem(u8"保存设置",101));}
+  menuRow(network->automatic?u8"自动探测同局最多三名真人，无需填写ID":u8"配置 hud.json 的 sprayP2P.room 与 peers")+menuRow(u8"双方开启联机，均需本版插件")+menuItem(u8"保存设置",101));}
  if(id==154)return menuPage(u8"自定义喷漆 · 操作设置",
   menuItem(settings->bindT?u8"绑定 T 键：开":u8"绑定 T 键：关（默认）",212)+
   menuItem(settings->autoNext?u8"喷漆后自动下一张：开":u8"喷漆后自动下一张：关（默认）",213)+
@@ -38,7 +39,7 @@ inline std::string page(std::uintptr_t id){
 }
 inline bool action(std::uintptr_t id){
  notice=u8"挂画操作已提交";
- if(id==218){auto settings=*std::atomic_load(&spraysync::options);settings.enabled=!settings.enabled;std::atomic_store(&spraysync::options,std::make_shared<const spraysync::Settings>(std::move(settings)));notice=u8"联机喷漆设置未保存";return true;}
+ if(id==218||id==219){auto settings=*std::atomic_load(&spraysync::options);if(id==218)settings.enabled=!settings.enabled;else settings.automatic=!settings.automatic;std::atomic_store(&spraysync::options,std::make_shared<const spraysync::Settings>(std::move(settings)));notice=u8"联机喷漆设置未保存";return true;}
  if(id==201){pictures::clearRequested=true;pictures::refreshRequested=true;return true;}
  if(id==202){
   auto settings=std::atomic_load(&pictures::options);auto images=std::atomic_load(&pictures::assets);
