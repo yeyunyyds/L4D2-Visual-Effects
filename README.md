@@ -1,14 +1,16 @@
 # L4D2 Visual Effects
 
-**求生之路 2 视觉效果插件 · 开发测试版 0.7.2-test / 正式版 0.4.0**
+**求生之路 2 视觉效果插件 · 正式版 0.7.2**
 
-**0.7.1-test 在 DXVK 下有闪烁 / 崩溃报告，请停用该版。0.7.2-test 撤回其场景 GPU 绘制路径，回到先前基本可用的 Present 方案；本环境尚未进行 DXVK 实机验收。**
+**免责声明：联机功能未经测试，不保障 VAC 安全。**
+
+**0.7.1-test 在 DXVK 下有闪烁 / 崩溃报告，请停用该版。0.7.2 撤回其场景 GPU 绘制路径，回到先前基本可用的 Present 方案；用户已确认0.7.2基础显示和T键正常，联机与VAC安全不作保证。**
 
 基于 **L4N v2 / Windows x86** 的求生之路 2 视觉效果项目。当前提供 **邦友的酒（模型拉伸）** 和 **自定义喷漆**，后者支持默认关闭的 Steam P2P 联机实验。0.5.0-test 将目标选择扩展为 **Class ID 类别开关**，默认所有类别关闭，并支持 128 / 256 骨骼容量运行时切换。具有双脚的模型保留脚部及脚趾姿态；其他受支持模型以渲染根骨骼为锚点。效果在绘制阶段使用骨骼矩阵副本，不写入实体位置、碰撞边界或命中骨骼缓存。
 
 项目名称为 **L4D2 Visual Effects（求生之路 2 视觉效果）**，覆盖项目整体的视觉效果方向；拉伸是当前实现的功能。插件标识、游戏内菜单、DLL 和安装包使用 `L4D2Visual`。
 
-[下载 0.7.2 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.2-test.zip) · [下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
+[下载 0.7.2 正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.2.zip) · [历史0.4.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
 
 ## 下载与分支
 
@@ -19,7 +21,7 @@
 
 `main` 的初始源码从正式安装包 `L4D2Visual-0.4.0.zip` 中的 `source/` 完整恢复。对应下载分支提交为 `2dd0a515a8dbbe552698464903ef84e7638b517a`；既有 `v0.4.0` 标签保留指向该打包提交。后续源码更改在 `main` 开发，生成的安装包单独发布至 `zip`。
 
-以下哈希仅对应 **0.4.0 正式包**；0.7.2-test 为新的独立测试包，覆盖与性能需要实机验收。
+以下哈希仅对应 **0.4.0 正式包**；0.7.2 为独立正式包，用户已确认基础显示和T键正常；联机功能未经测试，不保障VAC安全。
 
 0.4.0 安装包 SHA-256：
 
@@ -27,19 +29,19 @@
 f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 ```
 
-安装包包含插件 DLL 和对应完整源码，不含游戏 DLL、模型或纹理。GitHub 的 **Code → Download ZIP** 下载的是当前分支快照；安装游戏插件请使用上方对应安装包链接。
+0.7.2 安装包顶层仅包含 `bin/` 和 `README.md`；源码通过同一Release的Source code归档独立提供，许可证在bin内。不含游戏DLL、模型或纹理。GitHub 的 **Code → Download ZIP** 下载的是当前分支快照；安装游戏插件请使用上方对应安装包链接。
 
 ## 安装与启用
 
 1. 准备已安装 **L4N v2** 的 Windows x86 游戏环境。游戏构建必须匹配 [render-profile.json](docs/research/render-profile.json) 中记录的 `client.dll`、`engine.dll`、`studiorender.dll`。
 2. 完整退出游戏，解压所选版本安装包，将 `bin` 合并到游戏根目录。确认插件位于 `bin/neko/plugins/L4D2Visual.dll`，且只加载一份。
-3. 启动游戏并进入地图，在 **L4N → L4D2Visual 0.7.2-test → 邦友的酒[关] → 实体分类** 中开启需要的角色或类型，再返回邦友的酒子菜单开启总开关。正式版 0.4.0 沿用原特感开关。
+3. 启动游戏并进入地图，在 **L4N → L4D2Visual 0.7.2 → 邦友的酒[关] → 实体分类** 中开启需要的角色或类型，再返回邦友的酒子菜单开启总开关。正式版 0.4.0 沿用原特感开关。
 4. 在邦友的酒子菜单进入 **动画预设与细调** 调整效果；使用 **保存设置** 保存动画参数、类别规则、骨骼容量、渲染模式与菜单外观。
 5. 关闭拉伸后检查外观恢复。更新或移除插件前完整退出游戏，不要运行时卸载。
 
 拉伸开关默认关闭，且不跨游戏会话保存。卸载时删除该 DLL 即可停止加载；配置与日志保存在同目录下的 `L4D2Visual/` 文件夹，可按需备份或删除。
 
-## 自定义喷漆（0.7.2-test）
+## 自定义喷漆（0.7.2）
 
 主菜单按 **邦友的酒[开/关]**、**自定义喷漆** 收纳功能；喷漆独立于拉伸，默认关闭。联机实验也默认关闭；关闭联机时仅本机显示。普通客户端看不到，原版 spray 保持独立。
 
@@ -192,7 +194,7 @@ ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
 # Windows x86 DLL，可用 CXX_X86 指定编译器
 bash scripts/build-mingw.sh
 
-# 生成 build/L4D2Visual-0.7.2-test.zip（DLL + 对应完整源码）
+# 生成 build/L4D2Visual-0.7.2.zip（顶层仅bin/与README.md）
 python3 scripts/package.py
 
 # 可选：使用自己合法持有的游戏 DLL 进行离线构建核对
@@ -212,7 +214,7 @@ scripts/   本地测试、交叉编译、打包及 PE / ABI 校验
 docs/      验证记录与渲染接口研究
 ```
 
-## 0.7.2-test DXVK 渲染回退与 T 键热修复
+## 0.7.2 DXVK 渲染回退与 T 键热修复
 
 - 完全移除 Source 回调中的 GPU 调用和未经确认的深度借用，恢复 Present 绘制。
 - DXVK 鼠标 / 窗口兼容的 T 键判断；修复控制台状态持续阻止喷漆，并显示输入状态。
