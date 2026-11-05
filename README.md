@@ -1,12 +1,12 @@
 # L4D2 Visual Effects
 
-**求生之路 2 视觉效果插件 · 开发测试版 0.5.3-test / 正式版 0.4.0**
+**求生之路 2 视觉效果插件 · 开发测试版 0.6.0-test / 正式版 0.4.0**
 
-基于 **L4N v2 / Windows x86** 的求生之路 2 视觉效果项目。当前实现周期性竖直拉伸。0.5.0-test 将目标选择扩展为 **Class ID 类别开关**，默认所有类别关闭，并支持 128 / 256 骨骼容量运行时切换。具有双脚的模型保留脚部及脚趾姿态；其他受支持模型以渲染根骨骼为锚点。效果在绘制阶段使用骨骼矩阵副本，不写入实体位置、碰撞边界或命中骨骼缓存。
+基于 **L4N v2 / Windows x86** 的求生之路 2 视觉效果项目。当前提供周期性竖直拉伸和 **本地图片挂画**。0.5.0-test 将目标选择扩展为 **Class ID 类别开关**，默认所有类别关闭，并支持 128 / 256 骨骼容量运行时切换。具有双脚的模型保留脚部及脚趾姿态；其他受支持模型以渲染根骨骼为锚点。效果在绘制阶段使用骨骼矩阵副本，不写入实体位置、碰撞边界或命中骨骼缓存。
 
 项目名称为 **L4D2 Visual Effects（求生之路 2 视觉效果）**，覆盖项目整体的视觉效果方向；拉伸是当前实现的功能。插件标识、游戏内菜单、DLL 和安装包使用 `L4D2Visual`。
 
-[下载 0.5.3 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.3-test.zip) · [下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
+[下载 0.6.0 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.6.0-test.zip) · [下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
 
 ## 下载与分支
 
@@ -17,7 +17,7 @@
 
 `main` 的初始源码从正式安装包 `L4D2Visual-0.4.0.zip` 中的 `source/` 完整恢复。对应下载分支提交为 `2dd0a515a8dbbe552698464903ef84e7638b517a`；既有 `v0.4.0` 标签保留指向该打包提交。后续源码更改在 `main` 开发，生成的安装包单独发布至 `zip`。
 
-以下哈希仅对应 **0.4.0 正式包**；0.5.3-test 为新的独立测试包，覆盖与性能需要实机验收。
+以下哈希仅对应 **0.4.0 正式包**；0.6.0-test 为新的独立测试包，覆盖与性能需要实机验收。
 
 0.4.0 安装包 SHA-256：
 
@@ -31,11 +31,33 @@ f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 
 1. 准备已安装 **L4N v2** 的 Windows x86 游戏环境。游戏构建必须匹配 [render-profile.json](docs/research/render-profile.json) 中记录的 `client.dll`、`engine.dll`、`studiorender.dll`。
 2. 完整退出游戏，解压所选版本安装包，将 `bin` 合并到游戏根目录。确认插件位于 `bin/neko/plugins/L4D2Visual.dll`，且只加载一份。
-3. 启动游戏并进入地图，在 **L4N → L4D2Visual 0.5.3-test → 实体分类** 中开启需要的角色或类型，再返回主菜单开启 **拉伸总开关**。正式版 0.4.0 沿用原特感开关。
+3. 启动游戏并进入地图，在 **L4N → L4D2Visual 0.6.0-test → 实体分类** 中开启需要的角色或类型，再返回主菜单开启 **拉伸总开关**。正式版 0.4.0 沿用原特感开关。
 4. 进入 **动画预设与细调** 调整效果；使用 **保存设置** 保存动画参数、类别规则、骨骼容量、渲染模式与菜单外观。
 5. 关闭拉伸后检查外观恢复。更新或移除插件前完整退出游戏，不要运行时卸载。
 
 拉伸开关默认关闭，且不跨游戏会话保存。卸载时删除该 DLL 即可停止加载；配置与日志保存在同目录下的 `L4D2Visual/` 文件夹，可按需备份或删除。
+
+## 本地图片挂画（0.6.0-test）
+
+默认关闭，独立于拉伸总开关，**仅本机可见**。不上传图片、不修改游戏服务器、不替换原版 spray；普通游戏客户端不会收到这些图片。
+
+1. 将 PNG、JPG / JPEG 或 BMP 放到游戏目录下的 **`bin/neko/plugins/L4D2Visual/images/`**。安装包包含目录说明，插件也会自动创建目录。
+2. 在主菜单进入 **图片挂画（本地）**，点击 **刷新目录**。
+3. 开启图片挂画，在 **图片** 子页选择文件，等待后台加载完成。
+4. 对准足够平整的墙面，选择 **对准墙面放置所选图片**。
+5. 使用 **大小、旋转与透明度** 调整后续放置参数。`- / =` 翻页、`0` 返回。
+
+- 大小按最长边计算，默认 120 游戏单位，可在 20～512 间每次 ±20 调整；图片保持比例。
+- 旋转每次 15°，透明度每次 10%，范围 10%～100%。参数仅应用于之后放置的新图片。
+- 每张地图最多 **8 张**；支持删除最后一张、一键清空。刷新目录、关闭模块、退图或切图时清空已放置图片。
+- 图片解码在后台线程执行。最长边超过 **2048 像素**时等比例缩小；文件上限 **32 MiB / 3200 万像素**，列表最多 128 个文件。CPU 图片缓存和 GPU 纹理缓存各按 **64 MiB** 限额管理，另有一张屏幕备份表面的开销。
+- 不需要把图片转换成原版 VTF 喷漆。选项通过 **保存设置** 写入 `hud.json`，墙上放置记录不跨地图或会话保存。
+
+墙面定位和可见性采用 DangoMusic 的已验证构建接口：九点平面支撑检查、五点世界遮挡采样、朝向与地图 / 时效检查。当前是平面矩形挂画，部分遮挡时会保守隐藏整张，近裁剪面相交时也可能暂时隐藏。
+
+**动态人物 / 道具遮挡尚未覆盖；复杂墙角与其他渲染插件组合仍需实机验证。** 当前使用 Present 阶段的投影贴图与世界遮挡采样，不依赖未经确认的场景深度缓冲，不能视作引擎原生 decal 的逐像素投射。
+
+详细实现与验收边界见 [图片挂画说明](docs/wall-pictures.md)。
 
 ## 实体分类与识别（0.5.3-test）
 
@@ -142,13 +164,13 @@ f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 git clone --branch main https://github.com/yeyunyyds/L4D2-Visual-Effects.git
 cd L4D2-Visual-Effects
 
-# 十组本地回归；受限运行器中可单独关闭泄漏检测
+# 十一组本地回归；受限运行器中可单独关闭泄漏检测
 ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
 
 # Windows x86 DLL，可用 CXX_X86 指定编译器
 bash scripts/build-mingw.sh
 
-# 生成 build/L4D2Visual-0.5.3-test.zip（DLL + 对应完整源码）
+# 生成 build/L4D2Visual-0.6.0-test.zip（DLL + 对应完整源码）
 python3 scripts/package.py
 
 # 可选：使用自己合法持有的游戏 DLL 进行离线构建核对
@@ -168,7 +190,15 @@ scripts/   本地测试、交叉编译、打包及 PE / ABI 校验
 docs/      验证记录与渲染接口研究
 ```
 
-## 0.5.3-test 求生者与特感类型菜单
+## 0.6.0-test 本地图片挂画
+
+- 新增图片目录、后台 WIC 解码和独立菜单，支持 PNG / JPEG / BMP。
+- 复用 DangoMusic 的墙面射线、支撑检查和世界遮挡采样，放置仅本机可见的图片。
+- 支持保持比例的尺寸调整、旋转、透明度、撤销、清空和切图清理。
+- 纹理与屏幕备份缓存复用，并覆盖 Reset / ResetEx / 新设备时的资源释放和重建。
+- 原有角色、特感、拉伸及范围实验保留。
+
+## 0.5.3-test 求生者与特感类型菜单（历史）
 
 - 求生者分类改为固定八名角色，参考 DangoMusic 的 `m_survivorCharacter` 映射。
 - 特感也按八种实际类型独立保存，支持 NPC 与共享 Class ID 的感染者玩家；未知队伍或类型不套用角色规则。

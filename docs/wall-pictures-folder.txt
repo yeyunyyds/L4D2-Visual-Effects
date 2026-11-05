@@ -1,0 +1,7 @@
+L4D2 Visual Effects - local wall pictures
+Put PNG, JPG/JPEG or BMP files in this folder.
+In game: Pictures -> Refresh folder -> Enable -> Select picture -> Aim at a flat wall -> Place.
+Only this client sees the pictures. Nothing is uploaded to a game server.
+Up to 8 pictures per map. Map changes and disabling this module clear the placed pictures.
+Maximum decoded image edge: 2048 pixels (larger files are scaled down).
+Source files: at most 32 MiB and 32 megapixels. CPU/GPU caches: 64 MiB each.

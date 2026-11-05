@@ -64,3 +64,10 @@ Special-infected matching also reads m_zombieClass for infected players.
 The 1..8 zombie-type mapping was checked against the public L4D2ZombieClass
 enum in SilvDev/Left4DHooks, sourcemod/scripting/include/left4dhooks_stocks.inc.
 These are zombie-type values, not network Class IDs.
+
+The wall-picture module reuses wall_panel.hpp and source_trace_contract.hpp
+from LDBDangoMusic main commit 54ed4046e3a5dc9ecc762b133714fea8090d432c
+(GPL-3.0). image_trace.hpp adapts the same commit's source_walls.hpp static
+TraceRay binding, world-only filter, and result checks.
+Image decoding uses the Windows Imaging Component system API; no third-party
+image decoder or game assets are bundled.
