@@ -3,6 +3,7 @@
 #include <mutex>
 #include "image_runtime.hpp"
 #include "image_projection.hpp"
+#include "spray_display.hpp"
 namespace visual::picturerender {
 inline std::atomic<const char*> status{u8"挂画渲染关闭"};
 struct Texture {IDirect3DTexture9* texture=nullptr;unsigned width=0,height=0;std::uint64_t revision=0;std::size_t bytes=0;};
@@ -21,6 +22,7 @@ inline void maintain(IDirect3DDevice9* device){
  }
 }
 inline bool needed(){
+ if(pictures::displayPaused)return false;
  auto settings=std::atomic_load(&pictures::options);if(!settings->enabled)return false;
  auto scene=std::atomic_load(&pictures::sceneFrame);auto camera=std::atomic_load(&source_camera::snapshot);auto tick=GetTickCount64();
  for(const auto& item:scene->items)if(pictures::visibleLease(item,*camera,tick))return true;
@@ -45,6 +47,7 @@ inline Texture* texture(IDirect3DDevice9* device,const std::string& key,const pi
 }
 struct Vertex {float x,y,z,rhw;DWORD color;float u,v;};
 inline void draw(IDirect3DDevice9* device,float width,float height){
+ if(pictures::displayPaused)return;
  auto settings=std::atomic_load(&pictures::options);if(!settings->enabled)return;
  auto scene=std::atomic_load(&pictures::sceneFrame);auto camera=std::atomic_load(&source_camera::snapshot);auto decoded=std::atomic_load(&pictures::assets);auto now=GetTickCount64();
  if(scene->epoch!=camera->epoch||!dango::usableCamera(*camera,now)||now<scene->tick||now-scene->tick>350)return;
@@ -53,7 +56,7 @@ inline void draw(IDirect3DDevice9* device,float width,float height){
  if(FAILED(state->Capture())){state->Release();status=u8"无法保存挂画渲染状态";return;}
  struct Restore {IDirect3DStateBlock9* state;~Restore(){state->Apply();state->Release();}} restore{state};
  device->SetVertexShader(nullptr);device->SetPixelShader(nullptr);device->SetFVF(D3DFVF_XYZRHW|D3DFVF_DIFFUSE|D3DFVF_TEX1);
- device->SetRenderState(D3DRS_FILLMODE,D3DFILL_SOLID);device->SetRenderState(D3DRS_ZENABLE,D3DZB_TRUE);device->SetRenderState(D3DRS_ZFUNC,D3DCMP_LESSEQUAL);device->SetRenderState(D3DRS_ZWRITEENABLE,FALSE);device->SetRenderState(D3DRS_DEPTHBIAS,0);device->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS,0);device->SetRenderState(D3DRS_CLIPPLANEENABLE,0);
+ device->SetRenderState(D3DRS_FILLMODE,D3DFILL_SOLID);device->SetRenderState(D3DRS_ZENABLE,FALSE);device->SetRenderState(D3DRS_ZWRITEENABLE,FALSE);device->SetRenderState(D3DRS_DEPTHBIAS,0);device->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS,0);device->SetRenderState(D3DRS_CLIPPLANEENABLE,0);
  device->SetRenderState(D3DRS_CULLMODE,D3DCULL_NONE);device->SetRenderState(D3DRS_LIGHTING,FALSE);device->SetRenderState(D3DRS_FOGENABLE,FALSE);
  device->SetRenderState(D3DRS_STENCILENABLE,FALSE);device->SetRenderState(D3DRS_SCISSORTESTENABLE,FALSE);device->SetRenderState(D3DRS_ALPHATESTENABLE,FALSE);
  device->SetRenderState(D3DRS_ALPHABLENDENABLE,TRUE);device->SetRenderState(D3DRS_SRCBLEND,D3DBLEND_ONE);device->SetRenderState(D3DRS_DESTBLEND,D3DBLEND_INVSRCALPHA);

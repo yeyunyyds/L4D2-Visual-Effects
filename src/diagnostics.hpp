@@ -19,6 +19,11 @@ inline void write(const std::string& text) noexcept {
                 std::filesystem::create_directories(dir);path=dir/L"L4D2Visual.log";
             }
         }
+        static ULONGLONG nextSizeCheck=0;auto now=GetTickCount64();
+        if(now>=nextSizeCheck){nextSizeCheck=now+1000;std::error_code error;auto bytes=std::filesystem::file_size(path,error);
+            if(!error&&bytes>=4u*1024u*1024u){auto previous=path;previous.replace_filename(L"L4D2Visual.previous.log");
+                if(!MoveFileExW(path.c_str(),previous.c_str(),MOVEFILE_REPLACE_EXISTING)){writable=false;return;}}
+        }
         SYSTEMTIME t{};GetLocalTime(&t);
         std::ofstream file(path,std::ios::app|std::ios::binary);
         file<<t.wYear<<'-'<<t.wMonth<<'-'<<t.wDay<<' '<<t.wHour<<':'<<t.wMinute<<':'<<t.wSecond

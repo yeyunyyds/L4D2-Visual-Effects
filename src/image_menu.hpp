@@ -1,5 +1,6 @@
 #pragma once
 #include "image_renderer.hpp"
+#include "image_keys.hpp"
 #include "entity_menu.hpp"
 namespace visual::picturemenu {
 inline std::vector<std::string> displayedFiles;
@@ -23,7 +24,7 @@ inline std::string page(std::uintptr_t id){
   menuItem(settings->bindT?u8"绑定 T 键：开":u8"绑定 T 键：关（默认）",212)+
   menuItem(settings->autoNext?u8"喷漆后自动下一张：开":u8"喷漆后自动下一张：关（默认）",213)+
   menuRow(u8"每人最大数量："+std::to_string(settings->maximum))+menuItem(u8"数量上限 -1",214)+menuItem(u8"数量上限 +1",215)+
-  menuItem(u8"保存设置",101)+menuRow(u8"超出上限自动删除最早一张"));
+  menuItem(u8"保存设置",101)+menuRow(u8"超出上限自动删除最早一张")+menuRow(picturekeys::status.load())+menuRow(picturekeys::lastResult.load()));
  std::string message=scene->message;
  if(settings->selected.empty()&&files->files.empty())message=files->message;
  auto error=files->errors.find(settings->selected);auto decoded=files->decoded.find(settings->selected);
@@ -35,10 +36,11 @@ inline std::string page(std::uintptr_t id){
   menuItem(settings->enabled?u8"自定义喷漆：开":u8"自定义喷漆：关（默认）",200)+
   menuItem(u8"图片："+(settings->selected.empty()?std::string(u8"未选择"):settings->selected),151)+
   menuItem(u8"刷新目录（清空自己的喷漆）",201)+menuItem(u8"对准墙面放置所选图片",202)+menuItem(u8"大小、旋转与透明度",152)+menuItem(u8"按键、切图与数量限制",154)+menuItem(u8"联机喷漆（实验）",153)+
-  menuItem(u8"删除自己的最后一张",203)+menuItem(u8"清空自己的喷漆",204)+menuItem(u8"保存设置",101)+menuRow(message));
+  menuItem(u8"删除自己的最后一张",203)+menuItem(u8"清空自己的喷漆",204)+menuItem(pictures::displayPaused?u8"恢复喷漆显示（Esc后手动恢复）":u8"暂停喷漆显示",220)+menuItem(u8"保存设置",101)+menuRow(message));
 }
 inline bool action(std::uintptr_t id){
  notice=u8"挂画操作已提交";
+ if(id==220){pictures::displayPaused=!pictures::displayPaused.load();notice=u8"喷漆显示状态已切换";return true;}
  if(id==218||id==219){auto settings=*std::atomic_load(&spraysync::options);if(id==218)settings.enabled=!settings.enabled;else settings.automatic=!settings.automatic;std::atomic_store(&spraysync::options,std::make_shared<const spraysync::Settings>(std::move(settings)));notice=u8"联机喷漆设置未保存";return true;}
  if(id==201){pictures::clearRequested=true;pictures::refreshRequested=true;return true;}
  if(id==202){
