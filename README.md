@@ -4,7 +4,26 @@
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 当前测试版 0.7.1-test
+## 当前热修复测试版 0.7.2-test
+
+**[下载 L4D2Visual-0.7.2-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.2-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/ed9c177) · [使用与已知限制](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
+
+- 撤回0.7.1的Source回调GPU绘制和深度借用，恢复此前基础可用的Present方案；设备丢失跳过绘制，Present失败不继续恢复拷贝。
+- 修正T键的DXVK鼠标状态 / 窗口判断及控制台状态恢复。T仍默认关闭，请在按键设置中开启，页面新增输入状态和最近请求结果。
+- Esc自动暂停喷漆显示，返回游戏后在喷漆菜单手动“恢复喷漆显示”；图片不清空。**手部正确深度遮挡仍未实现。**
+- 日志每份约4MiB轮转，保留当前与previous两份，避免无限增长。保留同局自动匹配与逐图大小等其他功能。
+
+十五组本地回归及Windows x86编译通过。**本环境未运行DXVK游戏，不能宣称闪烁 / 崩溃已实测消除。** 0.7.1已标记停用；没有崩溃转储，资源管理器卡死原因尚未确认。
+
+包内含DLL和完整源码。SHA-256：
+
+```text
+0a51cc8b141a52b4e7b8f84b4df6ef3f04257f9d571e4b3ee6a9e90ffa7359e8
+```
+
+## 0.7.1-test（停用：DXVK 闪烁 / 崩溃回归）
+
+**请勿使用此版。用户报告默认本地喷图即出现闪烁 / 崩溃；0.7.2已撤回其场景GPU绘制路径。**
 
 **[下载 L4D2Visual-0.7.1-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.1-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/6741b05) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
 
