@@ -4,7 +4,29 @@
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 当前测试版 0.5.3-test
+## 当前测试版 0.6.0-test
+
+**[下载 L4D2Visual-0.6.0-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.6.0-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/338f1d7) · [图片挂画指南](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/docs/wall-pictures.md)
+
+新增默认关闭的 **图片挂画（本地）**，只在本机绘制，不上传、不分发，不修改原版 spray。
+
+1. 将 PNG、JPG/JPEG 或 BMP 放入游戏目录 `bin/neko/plugins/L4D2Visual/images/`。
+2. 进入 **图片挂画（本地）→ 刷新目录**，开启模块、选择图片，等待后台加载。
+3. 对准平整墙面，点击 **对准墙面放置所选图片**。
+
+支持保持比例的尺寸调整、15°旋转、透明度、删除最后一张和清空。每图最多八张；刷新目录、关闭模块或切图清空放置记录。参数可保存，放置记录不跨地图保存。
+
+图片最长边最多 2048 像素，较大图片等比例缩小；源文件上限 32 MiB / 32MP，CPU/GPU 纹理缓存各 64 MiB。解码在后台，纹理与屏幕备份表面复用，支持设备重置后重建。
+
+十一组本地回归与 Windows x86 交叉编译通过。**实际图片解码、显示、透明边缘和窗口切换仍需游戏内验收。** 当前沿用 DangoMusic 世界墙体遮挡采样，动态人物 / 道具遮挡尚未覆盖，并非原生 decal 投射。原有角色 / 特感、拉伸及范围实验保留。
+
+包内含 DLL、图片目录说明和完整对应源码。SHA-256：
+
+```text
+13b950661d25e7ad6ffb9d8e2839157807c4a10ba816c6b1f6d45dfca819835a
+```
+
+## 历史测试版 0.5.3-test
 
 **[下载 L4D2Visual-0.5.3-test.zip](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.5.3-test.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/cc32acf) · [完整指南](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)
 
@@ -82,4 +104,4 @@ SHA-256：
 f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 ```
 
-除当前 0.5.3-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
+除当前 0.6.0-test 外，其他 `*-test.zip` 为历史测试包，供复现和回退使用；稳定版用户可继续选择 0.4.0。不要将此下载分支合并到 `main`。兼容性限制、日志排查、许可证与开发流程见 [main README](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/main/README.md)。
