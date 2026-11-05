@@ -28,6 +28,7 @@ struct ModelInfo {
 static_assert(sizeof(DrawState)==28 && offsetof(ModelInfo,index)==48 && sizeof(ModelInfo)==68);
 using EngineDraw=void(__thiscall*)(void*,const DrawState&,const ModelInfo&,Matrix3x4*);
 using StudioDraw=void(__thiscall*)(void*,void*,const void*,Matrix3x4*,float*,float*,const Vec3&,int);
+inline std::atomic<void(*)(std::uint32_t,int)> modelObserver{nullptr};
 inline EngineDraw engineOriginal=nullptr;
 inline StudioDraw studioOriginal=nullptr;
 inline void** engineTable=nullptr;
@@ -199,6 +200,7 @@ inline std::string targetSummary() {
 }
 inline void __fastcall engineHook(void* self,void*,const DrawState& state,const ModelInfo& info,Matrix3x4* bones) {
     engineCalls.fetch_add(1,std::memory_order_relaxed);
+    if(auto observe=modelObserver.load(std::memory_order_acquire))try{observe(state.header,info.index);}catch(...){}
     Context current;
     if(enabled.load())try{current=identify(state,info);}catch(...){rejected.fetch_add(1,std::memory_order_relaxed);}
     if(current.valid)identified.fetch_add(1,std::memory_order_relaxed);

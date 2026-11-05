@@ -6,6 +6,7 @@
 #include "diagnostics.hpp"
 #include "image_renderer.hpp"
 #include "image_keys.hpp"
+#include "tank_overlay.hpp"
 namespace visual::hudruntime {
 inline dango::hud::NativeHud hud;
 struct Hook{void** table;unsigned slot;void* before;void* after;};
@@ -31,9 +32,9 @@ template<class Present> HRESULT paint(IDirect3DDevice9* device,IDirect3DSwapChai
  std::lock_guard<std::recursive_mutex> lock(paintMutex);
  if(depth++) {auto hr=present();--depth;return hr;}
  if(FAILED(device->TestCooperativeLevel())){pictures::displayPaused=true;auto hr=present();--depth;return hr;}
- ++presents;picturerender::maintain(device);hud.pollHotkey(device);auto camera=std::atomic_load(&source_camera::snapshot);displayGate.poll((GetAsyncKeyState(VK_ESCAPE)&0x8000)!=0,hud.isOpen(),picturekeys::foregroundGame(device),bool(camera->active));picturekeys::poll(device,hud.isOpen());if(!hud.isOpen()&&!picturerender::needed())releaseBackup();paintStatus=hud.isOpen()?"HUD requested":"HUD closed";
+ ++presents;picturerender::maintain(device);hud.pollHotkey(device);auto camera=std::atomic_load(&source_camera::snapshot);displayGate.poll((GetAsyncKeyState(VK_ESCAPE)&0x8000)!=0,hud.isOpen(),picturekeys::foregroundGame(device),bool(camera->active));picturekeys::poll(device,hud.isOpen());if(!hud.isOpen()&&!picturerender::needed()&&!tank::needed())releaseBackup();paintStatus=hud.isOpen()?"HUD requested":"HUD closed";
  IDirect3DSurface9* back=nullptr;IDirect3DSurface9* backup=nullptr;D3DSURFACE_DESC desc{};
- bool ready=(hud.isOpen()||picturerender::needed()) && SUCCEEDED(chain?chain->GetBackBuffer(0,D3DBACKBUFFER_TYPE_MONO,&back):device->GetBackBuffer(0,0,D3DBACKBUFFER_TYPE_MONO,&back));
+ bool ready=(hud.isOpen()||picturerender::needed()||tank::needed()) && SUCCEEDED(chain?chain->GetBackBuffer(0,D3DBACKBUFFER_TYPE_MONO,&back):device->GetBackBuffer(0,0,D3DBACKBUFFER_TYPE_MONO,&back));
  if(ready)ready=SUCCEEDED(back->GetDesc(&desc))&&acquireBackup(device,desc,&backup)&&SUCCEEDED(device->StretchRect(back,nullptr,backup,nullptr,D3DTEXF_NONE));
  if(hud.isOpen()&&!ready)paintStatus="Backbuffer backup failed; HUD skipped";
  D3DVIEWPORT9 viewport{};bool haveViewport=SUCCEEDED(device->GetViewport(&viewport));
@@ -43,6 +44,7 @@ template<class Present> HRESULT paint(IDirect3DDevice9* device,IDirect3DSwapChai
   bool selected=acquired&&SUCCEEDED(device->SetRenderTarget(0,back));
   if(selected&&SUCCEEDED(device->BeginScene())){
    try{picturerender::draw(device,float(desc.Width),float(desc.Height));}catch(...){picturerender::status=u8"挂画渲染异常，请关闭后重开";}
+   try{tank::draw(device,float(desc.Width),float(desc.Height));}catch(...){}
    hud.frame(device,float(desc.Width),float(desc.Height));++frames;paintStatus="Overlay frame submitted";device->EndScene();
   }else {paintStatus="Overlay render target/BeginScene unavailable";picturerender::status=u8"挂画目标表面不可用";}
   if(acquired)device->SetRenderTarget(0,target);if(target)target->Release();if(haveViewport)device->SetViewport(&viewport);

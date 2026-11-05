@@ -29,15 +29,21 @@ template<class Reader> std::string text(Reader& r,uint32_t address,size_t limit=
 inline std::optional<uint32_t> handle(unsigned index,uint32_t serial){if(index>=4096||serial>0xfffff)return {};uint32_t value=(serial<<12)|index;return value==0xffffffffu?std::nullopt:std::optional<uint32_t>(value);}
 // Walk only embedded baseclass tables, not arbitrary proxy-backed datatables.
 // Fields are network properties; they are NOT interpolated render poses.
-template<class Reader> bool fields(Reader& r,uint32_t root,Fields& result){
+template<class Reader> bool fields(Reader& r,uint32_t root,Fields& result,bool combat=false){
  Fields next;std::set<uint32_t> seen;uint32_t address=root,base=0;size_t budget=8192;
  for(unsigned depth=0;address&&depth<16;++depth){if(!seen.insert(address).second)return false;Table t;if(!load(r,address,t)||t.count<0||t.count>2048||size_t(t.count)>budget||text(r,t.name).rfind("DT_",0)!=0)return false;budget-=size_t(t.count);
  std::vector<Prop> props(size_t(t.count));if(t.count&&(!t.props||uint64_t(t.props)+props.size()*sizeof(Prop)>0x100000000ull||!r.read(t.props,props.data(),props.size()*sizeof(Prop))))return false;
  uint32_t parent=0,parentOffset=0;
  for(const auto& p:props){auto name=text(r,p.name);if(name.empty()||p.type<0||p.type>7||p.offset<0||p.offset>65536)return false;
  if(name=="baseclass"&&p.type==6){if(parent||!p.table)return false;parent=p.table;parentOffset=uint32_t(p.offset);}
- if(name=="moveparent"||name=="m_iParentAttachment"||name=="m_vecOrigin"||name=="m_angRotation"||name=="m_nModelIndex"||name=="m_iTeamNum"||name=="m_survivorCharacter"||name=="m_zombieClass"||name=="m_hOwnerEntity"||name=="m_hOwner"||name=="m_hActiveWeapon"||name=="m_hViewModel[0]"){
+ if(name=="moveparent"||name=="m_iParentAttachment"||name=="m_vecOrigin"||name=="m_angRotation"||name=="m_nModelIndex"||name=="m_iTeamNum"||name=="m_survivorCharacter"||name=="m_zombieClass"||name=="m_hOwnerEntity"||name=="m_hOwner"||name=="m_hActiveWeapon"||name=="m_hViewModel[0]"||(combat&&(name=="m_fEffects"||name=="m_iHealth"||name=="m_lifeState"||name=="m_angEyeAngles"||name=="m_angEyeAngles[0]"||name=="m_angEyeAngles[1]"||name=="m_vecVelocity[0]"||name=="m_vecVelocity"||name=="m_lookatPlayer"||name=="m_hEnemy"||name=="m_hAttackTarget"||name=="m_nSequence"||name=="m_flCycle"||name=="m_flSimulationTime"||name=="m_flNextPrimaryAttack"||name=="m_flNextAttack"))){
  if(uint64_t(base)+uint32_t(p.offset)>65536)return false;next.emplace(name,Field{base+uint32_t(p.offset),p.type});}}
+ for(const auto& p:props)if(combat&&p.type==6&&p.offset>=0&&text(r,p.name)=="m_Collision"){
+  Table child;if(!load(r,p.table,child)||text(r,child.name)!="DT_CollisionProperty"||child.count<0||child.count>64)return false;
+  for(int k=0;k<child.count;++k){Prop cp;if(!load(r,child.props+uint32_t(k)*sizeof(Prop),cp))return false;auto name=text(r,cp.name);
+   if((name=="m_vecMins"||name=="m_vecMaxs")&&cp.type==2&&cp.offset>=0&&uint64_t(base)+p.offset+cp.offset<65536)next.emplace("m_Collision."+name,Field{base+uint32_t(p.offset)+uint32_t(cp.offset),2});
+  }
+ }
  if(!parent){result=std::move(next);return true;}if(uint64_t(base)+parentOffset>65536)return false;base+=parentOffset;address=parent;
  }return false;
 }

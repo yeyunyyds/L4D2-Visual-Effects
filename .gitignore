@@ -7,3 +7,6 @@ __pycache__/
 # Per-user plugin state and logs.
 hud.json
 *.log
+
+# Local Tank diagnostic recordings.
+tank-prediction*.jsonl

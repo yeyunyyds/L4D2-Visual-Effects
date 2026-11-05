@@ -9,6 +9,9 @@ inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  builder.AddText(u8"拉伸测试保留双脚脚趾姿态接口日志诊断保存菜单设置已提交失败写入目录权限比例往复绘制开关");
  builder.AddText(u8"邦友的酒自定义喷漆绑定键喷后自动下一张每人数量限制最早当前大小应用所有仅文件大小墙上图片立即更新扩大超出保留原大小联机同局匹配真人无需填写探测对方开启本版插件实验握手缓存配置等待名单人数响应版本不兼容");
  builder.AddText(u8"恢复喷漆显示暂停焦点输入回车退出就绪选择等待加载放置请求已提交");
+ builder.AddText(u8"行为预测实验方向范围绘制诊断记录时间毫秒切换手长弧度参数未读取瞄准身体角回退网络敌对注视目标非锁敌保证朝向推测当前未知或存在歧义停滞可能尚证实服务器精确命中边界仅预测");
+ builder.AddText(u8"可读计时差估计秒瞄准弧度停滞预测精确命中边界");
+ builder.AddText(u8"另一个注视目标");
  builder.BuildRanges(&ranges);
 }
 }

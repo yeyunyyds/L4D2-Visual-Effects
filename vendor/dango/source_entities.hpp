@@ -13,7 +13,10 @@ namespace source_entities {
 using namespace dango;
 namespace wire=dango::entitywire;
 using Record=dango::inventory::Record;using Frame=dango::inventory::Frame;
-inline std::atomic<bool> browseRequested{false};
+inline std::atomic<bool> browseRequested{false},combatRequested{false};
+inline std::shared_ptr<const Frame> combatSnapshot=std::make_shared<const Frame>();
+inline uint64_t nextCombat=0;
+
 inline std::shared_ptr<const dango::inventory::FollowRequest> followRequest=std::make_shared<dango::inventory::FollowRequest>();
 inline std::shared_ptr<const Frame> followSnapshot=std::make_shared<Frame>();
 inline uint64_t nextFollow=0;
@@ -64,7 +67,7 @@ inline bool method(uint32_t object,unsigned slot,uint32_t& function){uint32_t vt
 inline std::optional<uint32_t> classAddress(uint32_t networkable){uint32_t fn;if(!method(networkable,profile::ClassSlot,fn))return {};return wire::addressGetter(reader,fn,networkable);}
 inline ClassInfo readClass(uint32_t address){
  ClassInfo out;wire::ClientClass c;if(!source_camera::owns(reinterpret_cast<void*>(uintptr_t(address)),source_camera::clientModule)||!wire::load(reader,address,c))return out;
- out.name=wire::text(reader,c.name);if(!wire::className(out.name)||c.id<0||c.id>4096){out.name.clear();return out;}out.id=c.id;out.schema=wire::fields(reader,c.table,out.fields);return out;
+ out.name=wire::text(reader,c.name);if(!wire::className(out.name)||c.id<0||c.id>4096){out.name.clear();return out;}out.id=c.id;out.schema=wire::fields(reader,c.table,out.fields,combatRequested.load());return out;
 }
 template<class T> std::optional<T> field(uint32_t base,const ClassInfo& c,const char* name,int type){auto it=c.fields.find(name);if(!c.schema||it==c.fields.end()||it->second.type!=type||uint64_t(base)+it->second.offset+sizeof(T)>0x100000000ull)return {};T value;if(!wire::load(reader,base+it->second.offset,value))return {};return value;}
 inline std::optional<Vec3> vectorField(uint32_t base,const ClassInfo& c,const char* name){auto v=field<Vec3>(base,c,name,2);if(!v||!std::isfinite(v->x)||!std::isfinite(v->y)||!std::isfinite(v->z)||std::max({std::abs(v->x),std::abs(v->y),std::abs(v->z)})>1000000)return {};return v;}
@@ -96,6 +99,14 @@ inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint
  if(!base){++frame.unknownBase;getterHint(frame,"data_base",dataGetter);}else if(!info.schema)++frame.unknownTables;else{
  r.networkOrigin=vectorField(base,info,"m_vecOrigin");r.networkAngles=vectorField(base,info,"m_angRotation");r.team=field<int>(base,info,"m_iTeamNum",0);r.character=field<int>(base,info,"m_survivorCharacter",0);r.zombieClass=field<int>(base,info,"m_zombieClass",0);r.effects=field<int>(base,info,"m_fEffects",0);r.health=field<int>(base,info,"m_iHealth",0);r.lifeState=field<uint8_t>(base,info,"m_lifeState",0);
  auto index=field<int16_t>(base,info,"m_nModelIndex",0);if(index){r.modelIndex=int(*index);r.modelName=modelName(*index);}
+ if(combatRequested){
+  r.eyeAngles=vectorField(base,info,"m_angEyeAngles");if(!r.eyeAngles){auto pitch=field<float>(base,info,"m_angEyeAngles[0]",1),yaw=field<float>(base,info,"m_angEyeAngles[1]",1);if(pitch&&yaw&&std::isfinite(*pitch)&&std::isfinite(*yaw)&&std::abs(*pitch)<=360&&std::abs(*yaw)<=36000)r.eyeAngles=Vec3{*pitch,*yaw,0};}
+  r.velocity=vectorField(base,info,"m_vecVelocity[0]");if(!r.velocity)r.velocity=vectorField(base,info,"m_vecVelocity");
+  r.collisionMins=vectorField(base,info,"m_Collision.m_vecMins");r.collisionMaxs=vectorField(base,info,"m_Collision.m_vecMaxs");
+  r.lookAtHandle=field<uint32_t>(base,info,"m_lookatPlayer",0);r.enemyHandle=field<uint32_t>(base,info,"m_hEnemy",0);if(!r.enemyHandle)r.enemyHandle=field<uint32_t>(base,info,"m_hAttackTarget",0);
+  r.sequence=field<int>(base,info,"m_nSequence",0);r.animationCycle=field<float>(base,info,"m_flCycle",1);r.simulationTime=field<float>(base,info,"m_flSimulationTime",1);
+  r.nextPrimaryAttack=field<float>(base,info,"m_flNextPrimaryAttack",1);r.nextAttack=field<float>(base,info,"m_flNextAttack",1);
+ }
  r.parent=field<uint32_t>(base,info,"moveparent",0);r.parentAttachment=field<uint8_t>(base,info,"m_iParentAttachment",0);r.owner=field<uint32_t>(base,info,"m_hOwnerEntity",0);r.weaponOwner=field<uint32_t>(base,info,"m_hOwner",0);r.activeWeapon=field<uint32_t>(base,info,"m_hActiveWeapon",0);r.viewModel=field<uint32_t>(base,info,"m_hViewModel[0]",0);
  }return r;
 }
@@ -127,11 +138,24 @@ inline void captureFollow(const GameCameraFrame& camera,const dango::inventory::
  auto record=readRecord(index,entry,net,f);if(!record)break;auto parent=record->parent;f.records.push_back(std::move(*record));if(!parent)break;handle=*parent;
  }f.status=f.records.empty()?"Follow target unavailable":"Target-only network pose update";finish();
 }
+// Bounded 20Hz refresh of already-discovered combat actors and their held weapon.
+// Uses verified raw handles/getters only; no new game virtual dispatch.
+inline void captureCombat(const GameCameraFrame& camera){
+ Frame f;f.epoch=camera.epoch;f.tick=camera.tick;auto full=std::atomic_load(&snapshot);
+ if(!camera.active||full->epoch!=camera.epoch||!bound||faulted){std::atomic_store(&combatSnapshot,std::make_shared<const Frame>(std::move(f)));return;}
+ auto object=uint32_t(reinterpret_cast<uintptr_t>(list));auto entries=uint32_t(int64_t(object)+profile::EntryBaseDelta);std::set<uint32_t> wanted;
+ for(const auto& r:full->records)if(r.className=="Tank"||(r.team&&(*r.team==2||(*r.team==3&&r.zombieClass&&*r.zombieClass==8)))){wanted.insert(r.handle);if(r.activeWeapon)wanted.insert(*r.activeWeapon);}
+ for(auto h:wanted){if(f.records.size()>=32)break;unsigned i=h&4095;if(i>=profile::MaxNetworked)continue;wire::Entry e;uint32_t net=0;
+  if(!wire::load(reader,entries+i*sizeof(e),e)||e.serial!=(h>>12)||!e.entity||!wire::load(reader,object+profile::CacheOffset+i*8,net)||!net)continue;
+  auto r=readRecord(i,e,net,f);if(r)f.records.push_back(std::move(*r));
+ }std::atomic_store(&combatSnapshot,std::make_shared<const Frame>(std::move(f)));
+}
 inline void onFrame(const GameCameraFrame& camera)noexcept{
  try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled;if(!active){if(wasEnabled){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}wasEnabled=false;return;}
- if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=0;epoch=camera.epoch;wasEnabled=true;}
+ if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=nextCombat=0;epoch=camera.epoch;wasEnabled=true;}
  if(request->enabled&&camera.tick>=nextFollow){nextFollow=camera.tick+33;captureFollow(camera,*request);}
  if((enabled.load()||browseRequested.load())&&camera.tick>=nextCapture){nextCapture=camera.tick+200;capture(camera);}
+ if(combatRequested&&camera.tick>=nextCombat){nextCombat=camera.tick+50;captureCombat(camera);}
  }catch(...){faulted=true;log("Capture stopped after an exception; toggle diagnostics to retry");}
 }
 inline nlohmann::json jsonFrame(const Frame& f){
