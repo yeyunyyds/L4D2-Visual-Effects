@@ -5,7 +5,9 @@ struct SequenceName{std::string label,activity;};
 template<class Reader> std::optional<SequenceName> sequenceName(Reader& reader,std::uint32_t header,int sequence,const char** reason=nullptr){
  auto fail=[&](const char* why)->std::optional<SequenceName>{if(reason)*reason=why;return {};};
  using namespace dango::entitywire;uint32_t magic=0;int version=0,length=0,count=0,offset=0;
- if(!load(reader,header,magic)||magic!=0x54534449||!load(reader,header+4,version)||version<44||version>49||!load(reader,header+76,length)||length<212||length>64*1024*1024||uint64_t(header)+length>0x100000000ull||!load(reader,header+188,count)||count<1||count>4096||sequence<0||sequence>=count||!load(reader,header+192,offset)||offset<212||offset>=length)return fail("studio header/count/sequence bounds rejected");
+ if(!load(reader,header,magic)||magic!=0x54534449||!load(reader,header+4,version)||version<44||version>49||!load(reader,header+76,length)||length<212||length>64*1024*1024||uint64_t(header)+length>0x100000000ull||!load(reader,header+188,count)||count<1||count>4096||!load(reader,header+192,offset)||offset<212||offset>=length)return fail("studio header/count/sequence bounds rejected");
+ if(sequence<0)return fail("negative sequence rejected");
+ if(sequence>=count)return fail("sequence outside local table; virtual model mapping required, unresolved");
  std::optional<SequenceName> found;
  for(auto stride:{212,216,224,232}){int64_t relative=int64_t(offset)+int64_t(sequence)*stride;if(relative<0||relative+212>length)continue;auto address=header+uint32_t(relative);int back=0,label=0,activity=0;
   if(!load(reader,address,back)||int64_t(relative)+back!=0||!load(reader,address+4,label)||!load(reader,address+8,activity))continue;

@@ -1,3 +1,14 @@
+# 0.7.3-tank-animation-preview5
+
+- 新增 SDK UtlVector 动画层元数据与只读采样测试：动态 stride、零权重层、超量容器、存储不一致、非法权重、坏元数据和地址溢出拒绝。
+- 19 组原生测试通过（ASan/UBSan）；Windows x86 MinGW 构建通过。安装包根目录仅 bin/ 与 README.md，DLL 与构建产物逐字节核对。
+- 无 L4D2 运行环境，未验证游戏内动画层布局、实际挥拳信号、事件接收或 DXVK 运行行为。
+- 不将 SDK 示例或公开事件枚举视为当前二进制已验证的 Hook 地址；正式版不变。
+
+---
+
+以下为历史预览验证记录；当前使用方式以 preview5 说明为准。
+
 # 0.7.3-tank-stopwatch-preview4
 
 - 主显示改为观测事件估算计时，陈旧客户端deadline只用于诊断。

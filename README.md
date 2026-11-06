@@ -1,8 +1,9 @@
 # L4D2 Visual Effects
 
-**Tank预测实验分支：0.7.3-tank-stopwatch-preview4（L4N-only）**
+**Tank预测实验分支：0.7.3-tank-animation-preview5（L4N-only）**
 
 默认关闭；只尝试客户端/同进程只读数据，无SourceMod依赖。正式版0.7.2仍是稳定基线。
+本次追踪叠加动画层与动画事件来源，尚未验证普通挥拳起手。见[调查依据](docs/tank-animation-sources.md)与[preview5 诊断包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-animation-preview5.zip)。
 请先阅读[实验说明与本地单人验收](docs/TANK-PREVIEW.md)，不要把注视目标或参数估计区理解为精确AI锁敌/命中边界。
 
 **求生之路 2 视觉效果插件 · 正式版 0.7.2**

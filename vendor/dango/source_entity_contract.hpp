@@ -66,8 +66,8 @@ template<class Reader> std::vector<std::string> combatSchemaHints(Reader& reader
  for(size_t index=0;index<pending.size()&&index<64&&out.size()<48;++index){auto node=pending[index];if(!seen.insert(node.table).second)continue;Table t;
   if(!load(reader,node.table,t)||t.count<0||t.count>2048||unsigned(t.count)>budget)continue;budget-=unsigned(t.count);
   for(int i=0;i<t.count&&out.size()<48;++i){Prop p;if(!load(reader,t.props+uint32_t(i)*sizeof(p),p))break;auto name=text(reader,p.name);if(name.empty()||name.size()>100||p.offset<0||p.offset>65536)continue;
-   auto path=node.path+name;bool wanted=name=="m_flCycle"||name=="m_nSequence"||name=="m_flSimulationTime"||name=="m_flNextAttack"||name=="m_flNextPrimaryAttack"||name=="m_lookatPlayer"||name=="m_hEnemy"||name=="m_hAttackTarget";
-   if(wanted)out.push_back(path+" type="+std::to_string(p.type)+" relativeOffset="+std::to_string(p.offset)+" recvProxy="+std::to_string(p.proxy));
+   auto path=node.path+name;bool wanted=name=="m_flCycle"||name=="m_nSequence"||name=="m_flSimulationTime"||name=="m_flNextAttack"||name=="m_flNextPrimaryAttack"||name=="m_lookatPlayer"||name=="m_hEnemy"||name=="m_hAttackTarget"||name=="overlay_vars"||name=="m_AnimOverlay"||name=="m_flWeight"||name=="m_nOrder"||name=="m_flPrevCycle"||name=="m_hPlayer"||name=="m_iPlayerIndex"||name=="m_iEvent"||name=="m_nData"||name=="lengthproxy";
+   if(wanted)out.push_back(path+" type="+std::to_string(p.type)+" relativeOffset="+std::to_string(p.offset)+" recvProxy="+std::to_string(p.proxy)+" tableProxy="+std::to_string(p.tableProxy)+" extra="+std::to_string(p.extra)+" stride="+std::to_string(p.stride)+" elements="+std::to_string(p.elements));
    if(p.type==6&&p.table&&node.depth<6&&pending.size()<64)pending.push_back({p.table,path+"/",node.depth+1});
   }
  }return out;

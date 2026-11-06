@@ -1,0 +1,43 @@
+# Tank 攻击动画与事件来源调查
+
+本次只追踪自动动作信号；不以手动标记、掉血、距离或固定 sequence 编号判定出拳。正式版 0.7.2 不变；实验分支仍仅依赖 L4N。
+
+## 已确认的采样缺口
+
+现有日志只给出了主体 `m_nSequence` 与主体 cycle。移动主体序列仍可能同时叠加另一层攻击手势，因此 `Run_4` 本身不能证明没有出拳。
+
+L4D2 分支 SDK 的 [c_baseanimatingoverlay.cpp](https://github.com/alliedmodders/hl2sdk/blob/l4d2/game/client/c_baseanimatingoverlay.cpp) 定义了独立的 `DT_Animationlayer`：`m_nSequence`、`m_flCycle`、`m_flPrevCycle`、`m_flWeight`、`m_nOrder`。其动画事件分发也按叠加层的序列和 cycle 处理。
+
+`m_AnimOverlay` 是通过 `RecvPropUtlVector` 接收的容器，不是内联层数组。[dt_utlvector_recv.cpp](https://github.com/alliedmodders/hl2sdk/blob/l4d2/public/dt_utlvector_recv.cpp) 的 `CRecvPropExtra_UtlVector` 记录元素大小、容器偏移和最大层数；元素属性的 stride 实际存的是元素编号。不能把 RecvProp offset 简单相加当成层地址。
+
+preview5 按这一元数据形状验证后读取 Tank 的所有层，包括权重为 0 的层。层字段偏移来自实际 RecvTable，元素大小来自实际 extra；容器数量、容量、指针、地址溢出和浮点值均检查。读取前后比较容器头，变化时舍弃该次采样。绝不调用接收代理、resize、SetupBones 或新的实体虚函数。校验失败只记录原因。
+
+这仍是每 50ms 的状态采样，日志每约 100ms 写一次，并非逐事件回调。短动作可能漏采，尚未据此接入自动出拳计时。
+
+旧日志还显示 Tank / CTerrorPlayer 的主体 `m_nSequence` 与基础动画实体使用不同的接收代理，同一个玩家的继承表中也同时出现了同偏移的不同代理。地址差异只证明接收入口不同，不能证明它触发了挥拳；需要当前 client.dll 的代码或经验证的代理入口才能继续追踪其具体作用。preview5 保留这些代理元数据，不修改它们。
+
+## 动画事件线索
+
+公开 L4D2 逆向资料的 [PlayerAnimEvent_t](https://github.com/SilvDev/Left4DHooks/blob/master/sourcemod/scripting/include/left4dhooks.inc) 将 `PLAYERANIMEVENT_HAND_ATTACK`（33）和 `PLAYERANIMEVENT_HAND_LOW_ATTACK`（34）关联到 `CTankClaw::OnSwingStart`。这给出了查找入口，但不等于已经验证当前客户端二进制的事件编号、调用约定或 AI 出拳覆盖率。这里仅参考资料，不安装、不调用、不依赖该项目。
+
+同一 SDK 分支的 [c_sdk_player.cpp](https://github.com/alliedmodders/hl2sdk/blob/l4d2/game/client/sdk/c_sdk_player.cpp) 展示了客户端事件接收链：`C_TEPlayerAnimEvent::PostDataUpdate` 使用 `m_hPlayer`、`m_iEvent`、`m_nData` 调用玩家的 `DoAnimationEvent`。这是 SDK 示例实现，不能直接当成 L4D2 的实际实现。
+
+preview5 从已有的模块内 ClientClass 描述符目录查找名称包含 `AnimEvent` 的类，只记录其事件工厂指针和 RecvTable 元数据。不会调用工厂、安装事件 Hook 或修改接收代理。目录可能不完整；找不到类不证明游戏没有该事件。
+
+下一步需要运行时先确认实际事件类、字段和接收位置，再按当前 client.dll 验证回调；不能直接套用服务端地址或其他 Source 游戏的虚表槽位。
+
+## 序列 80 与共享模型
+
+旧日志中序列 80 只有一个合并的拒绝原因，不能据此证明它一定超出了本地表，更不能宣布它就是拳击。
+
+[studio.cpp](https://github.com/alliedmodders/hl2sdk/blob/l4d2/public/studio.cpp) 的 `CStudioHdr::pSeqdesc` 在存在虚拟模型时，通过 `m_seq[i].group/index` 映射到另一个模型的本地序列；`studiohdr_t::numlocalseq` 只代表本地表数量。
+
+preview5 额外记录 `localSequenceCount`，区分本地表越界与描述符校验失败。尚未实现虚拟模型缓存读取，不会猜测私有布局或硬编码 sequence 80。
+
+## 需要下一份日志回答的问题
+
+1. 普通挥拳时，主体仍为移动动作，而某一叠加层是否出现攻击标签、权重上升和 cycle 重启？
+2. 该层是本地序列还是需要共享模型映射？
+3. 当前客户端是否暴露动画事件类，实际事件字段是什么？
+
+在这些问题验证前，不能宣称已获得可靠的普通拳起手事件或真实攻击冷却。

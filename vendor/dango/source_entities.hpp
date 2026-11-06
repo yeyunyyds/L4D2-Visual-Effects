@@ -29,7 +29,7 @@ struct Reader {
  bool read(uint32_t address,void* out,size_t size)const{SIZE_T got=0;return address&&size<=256*1024&&uint64_t(address)+size<=0x100000000ull&&ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<const void*>(uintptr_t(address)),out,size,&got)&&got==size;}
 };
 inline Reader reader;
-struct ClassInfo {std::string name;int id=-1;wire::Fields fields;std::vector<std::string> combatHints;bool schema=false;};
+struct ClassInfo {std::string name;int id=-1;wire::Fields fields;dango::animation::LayerLayout layers;std::vector<std::string> combatHints;bool schema=false;};
 inline std::map<uint32_t,ClassInfo> classes;inline std::map<int,std::string> models;
 inline void publish(Frame frame){std::atomic_store(&snapshot,std::make_shared<const Frame>(std::move(frame)));}
 inline void log(const std::string& text){source_camera::log("Entity inventory: "+text);}
@@ -67,7 +67,7 @@ inline bool method(uint32_t object,unsigned slot,uint32_t& function){uint32_t vt
 inline std::optional<uint32_t> classAddress(uint32_t networkable){uint32_t fn;if(!method(networkable,profile::ClassSlot,fn))return {};return wire::addressGetter(reader,fn,networkable);}
 inline ClassInfo readClass(uint32_t address){
  ClassInfo out;wire::ClientClass c;if(!source_camera::owns(reinterpret_cast<void*>(uintptr_t(address)),source_camera::clientModule)||!wire::load(reader,address,c))return out;
- out.name=wire::text(reader,c.name);if(!wire::className(out.name)||c.id<0||c.id>4096){out.name.clear();return out;}out.id=c.id;out.schema=wire::fields(reader,c.table,out.fields,combatRequested.load());if(combatRequested)out.combatHints=wire::combatSchemaHints(reader,c.table);return out;
+ out.name=wire::text(reader,c.name);if(!wire::className(out.name)||c.id<0||c.id>4096){out.name.clear();return out;}out.id=c.id;out.schema=wire::fields(reader,c.table,out.fields,combatRequested.load());if(combatRequested){out.combatHints=wire::combatSchemaHints(reader,c.table);out.layers=dango::animation::animationLayerLayout(reader,c.table);}return out;
 }
 template<class T> std::optional<T> field(uint32_t base,const ClassInfo& c,const char* name,int type){auto it=c.fields.find(name);if(!c.schema||it==c.fields.end()||it->second.type!=type||uint64_t(base)+it->second.offset+sizeof(T)>0x100000000ull)return {};T value;if(!wire::load(reader,base+it->second.offset,value))return {};return value;}
 inline std::optional<Vec3> vectorField(uint32_t base,const ClassInfo& c,const char* name){auto v=field<Vec3>(base,c,name,2);if(!v||!std::isfinite(v->x)||!std::isfinite(v->y)||!std::isfinite(v->z)||std::max({std::abs(v->x),std::abs(v->y),std::abs(v->z)})>1000000)return {};return v;}
@@ -86,9 +86,12 @@ inline void getterHint(Frame& frame,const char* kind,uint32_t fn){
 }
 // Class ID catalog follows only module-owned ClientClass descriptors. It does
 // not dispatch GetAllClasses or any new game virtual method. Bounded per map.
-inline visual::ClassCatalog classCatalog;
+inline visual::ClassCatalog classCatalog;inline std::map<uint32_t,std::vector<std::string>> animationEventSchemas;inline std::set<uint32_t> animationEventScanned;
 inline void catalogClasses(uint32_t address){
  classCatalog.observe(reader,address,[](uint32_t p){return source_camera::owns(reinterpret_cast<void*>(uintptr_t(p)),source_camera::clientModule);});
+ if(combatRequested&&animationEventScanned.size()<classCatalog.descriptors.size())for(auto descriptor:classCatalog.descriptors){if(!animationEventScanned.insert(descriptor).second)continue;wire::ClientClass c;if(!wire::load(reader,descriptor,c))continue;auto name=wire::text(reader,c.name);if(name.find("AnimEvent")==std::string::npos)continue;
+  auto hints=wire::combatSchemaHints(reader,c.table);hints.insert(hints.begin(),"descriptor="+name+" createEvent="+std::to_string(c.event)+" metadata only; callback not hooked");animationEventSchemas[descriptor]=std::move(hints);
+ }
 }
 inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint32_t net,Frame& frame){
  ++frame.occupied;auto h=wire::handle(i,entry.serial);if(!h)return {};Record r;r.index=i;r.serial=entry.serial;r.handle=*h;
@@ -106,6 +109,7 @@ inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint
   r.velocity=vectorField(base,info,"m_vecVelocity[0]");if(!r.velocity)r.velocity=vectorField(base,info,"m_vecVelocity");
   r.collisionMins=vectorField(base,info,"m_Collision.m_vecMins");r.collisionMaxs=vectorField(base,info,"m_Collision.m_vecMaxs");
   r.lookAtHandle=field<uint32_t>(base,info,"m_lookatPlayer",0);r.enemyHandle=field<uint32_t>(base,info,"m_hEnemy",0);if(!r.enemyHandle)r.enemyHandle=field<uint32_t>(base,info,"m_hAttackTarget",0);
+  if(r.className=="Tank"||(r.zombieClass&&*r.zombieClass==8))r.animationLayers=dango::animation::animationLayers(reader,base,info.layers,r.animationLayerReason);
   r.sequence=field<int>(base,info,"m_nSequence",0);r.animationCycle=field<float>(base,info,"m_flCycle",1);if(r.animationCycle&&(!std::isfinite(*r.animationCycle)||*r.animationCycle<0||*r.animationCycle>1))r.animationCycle.reset();r.simulationTime=field<float>(base,info,"m_flSimulationTime",1);
   // RecvProxy_SimulationTime receives an integer but stores a decoded FLOAT.
   if(!r.simulationTime)r.simulationTime=field<float>(base,info,"m_flSimulationTime",0);
@@ -155,11 +159,11 @@ inline void captureCombat(const GameCameraFrame& camera){
  for(auto h:wanted){if(f.records.size()>=32)break;unsigned i=h&4095;if(i>=profile::MaxNetworked)continue;wire::Entry e;uint32_t net=0;
   if(!wire::load(reader,entries+i*sizeof(e),e)||e.serial!=(h>>12)||!e.entity||!wire::load(reader,object+profile::CacheOffset+i*8,net)||!net)continue;
   auto r=readRecord(i,e,net,f);if(r)f.records.push_back(std::move(*r));
- }std::atomic_store(&combatSnapshot,std::make_shared<const Frame>(std::move(f)));
+ }for(const auto& entry:animationEventSchemas)for(const auto& hint:entry.second)if(f.animationEventSchemas.size()<32)f.animationEventSchemas.push_back(hint);std::atomic_store(&combatSnapshot,std::make_shared<const Frame>(std::move(f)));
 }
 inline void onFrame(const GameCameraFrame& camera)noexcept{
- try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled;if(!active){if(wasEnabled){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}wasEnabled=false;return;}
- if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=nextCombat=0;epoch=camera.epoch;wasEnabled=true;}
+ try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled;if(!active){if(wasEnabled){classes.clear();models.clear();classCatalog.clear();animationEventSchemas.clear();animationEventScanned.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}wasEnabled=false;return;}
+ if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();classCatalog.clear();animationEventSchemas.clear();animationEventScanned.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=nextCombat=0;epoch=camera.epoch;wasEnabled=true;}
  if(request->enabled&&camera.tick>=nextFollow){nextFollow=camera.tick+33;captureFollow(camera,*request);}
  if((enabled.load()||browseRequested.load())&&camera.tick>=nextCapture){nextCapture=camera.tick+200;capture(camera);}
  if(combatRequested&&camera.tick>=nextCombat){nextCombat=camera.tick+50;captureCombat(camera);}

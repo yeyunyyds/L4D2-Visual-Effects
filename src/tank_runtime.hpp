@@ -11,7 +11,7 @@ inline std::atomic<unsigned long> engineObservations{0},studioObservations{0},ta
 inline std::shared_ptr<const Result> emptyResult=std::make_shared<const Result>();
 inline std::shared_ptr<const Settings> options=std::make_shared<const Settings>();
 inline std::shared_ptr<const Result> snapshot=std::make_shared<const Result>();
-struct Animation{std::uint32_t epoch=0,handle=0;int sequence=-1;SequenceName names;std::string route,reason,model;};
+struct Animation{std::uint32_t epoch=0,handle=0;int sequence=-1;SequenceName names;std::string route,reason,model;std::map<int,SequenceName> layerNames;std::map<int,std::string> layerReasons;std::uint32_t header=0;int localSequenceCount=0;};
 struct MarkRequest{std::uint32_t epoch=0,handle=0;std::uint64_t tick=0;};
 inline std::shared_ptr<const MarkRequest> markRequest=std::make_shared<const MarkRequest>();
 inline std::atomic<const char*> markStatus{u8"未手动标记"};
@@ -32,12 +32,14 @@ inline bool tankModel(std::uint32_t header){
 inline void observeRecord(std::uint32_t header,const Record& record,std::uint32_t epoch,const char* route){
  if(!record.sequence)return;std::lock_guard<std::mutex> lock(animationMutex);auto old=animations.find(record.handle);
  std::string routes=route;
- if(old!=animations.end()&&old->second.epoch==epoch&&old->second.sequence==*record.sequence){
-  if(old->second.route.find(route)!=std::string::npos)return;
-  routes=old->second.route+"+"+route;if(!old->second.names.label.empty()){old->second.route=routes;return;}
+ if(old!=animations.end()&&old->second.epoch==epoch&&old->second.sequence==*record.sequence&&old->second.header==header){
+  std::set<int> unique;for(const auto& layer:record.animationLayers)unique.insert(layer.sequence);bool sameLayers=old->second.layerReasons.size()==unique.size();for(const auto& layer:record.animationLayers)if(!old->second.layerReasons.count(layer.sequence))sameLayers=false;
+  if(old->second.route.find(route)!=std::string::npos&&sameLayers)return;
+  routes=old->second.route;if(routes.find(route)==std::string::npos)routes+="+"+std::string(route);if(!old->second.names.label.empty()&&sameLayers){old->second.route=routes;return;}
  }
  if(animations.size()>16)animations.clear();const char* reason="not attempted";auto name=sequenceName(source_entities::reader,header,*record.sequence,&reason);
- animations[record.handle]={epoch,record.handle,*record.sequence,name?*name:SequenceName{},routes,reason,dango::entitywire::text(source_entities::reader,header+12,64)};
+ animations[record.handle]={epoch,record.handle,*record.sequence,name?*name:SequenceName{},routes,reason,dango::entitywire::text(source_entities::reader,header+12,64),{}, {}};
+ auto& current=animations[record.handle];current.header=header;dango::entitywire::load(source_entities::reader,header+188,current.localSequenceCount);for(const auto& layer:record.animationLayers){const char* why="not attempted";auto n=sequenceName(source_entities::reader,header,layer.sequence,&why);current.layerReasons[layer.sequence]=why;if(n)current.layerNames[layer.sequence]=*n;}
 }
 inline void observeModel(std::uint32_t header,int index){
  if(faulted||!std::atomic_load(&options)->enabled)return;++engineObservations;auto frame=std::atomic_load(&source_entities::combatSnapshot);auto camera=std::atomic_load(&source_camera::snapshot);auto now=GetTickCount64();
@@ -108,21 +110,22 @@ inline std::string menu(){auto cfg=std::atomic_load(&options);auto f=std::atomic
 inline bool action(std::uintptr_t id){if(id>=0x90000&&id<0x90000+displayedTanks.size()){auto pair=displayedTanks[id-0x90000];mark(pair.first,pair.second);return true;}if((id<330||id>333)&&id!=335)return false;auto s=*std::atomic_load(&options);if(id==330){source_entities::resetRequested=true;s.enabled=!s.enabled;if(s.enabled)faulted=false;}if(id==331)s.draw=!s.draw;if(id==332)s.logging=!s.logging;if(id==335)s.markKey=!s.markKey;if(id==333)s.horizonMs=s.horizonMs>=500?0:s.horizonMs+100;std::atomic_store(&options,std::make_shared<const Settings>(s));return true;}
 inline void poll(std::uint64_t now)try{if(faulted)return;auto cfg=std::atomic_load(&options);pollCvars(now,cfg->enabled);static std::uint64_t next=0,last=0;
  if(!cfg->enabled||!cfg->logging||now<next)return;next=now+100;auto f=std::atomic_load(&snapshot);if(!f->tick||f->tick==last)return;last=f->tick;
- nlohmann::json j={{"schema",4},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
+ nlohmann::json j={{"schema",5},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
  j["observationDiagnostics"]={{"engine",engineObservations.load()},{"studio",studioObservations.load()},{"tankHeaders",tankHeaders.load()},{"renderableMatches",renderableMatches.load()}};
  j["clockSourceHandle"]=f->clock.source;j["clockReason"]=f->clock.reason;if(f->clock.time)j["observedGameTime"]=*f->clock.time;
  if(f->parameters.range)j["range"]=*f->parameters.range;if(f->parameters.arc)j["arc"]=*f->parameters.arc;if(f->parameters.windup)j["windup"]=*f->parameters.windup;if(f->parameters.duration)j["duration"]=*f->parameters.duration;if(f->parameters.interval)j["interval"]=*f->parameters.interval;if(f->parameters.missInterval)j["missInterval"]=*f->parameters.missInterval;
  for(const auto& o:f->tanks){nlohmann::json r={{"handle",o.handle},{"position",{o.origin.x,o.origin.y,o.origin.z}},{"yaw",o.heading},{"pitch",o.pitch},{"nearVerticalAim",o.nearVerticalAim},{"eyeAngle",o.eye},{"headingRate",o.headingRate},{"possibleHeadingLock",o.headingStalled},{"action",o.action},{"geometry",o.geometry},{"reason",o.reason}};
   {std::lock_guard<std::mutex> lock(animationMutex);auto probe=animations.find(o.handle);
-   if(probe!=animations.end()&&probe->second.epoch==f->epoch){r["animationProbe"]={{"route",probe->second.route},{"reason",probe->second.reason},{"model",probe->second.model},{"sequence",probe->second.sequence},{"label",probe->second.names.label},{"activity",probe->second.names.activity}};}
+   if(probe!=animations.end()&&probe->second.epoch==f->epoch){r["animationProbe"]={{"route",probe->second.route},{"reason",probe->second.reason},{"model",probe->second.model},{"sequence",probe->second.sequence},{"localSequenceCount",probe->second.localSequenceCount},{"label",probe->second.names.label},{"activity",probe->second.names.activity}};}
    else r["animationProbe"]={{"reason","no matching model observation"}};}
   r["rawFieldCooldownReason"]=o.timing.reason;r["rawFieldPartial"]=o.timing.partial;if(o.timing.weaponDeadline)r["rawWeaponDeadline"]=*o.timing.weaponDeadline;if(o.timing.actorDeadline)r["rawActorDeadline"]=*o.timing.actorDeadline;
   auto estimates=std::atomic_load(&observedSnapshot);auto estimate=estimates->find(o.handle);if(estimate!=estimates->end()){const auto& e=estimate->second;r["stopwatch"]={{"eventId",e.eventId},{"source",e.source},{"reason",e.reason},{"triggered",e.triggered},{"expired",e.expired},{"throwing",e.throwing}};if(e.startedAt)r["stopwatch"]["startedAt"]=*e.startedAt;if(e.span)r["stopwatch"]["span"]=*e.span;if(e.sinceThrow)r["stopwatch"]["sinceThrowEnd"]=*e.sinceThrow;}
   if(o.cooldown)r["estimatedCooldown"]=*o.cooldown;if(o.sequence)r["sequence"]=*o.sequence;if(o.cycle)r["cycle"]=*o.cycle;if(o.target)r["target"]={{"handle",o.target->handle},{"name",o.target->name},{"source",o.target->source}};j["tanks"].push_back(r);
  }
- auto actors=std::atomic_load(&source_entities::combatSnapshot);j["actors"]=nlohmann::json::array();j["actorTick"]=actors->tick;j["resultTick"]=f->tick;j["fieldSchemaHints"]=actors->getterHints;
+ auto actors=std::atomic_load(&source_entities::combatSnapshot);j["actors"]=nlohmann::json::array();j["actorTick"]=actors->tick;j["resultTick"]=f->tick;j["fieldSchemaHints"]=actors->getterHints;j["animationEventSchemas"]=actors->animationEventSchemas;
  if(actors->epoch==f->epoch)for(const auto& a:actors->records){nlohmann::json r={{"handle",a.handle},{"class",a.className}};
   auto vector=[&](const char* key,const std::optional<Vec3>& v){if(v)r[key]={v->x,v->y,v->z};};vector("position",a.networkOrigin);vector("bodyAngles",a.networkAngles);vector("eyeAngles",a.eyeAngles);vector("collisionMins",a.collisionMins);vector("collisionMaxs",a.collisionMaxs);
+  if(!a.animationLayerReason.empty()){r["animationLayerReason"]=a.animationLayerReason;r["animationLayers"]=nlohmann::json::array();std::lock_guard<std::mutex> lock(animationMutex);auto probe=animations.find(a.handle);for(const auto& layer:a.animationLayers){nlohmann::json l={{"index",layer.index},{"sequence",layer.sequence},{"cycle",layer.cycle},{"previousCycle",layer.previousCycle},{"weight",layer.weight},{"order",layer.order}};if(probe!=animations.end()&&probe->second.epoch==actors->epoch){auto n=probe->second.layerNames.find(layer.sequence);if(n!=probe->second.layerNames.end()){l["label"]=n->second.label;l["activity"]=n->second.activity;}auto why=probe->second.layerReasons.find(layer.sequence);if(why!=probe->second.layerReasons.end())l["resolution"]=why->second;}r["animationLayers"].push_back(l);}}
   if(a.weaponOwner)r["weaponOwner"]=*a.weaponOwner;if(a.owner)r["owner"]=*a.owner;if(a.animationCycle)r["animationCycle"]=*a.animationCycle;
   if(a.health)r["health"]=*a.health;if(a.lookAtHandle)r["lookAtHandle"]=*a.lookAtHandle;if(a.enemyHandle)r["enemyHandle"]=*a.enemyHandle;if(a.activeWeapon)r["activeWeapon"]=*a.activeWeapon;if(a.nextPrimaryAttack)r["nextPrimaryAttack"]=*a.nextPrimaryAttack;if(a.nextAttack)r["nextAttack"]=*a.nextAttack;if(a.simulationTime)r["simulationTime"]=*a.simulationTime;j["actors"].push_back(r);
  }
