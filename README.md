@@ -24,7 +24,23 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
-## Tank 攻击叠加层自动计时 · 0.7.3-tank-layer-timer-preview7
+## Tank 完整周期与黄条位置修复 · 0.7.3-tank-cycle-preview8
+
+**[下载 preview8 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-cycle-preview8.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/ffa4749) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/ffa4749/docs/TANK-PREVIEW.md)
+
+修复 preview7 直接采用较短挥空间隔造成的黄条过早归零。现在以实时前摇加普通攻击间隔估算正常完整周期，最新日志为 0.5+1.5=2.0 秒，与贴身连续起手的约 1.99～2.00 秒吻合；没有写死 2 秒。命中/挥空仍未确认，不能据此保证所有情况下的真实冷却或安全窗口。
+
+黄条世界空间锚点由 origin.z+100 调至 +91，下移约原高度的 9%。自动识别、重复采样去重和加粗样式保留；无需 F7 或开启诊断。开启 Tank 预测和绘制即可使用。
+
+21 组原生测试、Windows x86 构建、安装包检查通过；最新和先前日志回放分别得到 8/29 次新起手及对应计时，没有重复启动。尚未进行新 DLL 游戏实测。事件采集和共享模型映射的已知限制保持，正式版仍为 0.7.2。
+
+安装包根目录仅 bin/ 和 README.md。**联机功能未经测试，不保障 VAC 安全。**
+
+SHA-256：`411a401a133590cf5d546f79838361f575f7ddfa6e363a717c0ea0efedceb313`
+
+## 历史 Tank 攻击叠加层自动计时 · 0.7.3-tank-layer-timer-preview7
+
+用户实测发现本版黄条周期过短，请升级 preview8。以下保留为历史记录。
 
 **[下载 preview7 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-layer-timer-preview7.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/66c0611) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/66c0611/docs/TANK-PREVIEW.md)
 
