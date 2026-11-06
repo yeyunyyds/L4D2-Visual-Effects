@@ -24,6 +24,20 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
+## Tank行为预测实验 · 0.7.3-tank-preview2
+
+**[下载preview2](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-preview2.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/d59dfc1) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experiment/tank-threat/docs/TANK-PREVIEW.md)
+
+- 修正近竖直瞄准时的二维yaw锁向误报，暂停此时不可靠的地面范围，方向线保留真实pitch。
+- 既有Studio钩子在关闭拉伸/快速绘制时也采集Tank动画CPU元数据，补足可能绕过Engine模型回调的路径。不增加Source GPU操作，不改变骨骼，不调用新游戏虚函数。
+- 日志schema=2新增动画路径/失败原因、字段表元数据、pitch与采样时间；仅采集角色、Tank及武器，排除团队等非角色对象。
+
+仍只依赖L4N，默认关闭，不需要SourceMod。十六组回归和x86构建通过；动作标签可读性及预测准确率仍需实机验证，unknown不能视为没有攻击。开启诊断记录后生成新的tank-prediction.jsonl。
+
+安装包顶层仅bin/与README.md。**联机功能未经测试，不保障VAC安全；Tank实验同样不提供VAC保证。** 正式版仍为0.7.2。
+
+SHA-256：`cb1211a77ac117203f68d6438b246b8844ccfbfb74c1482aae6291650a06c9bf`
+
 ## Tank行为预测实验 · 0.7.3-tank-preview
 
 **[下载独立实验包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-preview.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/cf53276) · [说明与单人验收](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experiment/tank-threat/docs/TANK-PREVIEW.md)
