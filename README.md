@@ -24,7 +24,19 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
-## Tank 动画来源诊断 · 0.7.3-tank-animation-preview5
+## Tank 实际动画事件诊断 · 0.7.3-tank-events-preview6
+
+**[下载 preview6 诊断包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-events-preview6.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/dc3f73d) · [测试步骤](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/dc3f73d/docs/TANK-PREVIEW.md)
+
+在 preview5 已确认的 CTEPlayerAnimEvent 上观察事件工厂和三个字段接收代理；原回调照常执行，不改变事件参数。仅在 Tank 预测和诊断记录同时开启时安装，关闭后恢复；默认关闭。不是套用 SDK 的事件虚表槽位，也不依赖 SourceMod。
+
+新增独立 tank-animation-events.jsonl，记录完整/不完整字段组、实际事件编号和完整玩家句柄；tank-animation-binding.json 保存绑定检查与入口代码诊断。tank-prediction.jsonl 升为 schema 6，并附回调计数和最近事件。请在本地测试普通挥拳、挥空和投石后挥拳约 20～30 秒，提供上述三份文件及存在的 previous 日志；无需 F7 或人工标记。
+
+**尚未实机验证实际接收覆盖率和 AI Tank 事件编号，未据此接入冷却。** 同时增加模型 include 名称记录，序列 80 的全局映射仍未实现。20 组原生测试、Windows x86 构建及安装包检查通过。根目录仅 bin/ 和 README.md，正式版保持 0.7.2。
+
+**联机功能未经测试，不保障 VAC 安全。** SHA-256：`d8e2b8cf20084129e0d31182d3f00cfb625473dcb2485a74d7778e239d2e12e1`
+
+## 历史 Tank 动画来源诊断 · 0.7.3-tank-animation-preview5
 
 **[下载动画来源诊断包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-animation-preview5.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/6c87ffc) · [调查依据](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/6c87ffc/docs/tank-animation-sources.md)
 
