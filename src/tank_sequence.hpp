@@ -1,6 +1,17 @@
 #pragma once
 #include "dango/source_entity_contract.hpp"
 namespace visual::tank {
+struct ModelIncludes{std::vector<std::string> names;std::string reason="include metadata unavailable";};
+template<class Reader> ModelIncludes modelIncludes(Reader& reader,std::uint32_t header){
+ using namespace dango::entitywire;ModelIncludes out;uint32_t magic=0;int version=0,length=0,count=0,offset=0;
+ if(!load(reader,header,magic)||magic!=0x54534449||!load(reader,header+4,version)||version!=48||!load(reader,header+76,length)||length<408||length>64*1024*1024||uint64_t(header)+length>0x100000000ull||!load(reader,header+336,count)||count<0||count>32||!load(reader,header+340,offset)){out.reason="v48 include header rejected";return out;}
+ if(count==0){out.reason="no included models in v48 header";return out;}
+ if(offset<408||uint64_t(offset)+uint64_t(count)*8>uint64_t(length)){out.reason="include table bounds rejected";return out;}
+ for(int i=0;i<count;++i){int relative=0;uint32_t group=uint32_t(offset)+uint32_t(i)*8;if(!load(reader,header+group+4,relative)){out.names.clear();out.reason="include entry unreadable";return out;}
+  auto at=int64_t(group)+relative;if(relative<=0||at<0||at>=length){out.names.clear();out.reason="include name bounds rejected";return out;}
+  auto name=text(reader,header+uint32_t(at),size_t(std::min<int64_t>(260,int64_t(length)-at)));if(name.empty()){out.names.clear();out.reason="include name unreadable";return out;}out.names.push_back(std::move(name));
+ }out.reason="v48 include names only; virtual sequence mapping unresolved";return out;
+}
 struct SequenceName{std::string label,activity;};
 template<class Reader> std::optional<SequenceName> sequenceName(Reader& reader,std::uint32_t header,int sequence,const char** reason=nullptr){
  auto fail=[&](const char* why)->std::optional<SequenceName>{if(reason)*reason=why;return {};};

@@ -33,6 +33,8 @@ int main(){using namespace visual::tank;using dango::inventory::Record;using dan
  unsigned header=4096;m.put(header,0x54534449u);m.put(header+4,48);m.put(header+76,2000);m.put(header+188,2);m.put(header+192,256);
  for(int i=0;i<2;++i){unsigned address=header+256+unsigned(i)*212;m.put(address,-(256+i*212));m.put(address+4,int(header+1000+unsigned(i)*128-address));m.put(address+8,int(header+1300+unsigned(i)*128-address));}
  m.text(header+1000,"Idle");m.text(header+1300,"ACT_IDLE");m.text(header+1128,"Throw_Rock");m.text(header+1428,"ACT_RANGE_ATTACK1");auto seq=sequenceName(m,header,1);check(seq&&seq->label=="Throw_Rock"&&classify(*seq)=="throw-animation");check(!sequenceName(m,header,2));m.put(header+256+212,0);check(!sequenceName(m,header,1));
+ // Included model references are data only; they are not global sequence indices.
+ m.put(header+336,1);m.put(header+340,1600);m.put(header+1600+4,32);m.text(header+1632,"models/infected/anim_hulk.mdl");auto includes=modelIncludes(m,header);check(includes.names.size()==1&&includes.names[0]=="models/infected/anim_hulk.mdl");m.put(header+1600+4,0x7fffffff);check(modelIncludes(m,header).names.empty());m.put(header+336,33);check(modelIncludes(m,header).names.empty());m.put(header+336,0);check(modelIncludes(m,header).names.empty());
  // Combat fields are opt-in and only the explicitly embedded collision table is walked.
  using namespace dango::entitywire;Memory schema;Table root;root.props=4000;root.count=3;root.name=3000;schema.text(3000,"DT_TestTank");schema.put(256,root);
  Table collision;collision.props=4300;collision.count=2;collision.name=3032;schema.text(3032,"DT_CollisionProperty");schema.put(320,collision);

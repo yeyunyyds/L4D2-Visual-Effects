@@ -2,6 +2,7 @@
 #include "tank_cvars.hpp"
 #include "diagnostics.hpp"
 #include "tank_sequence.hpp"
+#include "tank_event_runtime.hpp"
 #include "tank_observed_timer.hpp"
 #include "entity_menu.hpp"
 #include <mutex>
@@ -11,7 +12,7 @@ inline std::atomic<unsigned long> engineObservations{0},studioObservations{0},ta
 inline std::shared_ptr<const Result> emptyResult=std::make_shared<const Result>();
 inline std::shared_ptr<const Settings> options=std::make_shared<const Settings>();
 inline std::shared_ptr<const Result> snapshot=std::make_shared<const Result>();
-struct Animation{std::uint32_t epoch=0,handle=0;int sequence=-1;SequenceName names;std::string route,reason,model;std::map<int,SequenceName> layerNames;std::map<int,std::string> layerReasons;std::uint32_t header=0;int localSequenceCount=0;};
+struct Animation{std::uint32_t epoch=0,handle=0;int sequence=-1;SequenceName names;std::string route,reason,model;std::map<int,SequenceName> layerNames;std::map<int,std::string> layerReasons;std::uint32_t header=0;int localSequenceCount=0;ModelIncludes includes{};};
 struct MarkRequest{std::uint32_t epoch=0,handle=0;std::uint64_t tick=0;};
 inline std::shared_ptr<const MarkRequest> markRequest=std::make_shared<const MarkRequest>();
 inline std::atomic<const char*> markStatus{u8"未手动标记"};
@@ -39,7 +40,7 @@ inline void observeRecord(std::uint32_t header,const Record& record,std::uint32_
  }
  if(animations.size()>16)animations.clear();const char* reason="not attempted";auto name=sequenceName(source_entities::reader,header,*record.sequence,&reason);
  animations[record.handle]={epoch,record.handle,*record.sequence,name?*name:SequenceName{},routes,reason,dango::entitywire::text(source_entities::reader,header+12,64),{}, {}};
- auto& current=animations[record.handle];current.header=header;dango::entitywire::load(source_entities::reader,header+188,current.localSequenceCount);for(const auto& layer:record.animationLayers){const char* why="not attempted";auto n=sequenceName(source_entities::reader,header,layer.sequence,&why);current.layerReasons[layer.sequence]=why;if(n)current.layerNames[layer.sequence]=*n;}
+ auto& current=animations[record.handle];current.header=header;current.includes=modelIncludes(source_entities::reader,header);dango::entitywire::load(source_entities::reader,header+188,current.localSequenceCount);for(const auto& layer:record.animationLayers){const char* why="not attempted";auto n=sequenceName(source_entities::reader,header,layer.sequence,&why);current.layerReasons[layer.sequence]=why;if(n)current.layerNames[layer.sequence]=*n;}
 }
 inline void observeModel(std::uint32_t header,int index){
  if(faulted||!std::atomic_load(&options)->enabled)return;++engineObservations;auto frame=std::atomic_load(&source_entities::combatSnapshot);auto camera=std::atomic_load(&source_camera::snapshot);auto now=GetTickCount64();
@@ -63,6 +64,7 @@ inline void observeStudio(std::uint32_t header,std::uint32_t renderable){
  }
 }
 inline void onFrame(const dango::GameCameraFrame& camera)try{
+ auto eventCfg=std::atomic_load(&options);events::update(!faulted&&eventCfg->enabled&&eventCfg->logging,camera);
  if(faulted)return;
  static Predictor predictor;static std::shared_ptr<const Frame> previous;
  static std::uint32_t timerEpoch=0;static std::uint64_t consumedMark=0;static std::map<std::uint32_t,SwingStopwatch> timers;
@@ -108,15 +110,16 @@ inline std::string menu(){auto cfg=std::atomic_load(&options);auto f=std::atomic
  return menuPage(u8"Tank 行为预测 · L4N 客户端实验",rows+menuItem(u8"保存设置",101)+menuRow(u8"仅预测；不是服务器精确命中边界"));
 }
 inline bool action(std::uintptr_t id){if(id>=0x90000&&id<0x90000+displayedTanks.size()){auto pair=displayedTanks[id-0x90000];mark(pair.first,pair.second);return true;}if((id<330||id>333)&&id!=335)return false;auto s=*std::atomic_load(&options);if(id==330){source_entities::resetRequested=true;s.enabled=!s.enabled;if(s.enabled)faulted=false;}if(id==331)s.draw=!s.draw;if(id==332)s.logging=!s.logging;if(id==335)s.markKey=!s.markKey;if(id==333)s.horizonMs=s.horizonMs>=500?0:s.horizonMs+100;std::atomic_store(&options,std::make_shared<const Settings>(s));return true;}
-inline void poll(std::uint64_t now)try{if(faulted)return;auto cfg=std::atomic_load(&options);pollCvars(now,cfg->enabled);static std::uint64_t next=0,last=0;
+inline void poll(std::uint64_t now)try{events::poll();if(faulted)return;auto cfg=std::atomic_load(&options);pollCvars(now,cfg->enabled);static std::uint64_t next=0,last=0;
  if(!cfg->enabled||!cfg->logging||now<next)return;next=now+100;auto f=std::atomic_load(&snapshot);if(!f->tick||f->tick==last)return;last=f->tick;
- nlohmann::json j={{"schema",5},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
+ nlohmann::json j={{"schema",6},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
+ j["eventCapture"]=events::summary();
  j["observationDiagnostics"]={{"engine",engineObservations.load()},{"studio",studioObservations.load()},{"tankHeaders",tankHeaders.load()},{"renderableMatches",renderableMatches.load()}};
  j["clockSourceHandle"]=f->clock.source;j["clockReason"]=f->clock.reason;if(f->clock.time)j["observedGameTime"]=*f->clock.time;
  if(f->parameters.range)j["range"]=*f->parameters.range;if(f->parameters.arc)j["arc"]=*f->parameters.arc;if(f->parameters.windup)j["windup"]=*f->parameters.windup;if(f->parameters.duration)j["duration"]=*f->parameters.duration;if(f->parameters.interval)j["interval"]=*f->parameters.interval;if(f->parameters.missInterval)j["missInterval"]=*f->parameters.missInterval;
  for(const auto& o:f->tanks){nlohmann::json r={{"handle",o.handle},{"position",{o.origin.x,o.origin.y,o.origin.z}},{"yaw",o.heading},{"pitch",o.pitch},{"nearVerticalAim",o.nearVerticalAim},{"eyeAngle",o.eye},{"headingRate",o.headingRate},{"possibleHeadingLock",o.headingStalled},{"action",o.action},{"geometry",o.geometry},{"reason",o.reason}};
   {std::lock_guard<std::mutex> lock(animationMutex);auto probe=animations.find(o.handle);
-   if(probe!=animations.end()&&probe->second.epoch==f->epoch){r["animationProbe"]={{"route",probe->second.route},{"reason",probe->second.reason},{"model",probe->second.model},{"sequence",probe->second.sequence},{"localSequenceCount",probe->second.localSequenceCount},{"label",probe->second.names.label},{"activity",probe->second.names.activity}};}
+   if(probe!=animations.end()&&probe->second.epoch==f->epoch){r["animationProbe"]={{"route",probe->second.route},{"reason",probe->second.reason},{"model",probe->second.model},{"sequence",probe->second.sequence},{"localSequenceCount",probe->second.localSequenceCount},{"includedModels",probe->second.includes.names},{"includeReason",probe->second.includes.reason},{"label",probe->second.names.label},{"activity",probe->second.names.activity}};}
    else r["animationProbe"]={{"reason","no matching model observation"}};}
   r["rawFieldCooldownReason"]=o.timing.reason;r["rawFieldPartial"]=o.timing.partial;if(o.timing.weaponDeadline)r["rawWeaponDeadline"]=*o.timing.weaponDeadline;if(o.timing.actorDeadline)r["rawActorDeadline"]=*o.timing.actorDeadline;
   auto estimates=std::atomic_load(&observedSnapshot);auto estimate=estimates->find(o.handle);if(estimate!=estimates->end()){const auto& e=estimate->second;r["stopwatch"]={{"eventId",e.eventId},{"source",e.source},{"reason",e.reason},{"triggered",e.triggered},{"expired",e.expired},{"throwing",e.throwing}};if(e.startedAt)r["stopwatch"]["startedAt"]=*e.startedAt;if(e.span)r["stopwatch"]["span"]=*e.span;if(e.sinceThrow)r["stopwatch"]["sinceThrowEnd"]=*e.sinceThrow;}
