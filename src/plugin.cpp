@@ -156,7 +156,7 @@ std::string buildMenu(uintptr_t id){
  if(id==300)return "\"邦友的酒\" {"+item(requested?u8"邦友的酒：开":u8"邦友的酒：关",100)+
  item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
  item(experimental,108)+item(u8"接口与日志诊断",24)+item(u8"保存设置",101)+"}";
- return "\"L4D2Visual 0.7.3-tank-layer-timer-preview7\" {"+item(requested?u8"邦友的酒[开]":u8"邦友的酒[关]",300)+
+ return "\"L4D2Visual 0.7.3-tank-cycle-preview8\" {"+item(requested?u8"邦友的酒[开]":u8"邦友的酒[关]",300)+
  item(u8"自定义喷漆",150)+item(u8"Tank 行为预测（实验）",320)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+"}";
 }
 void action(uintptr_t id){if(visual::tank::action(id)){saveMessage=u8"Tank预测设置未保存";return;}if(visual::picturemenu::action(id)){saveMessage=visual::picturemenu::notice.load();return;}if(entityAction(id))return;if(id==100)toggle();if(id>=110&&id<=117){auto a=*std::atomic_load(&visual::render::animation);a=visual::adjustAnimation(a,unsigned(id));std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(a));visual::render::startedAt=GetTickCount64();saveMessage=u8"动画设置未保存";}if(id==119){visual::render::compatibility=!visual::render::compatibility.load();saveMessage=u8"渲染模式未保存";}if(id==118){visual::render::boneLimit=visual::nextBoneLimit(visual::render::boneLimit.load());saveMessage=u8"骨骼上限未保存";}if(id==101){saveRequested=true;saveMessage=u8"已提交保存";}}
@@ -184,16 +184,16 @@ class Plugin final:public IL4NPlugin {
   }
  }
 public:
- Plugin(){note("=== L4D2Visual 0.7.3-tank-layer-timer-preview7 startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);
+ Plugin(){note("=== L4D2Visual 0.7.3-tank-cycle-preview8 startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);
   try{std::ifstream file(visual::diagnostics::path.parent_path()/L"hud.json");if(file){nlohmann::json j;file>>j;std::atomic_store(&visual::tank::options,std::make_shared<const visual::tank::Settings>(visual::tank::readSettings(j)));std::atomic_store(&visual::spraysync::options,std::make_shared<const visual::spraysync::Settings>(visual::spraysync::readSettings(j)));std::atomic_store(&visual::pictures::options,std::make_shared<const visual::pictures::Settings>(visual::pictures::readSettings(j)));std::atomic_store(&visual::render::proximity,std::make_shared<const visual::ProximitySettings>(visual::readProximity(j)));visual::render::compatibility=visual::readRenderCompatibility(j);std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(visual::readEntitySelection(j)));visual::render::boneLimit=visual::readBoneLimit(j);std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(visual::readAnimationSettings(j)));appearance.preset=std::min(3u,j.value("preset",0u));appearance.step=std::clamp(j.value("step",8u),1u,64u);appearance.opacity=std::clamp(j.value("opacity",.48f),.05f,1.f);appearance.font=std::clamp(j.value("font",22.f),12.f,48.f);appearance.x=j.value("x",8.f);appearance.y=j.value("y",14.f);appearance.f10=j.value("f10",false);appearance.centerY=j.value("centerY",true);visual::hudruntime::hud.loadAppearance(appearance);}}catch(const std::exception& e){note(std::string("HUD settings load failed: ")+e.what());}
   visual::pictures::folder=visual::diagnostics::path.parent_path()/L"images";
   worker=std::thread([this]{diagnostics();});}
  const char* GetName()override{return "L4D2Visual";}
- const char* GetVersion()override{return "0.7.3-tank-layer-timer-preview7";}
+ const char* GetVersion()override{return "0.7.3-tank-cycle-preview8";}
  void OnModuleLoaded(const char* name,uintptr_t handle)override{if(!name)return;std::string n(name);if(n=="client"||n=="client.dll")source_camera::clientModule=reinterpret_cast<HMODULE>(handle);if(n=="engine"||n=="engine.dll")source_camera::engineModule=reinterpret_cast<HMODULE>(handle);note("Module loaded: "+n);connect();}
  void OnGameLaunch()override{note("OnGameLaunch");connect();}
  void OnD3DDeviceCreated(void* d,bool dxvk)override{note(std::string("OnD3DDeviceCreated dxvk=")+(dxvk?"yes":"no"));visual::hudruntime::created(static_cast<IDirect3DDevice9*>(d));}
- const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.7.3-tank-layer-timer-preview7";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开视觉效果菜单\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
+ const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.7.3-tank-cycle-preview8";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开视觉效果菜单\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
  void stop(){stopping=true;if(worker.joinable())worker.join();visual::tank::events::stop();visual::spraysync::network.stop();requested=false;visual::render::modelObserver=nullptr;visual::render::studioObserver=nullptr;source_entities::combatRequested=false;visual::modelpath::apply(false);visual::hudruntime::stop();visual::render::stop();source_entities::browseRequested=false;source_camera::frameListener=nullptr;source_camera::stop();}
  ~Plugin()override{stop();}
 };

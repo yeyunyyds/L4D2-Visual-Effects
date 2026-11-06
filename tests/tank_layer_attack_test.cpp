@@ -29,11 +29,11 @@ int main(){using namespace visual::tank;SequenceName left{"Hulk_RunAttack1_gestu
  // Invalid weights and clock rollback cannot fabricate an onset.
  check(!blend.update(1.3f,true,{{0,43,.01f,2,left}}).onset);check(!blend.update(.1f,true,{{0,43,.6f,1,left}}).onset);
  // The runtime feeds an ordinary movement body plus a separate layer onset.
- SwingStopwatch watch;SequenceName run{"Run_4",""};watch.update(10,1,9,.5f,run,1.5f,1.f);
- auto r=watch.update(10.05f,2,9,.6f,run,1.5f,1.f,false,true);check(r.triggered&&r.eventId==1&&std::string(r.source)=="layer-observed-punch"&&r.remaining&&*r.remaining<1);
- r=watch.update(10.1f,3,9,.7f,run,1.5f,1.f,false,false);check(!r.triggered&&r.eventId==1&&*r.remaining<.91f);
+ SwingStopwatch watch;SequenceName run{"Run_4",""};watch.update(10,1,9,.5f,run,1.5f,1.f,false,false,.5f);
+ auto r=watch.update(10.05f,2,9,.6f,run,1.5f,1.f,false,true,.5f);check(r.triggered&&r.eventId==1&&std::string(r.source)=="layer-observed-punch"&&r.remaining&&*r.remaining<2&&*r.remaining>1.9f);
+ r=watch.update(10.1f,3,9,.7f,run,1.5f,1.f,false,false,.5f);check(!r.triggered&&r.eventId==1&&*r.remaining<1.91f&&*r.remaining>1.89f);
  r=watch.update(10.2f,4,49,.1f,SequenceName{"Throw_02","ACT_TANK_OVERHEAD_THROW"},1.5f,1.f);check(!r.remaining&&r.throwing);
- r=watch.update(11.2f,5,9,.2f,run,1.5f,1.f,false,true);check(r.triggered&&r.eventId==2&&r.remaining);
+ r=watch.update(11.2f,5,9,.2f,run,1.5f,1.f,false,true,.5f);check(r.triggered&&r.eventId==2&&r.remaining);
  SwingStopwatch missing;check(!missing.update(1,1,9,.1f,run,{}, {},false,true).remaining);
  std::cout<<"PASS: actual Tank gesture names, onset/cycle/sequence restarts, blend deduplication, stale/unknown/paused samples and automatic layer stopwatch integration\n";
 }

@@ -12,8 +12,8 @@ class SwingStopwatch {
  const char* source="unknown";unsigned eventId=0;std::optional<float> startedAt;
 public:
  void reset(){initialized=attack=throwing=hasTimer=false;sequence=-1;cycle.reset();lastTime.reset();deadline.reset();span.reset();throwEnd.reset();startedAt.reset();eventId=0;source="unknown";}
- ObservedTimer update(std::optional<float> now,std::uint64_t tick,int seq,std::optional<float> currentCycle,const std::optional<SequenceName>& name,std::optional<float> interval,std::optional<float> miss,bool manual=false,bool layerOnset=false){
-  (void)tick;ObservedTimer out;
+ ObservedTimer update(std::optional<float> now,std::uint64_t tick,int seq,std::optional<float> currentCycle,const std::optional<SequenceName>& name,std::optional<float> interval,std::optional<float> miss,bool manual=false,bool layerOnset=false,std::optional<float> windup={}){
+  (void)tick;(void)miss;ObservedTimer out;
   if(!now||!std::isfinite(*now)){out.reason="Source clock unavailable/stalled";return out;}
   if(lastTime&&*now<*lastTime-.001f){reset();out.reason="Source clock reset";return out;}
   auto valid=[](std::optional<float> f){return f&&std::isfinite(*f)&&*f>=0&&*f<=10;};
@@ -25,15 +25,19 @@ public:
   if(known&&throwing&&!currentThrow)throwEnd=now;
   if(manual||layerOnset||onset){
    hasTimer=false;deadline.reset();span.reset();
-   if(valid(interval)){
-    float duration=*interval;if(valid(miss))duration=std::min(duration,*miss);
+   if(valid(interval)&&valid(windup)){
+    // Our observed signal is the beginning of the attack animation. A normal
+    // onset-to-next-onset estimate includes windup plus the swing interval.
+    // A smaller miss interval alone is not a complete punch cycle, and the
+    // animation does not establish whether this punch hit or missed.
+    float duration=*windup+*interval;
     // An automatically observed onset happened between this and the preceding
     // sample. Use the earlier bound so a delayed observation does not grant a
     // falsely long "safe" window. Manual marks start at the marked instant.
     float start=*now;if(!manual&&lastTime&&*now>=*lastTime&&*now-*lastTime<=.25f)start=*lastTime;
     deadline=start+duration;span=duration;startedAt=start;++eventId;hasTimer=true;source=manual?"manual-observed-punch":layerOnset?"layer-observed-punch":"animation-observed-punch";out.triggered=true;
-    out.reason=valid(miss)?"parameter-based estimate; earliest hit/miss interval":"miss interval unavailable; normal-interval estimate";
-   }else out.reason="punch marked but live swing interval unavailable";
+    out.reason="normal punch cycle estimate: windup + swing interval; hit/miss unconfirmed";
+   }else out.reason="punch observed but live windup/normal interval unavailable";
   }
   if(known){initialized=true;attack=currentAttack;throwing=currentThrow;sequence=seq;if(cycleValid)cycle=currentCycle;else cycle.reset();}
   // An unresolved frame does not count as leaving/re-entering the same attack.

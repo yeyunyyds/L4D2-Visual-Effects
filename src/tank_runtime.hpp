@@ -90,7 +90,7 @@ inline void onFrame(const dango::GameCameraFrame& camera)try{
   auto layer=detector.update(out.clock.time,actor&&actor->animationLayerReason==dango::animation::SampledReason,layers);
   layerReadings[o.handle]=layer;nextDetectors[o.handle]=std::move(detector);if(layer.active)o.action="attack-layer: "+layer.names.label;
   bool manual=requested&&request->epoch==out.epoch&&request->handle==o.handle&&camera.tick>=request->tick&&camera.tick-request->tick<=1000;
-  if(manual)matched=true;auto reading=watch.update(out.clock.time,out.tick,o.sequence.value_or(-1),o.cycle,names,out.parameters.interval,out.parameters.missInterval,manual,layer.onset);
+  if(manual)matched=true;auto reading=watch.update(out.clock.time,out.tick,o.sequence.value_or(-1),o.cycle,names,out.parameters.interval,out.parameters.missInterval,manual,layer.onset,out.parameters.windup);
   if(manual)started=reading.triggered;
   // Raw client deadlines are diagnostic evidence only; stale AI fields must not
   // be presented as zero cooldown. The visible value is observation-based.

@@ -67,3 +67,12 @@ preview5 额外记录 `localSequenceCount`，区分本地表越界与描述符�
 检测到起手后直接向现有 SwingStopwatch 提交独立的 layerOnset 信号，source 为 layer-observed-punch。主体仍可保持 Run_4，投石状态保持独立。此路径在诊断关闭时照常工作，不依赖尚未成功读取的事件编号。
 
 生产检测器和秒表的离线回放得到 29 次起手/29 次计时，与人工检查的 17 段 Hulk_RunAttack1_gesture、7 段 Attack_Moving、5 段 Hulk_RunAttack2_gesture 对应；重复样本没有再次启动。回放不是实机准确率保证，也不能证明动画起手与实际冷却恢复或挥拳命中完全同步。
+
+
+## preview8：修正周期含义
+
+最新 schema 7 日志 136 条、约 16.86 秒。记录的 eventId 32～40 对应的 startedAt 间隔约 1.99～2.00 秒，旧秒表 span 却始终为 1 秒。主体/叠加层已成功识别，因此这次偏差来自计时周期选择，而非漏掉了每隔一次的起手。
+
+旧实现 min(tank_swing_interval, tank_swing_miss_interval) 把短的挥空间隔当成从动画起手算起的完整周期，缺少依据。新实现采用正常周期假设 tank_windup_time + tank_swing_interval；实际读取值 0.5+1.5=2.0，与该片段连续攻击间隔吻合。没有通过动画确认命中/挥空，不使用 missInterval 缩短普通周期，不声称该公式已覆盖所有 AI 状态。新起手使用当时的实时参数，参数缺失则未知。
+
+本次只修正周期和黄条位置，不扩展事件 Hook。黄条原锚点 origin.z+100 调至 +91，按原世界空间高度下移约 9%。

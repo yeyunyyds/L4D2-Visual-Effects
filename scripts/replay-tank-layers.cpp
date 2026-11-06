@@ -16,9 +16,9 @@ int main(int argc,char** argv){using namespace visual::tank;using nlohmann::json
    auto layer=detectors[h].update(optional("observedGameTime"),sampled,layers);if(layer.onset){++onsets;++names[layer.names.label];}
    std::optional<SequenceName> body;if(t.contains("animationProbe")){auto a=t["animationProbe"];if(a.value("sequence",-2)==t.value("sequence",-1)&&!a.value("label","").empty())body=SequenceName{a.value("label",""),a.value("activity","")};}
    std::optional<float> cycle;if(t.contains("cycle"))cycle=t["cycle"].get<float>();
-   auto r=timers[h].update(optional("observedGameTime"),tick,t.value("sequence",-1),cycle,body,optional("interval"),optional("missInterval"),false,layer.onset);if(r.triggered)++starts;if(r.remaining&&*r.remaining>0)++positive;
+   auto r=timers[h].update(optional("observedGameTime"),tick,t.value("sequence",-1),cycle,body,optional("interval"),optional("missInterval"),false,layer.onset,optional("windup"));if(r.triggered)++starts;if(r.remaining&&*r.remaining>0)++positive;
    // Duplicate sampling must not restart either layer detection or the timer.
-   auto duplicate=detectors[h].update(optional("observedGameTime"),sampled,layers);auto again=timers[h].update(optional("observedGameTime"),tick,t.value("sequence",-1),cycle,body,optional("interval"),optional("missInterval"),false,duplicate.onset);
+   auto duplicate=detectors[h].update(optional("observedGameTime"),sampled,layers);auto again=timers[h].update(optional("observedGameTime"),tick,t.value("sequence",-1),cycle,body,optional("interval"),optional("missInterval"),false,duplicate.onset,optional("windup"));
    if(duplicate.onset||again.triggered){std::cerr<<"Duplicate replay sample restarted a swing\n";return 2;}
   }
  }}

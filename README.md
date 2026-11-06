@@ -1,9 +1,9 @@
 # L4D2 Visual Effects
 
-**Tank预测实验分支：0.7.3-tank-layer-timer-preview7（L4N-only）**
+**Tank预测实验分支：0.7.3-tank-cycle-preview8（L4N-only）**
 
 默认关闭；只尝试客户端/同进程只读数据，无SourceMod依赖。正式版0.7.2仍是稳定基线。
-本次将已识别的攻击叠加层接入自动计时，无需 F7 或诊断 Hook；已通过日志回放，仍需游戏内验证估算显示。见[调查依据](docs/tank-animation-sources.md)与[preview7 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-layer-timer-preview7.zip)。
+本次修复黄条过早归零：以实时前摇加普通攻击间隔估算完整周期，并将黄条锚点下移约 9%。无需 F7 或诊断 Hook，仍需游戏内验证。见[调查依据](docs/tank-animation-sources.md)与[preview8 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-cycle-preview8.zip)。
 请先阅读[实验说明与本地单人验收](docs/TANK-PREVIEW.md)，不要把注视目标或参数估计区理解为精确AI锁敌/命中边界。
 
 **求生之路 2 视觉效果插件 · 正式版 0.7.2**
