@@ -24,6 +24,18 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
+## Tank冷却实验 · 0.7.3-tank-cooldown-preview3
+
+**[下载冷却实验包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-cooldown-preview3.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/57a40b0) · [实验说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experiment/tank-cooldown/docs/TANK-PREVIEW.md)
+
+补齐局部网络表的角色/武器攻击计时、已解码Source模拟时间和动画cycle读取。冷却使用实际推进的Source时钟计算，暂停/切图/缺失时标未知，不用固定1.5秒代替。菜单显示数值，Tank上方显示小条：灰色未知、黄色部分计时下限、青色两项客户端计时均读到；零秒不代表AI一定可出拳。
+
+仅依赖L4N，不需要SourceMod。功能默认关闭，在Tank行为预测实验页启用并开启诊断记录。局部表可能仅发给所有者，AI Tank字段可能未同步；本环境未运行Windows游戏，需实机记录验证。十七组回归与x86编译通过。
+
+包顶层仅bin/与README.md；源码独立提供。**不保障VAC安全。** 正式版仍为0.7.2。
+
+SHA-256：`2df8c45e38ba9e617760932863833289ffb1d6c440f5a8a5fe22a2783463b598`
+
 ## Tank行为预测实验 · 0.7.3-tank-preview2
 
 **[下载preview2](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-preview2.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/d59dfc1) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experiment/tank-threat/docs/TANK-PREVIEW.md)
