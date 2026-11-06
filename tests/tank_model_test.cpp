@@ -17,6 +17,10 @@ int main(){using namespace visual::tank;using dango::inventory::Record;using dan
  f.records[0].lookAtHandle=a.handle;out=predictor.update(f,p,cfg);check(out.tanks[0].target->handle==a.handle&&!out.tanks[0].target->authoritativeField&&out.tanks[0].target->source=="network-look-at");
  f.records[0].enemyHandle=b.handle;out=predictor.update(f,p,cfg);check(out.tanks[0].target->handle==b.handle&&out.tanks[0].target->authoritativeField);
  f.records[0].enemyHandle.reset();for(unsigned time:{1050u,1100u,1150u,1200u}){f.tick=time;p.tick=time;out=predictor.update(f,p,cfg);}check(out.tanks[0].headingStalled&&out.tanks[0].radius==56&&out.tanks[0].halfArc==90);
+ // A near-vertical aim makes yaw unsuitable for ground lock/range claims.
+ f.records[0].eyeAngles=dango::Vec3{273.1640625f,90,0};for(unsigned time:{1250u,1300u,1350u,1400u}){f.tick=time;p.tick=time;out=predictor.update(f,p,cfg);}
+ check(out.tanks[0].nearVerticalAim&&!out.tanks[0].headingStalled&&!out.tanks[0].geometry&&std::abs(out.tanks[0].pitch+86.8359375f)<.001f);
+ f.records[0].eyeAngles=dango::Vec3{0,90,0};f.tick=1450;p.tick=f.tick;out=predictor.update(f,p,cfg);check(out.tanks[0].geometry);
  // Runtime updates alter range; no parameter availability means no invented ring.
  p.range=84;out=predictor.update(f,p,cfg);check(out.tanks[0].radius==84);p.range.reset();out=predictor.update(f,p,cfg);check(!out.tanks[0].geometry);p.range=84;p.tick=0;f.tick=5000;out=predictor.update(f,p,cfg);check(!out.tanks[0].geometry&&!out.tanks[0].headingStalled);
  // A reused entity index with a new serial cannot resolve an old target handle.
@@ -36,7 +40,7 @@ int main(){using namespace visual::tank;using dango::inventory::Record;using dan
  Prop target;target.name=3132;target.type=0;target.offset=100;schema.text(3132,"m_lookatPlayer");schema.put(4060,target);
  Prop eye;eye.name=3164;eye.type=1;eye.offset=120;schema.text(3164,"m_angEyeAngles[1]");schema.put(4120,eye);
  Prop mins;mins.name=3200;mins.type=2;mins.offset=8;schema.text(3200,"m_vecMins");schema.put(4300,mins);Prop maxs=mins;maxs.name=3232;maxs.offset=20;schema.text(3232,"m_vecMaxs");schema.put(4360,maxs);
- Fields fields;check(dango::entitywire::fields(schema,256,fields)&&fields.empty());check(dango::entitywire::fields(schema,256,fields,true));check(fields.at("m_Collision.m_vecMins").offset==208&&fields.at("m_Collision.m_vecMaxs").offset==220&&fields.at("m_lookatPlayer").offset==100&&fields.at("m_angEyeAngles[1]").type==1);
+ Fields fields;check(dango::entitywire::fields(schema,256,fields)&&fields.empty());check(dango::entitywire::fields(schema,256,fields,true));auto hints=combatSchemaHints(schema,256);check(std::any_of(hints.begin(),hints.end(),[](const auto& s){return s.find("m_lookatPlayer type=0")!=std::string::npos;}));check(fields.at("m_Collision.m_vecMins").offset==208&&fields.at("m_Collision.m_vecMaxs").offset==220&&fields.at("m_lookatPlayer").offset==100&&fields.at("m_angEyeAngles[1]").type==1);
  schema.text(3032,"DT_UnknownProxy");check(!dango::entitywire::fields(schema,256,fields,true));
  std::cout<<"PASS: runtime reach updates, aim/body separation, look-at/enemy distinction, ambiguity and handle reuse, stationary-heading observation, bounded prediction and read-only ConVar/studio validation\n";
 }

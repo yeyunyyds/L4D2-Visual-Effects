@@ -47,6 +47,19 @@ template<class Reader> bool fields(Reader& r,uint32_t root,Fields& result,bool c
  if(!parent){result=std::move(next);return true;}if(uint64_t(base)+parentOffset>65536)return false;base+=parentOffset;address=parent;
  }return false;
 }
+// Metadata-only walk: arbitrary child proxies are described, never dereferenced
+// as entity fields. This reveals why a desired network property is unavailable.
+template<class Reader> std::vector<std::string> combatSchemaHints(Reader& reader,uint32_t root){
+ struct Pending{uint32_t table;std::string path;unsigned depth;};std::vector<Pending> pending{{root,"",0}};std::set<uint32_t> seen;std::vector<std::string> out;unsigned budget=4096;
+ for(size_t index=0;index<pending.size()&&index<64&&out.size()<48;++index){auto node=pending[index];if(!seen.insert(node.table).second)continue;Table t;
+  if(!load(reader,node.table,t)||t.count<0||t.count>2048||unsigned(t.count)>budget)continue;budget-=unsigned(t.count);
+  for(int i=0;i<t.count&&out.size()<48;++i){Prop p;if(!load(reader,t.props+uint32_t(i)*sizeof(p),p))break;auto name=text(reader,p.name);if(name.empty()||name.size()>100||p.offset<0||p.offset>65536)continue;
+   auto path=node.path+name;bool wanted=name=="m_flCycle"||name=="m_nSequence"||name=="m_flSimulationTime"||name=="m_flNextAttack"||name=="m_flNextPrimaryAttack"||name=="m_lookatPlayer"||name=="m_hEnemy"||name=="m_hAttackTarget";
+   if(wanted)out.push_back(path+" type="+std::to_string(p.type)+" relativeOffset="+std::to_string(p.offset)+" recvProxy="+std::to_string(p.proxy));
+   if(p.type==6&&p.table&&node.depth<6&&pending.size()<64)pending.push_back({p.table,path+"/",node.depth+1});
+  }
+ }return out;
+}
 // Decode tiny read-only getters instead of invoking unknown entity virtuals.
 template<class Reader> std::optional<uint32_t> addressGetter(Reader& r,uint32_t code,uint32_t self){
  uint8_t b[8];if(!r.read(code,b,sizeof(b)))return {};int64_t out=0;

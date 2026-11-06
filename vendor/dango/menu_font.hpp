@@ -12,6 +12,7 @@ inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  builder.AddText(u8"行为预测实验方向范围绘制诊断记录时间毫秒切换手长弧度参数未读取瞄准身体角回退网络敌对注视目标非锁敌保证朝向推测当前未知或存在歧义停滞可能尚证实服务器精确命中边界仅预测");
  builder.AddText(u8"可读计时差估计秒瞄准弧度停滞预测精确命中边界");
  builder.AddText(u8"另一个注视目标");
+ builder.AddText(u8"近乎竖直瞄准不以水平角推测锁向");
  builder.BuildRanges(&ranges);
 }
 }

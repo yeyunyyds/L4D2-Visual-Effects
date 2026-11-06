@@ -38,7 +38,7 @@ inline std::optional<Target> inferTarget(const Record& tank,const Frame& frame,f
  if(!first||first->score<.6f||first->score-second<.12f)return {};
  return first;
 }
-struct Observation{std::uint32_t handle=0;Vec3 origin{},velocity{},predicted{};float heading=0,radius=0,halfArc=0;bool eye=false,geometry=false,headingStalled=false;std::optional<Target> target,gaze;std::optional<std::uint32_t> lookAt;std::optional<int> sequence;std::optional<float> cycle;float headingRate=0;std::optional<float> cooldown;std::string action="unknown",reason;};
+struct Observation{std::uint32_t handle=0;Vec3 origin{},velocity{},predicted{};float heading=0,pitch=0,radius=0,halfArc=0;bool eye=false,geometry=false,headingStalled=false,nearVerticalAim=false;std::optional<Target> target,gaze;std::optional<std::uint32_t> lookAt;std::optional<int> sequence;std::optional<float> cycle;float headingRate=0;std::optional<float> cooldown;std::string action="unknown",reason;};
 struct Result{std::uint32_t epoch=0;std::uint64_t tick=0;Parameters parameters;std::vector<Observation> tanks;};
 struct Track{Motion motion;float heading=0;std::uint64_t steadySince=0;std::uint32_t target=0;};
 class Predictor {
@@ -49,7 +49,7 @@ public:
   if(epoch!=frame.epoch){tracks.clear();epoch=frame.epoch;}Result out;out.epoch=frame.epoch;out.tick=frame.tick;out.parameters=p;std::map<std::uint32_t,Track> next;
   for(const auto& r:frame.records){if(!tank(r)||out.tanks.size()>=8)continue;auto direction=aim(r);Observation o;o.handle=r.handle;o.origin=*r.networkOrigin;o.sequence=r.sequence;o.cycle=r.animationCycle;o.lookAt=r.lookAtHandle;
    auto previous=tracks.find(r.handle);Track track;if(previous!=tracks.end())track=previous->second;
-   if(direction){o.heading=direction->yaw;o.eye=direction->eye;}
+   if(direction){o.heading=direction->yaw;o.eye=direction->eye;if(o.eye){o.pitch=std::remainder(r.eyeAngles->x,360.f);o.nearVerticalAim=std::abs(std::cos(o.pitch*3.14159265358979323846f/180))<.25f;}}
    bool timely=track.motion.tick&&frame.tick>track.motion.tick&&frame.tick-track.motion.tick<=250;
    if(timely){float seconds=float(frame.tick-track.motion.tick)*.001f;auto displacement=o.origin-track.motion.position;
     if(horizontal(displacement)<200&&std::abs(displacement.z)<200)o.velocity=displacement*(1/seconds);
@@ -63,14 +63,14 @@ public:
    if(r.lookAtHandle){auto looked=resolve(frame,*r.lookAtHandle);if(looked&&survivor(*looked))o.gaze=Target{looked->handle,role(*looked),"network-look-at",*looked->networkOrigin,1,false};}
    o.target=resolveTarget(r,frame);if(!o.target&&direction)o.target=inferTarget(r,frame,o.heading,track.target);
    if(!direction||!timely||std::abs(o.headingRate)>4)track.steadySince=frame.tick;
-   if(direction&&timely&&o.target&&frame.tick>=track.steadySince&&frame.tick-track.steadySince>=150){float angle=std::abs(difference(yaw(o.target->origin-o.origin),o.heading));o.headingStalled=angle>25;}
+   if(direction&&timely&&!o.nearVerticalAim&&o.target&&frame.tick>=track.steadySince&&frame.tick-track.steadySince>=150){float angle=std::abs(difference(yaw(o.target->origin-o.origin),o.heading));o.headingStalled=angle>25;}
    // Never narrow the arc or shorten reach solely because a heading stayed still.
    // Geometry needs fresh runtime values, not a hard-coded stock distance.
-   if(direction&&p.range&&p.arc&&p.tick<=frame.tick&&frame.tick-p.tick<=2500&&*p.range>0&&*p.range<=512&&*p.arc>0&&*p.arc<=360){
+   if(direction&&!o.nearVerticalAim&&p.range&&p.arc&&p.tick<=frame.tick&&frame.tick-p.tick<=2500&&*p.range>0&&*p.range<=512&&*p.arc>0&&*p.arc<=360){
     float hull=0;if(r.collisionMins&&r.collisionMaxs&&horizontal(*r.collisionMins)<128&&horizontal(*r.collisionMaxs)<128)hull=std::max({std::abs(r.collisionMins->x),std::abs(r.collisionMins->y),std::abs(r.collisionMaxs->x),std::abs(r.collisionMaxs->y)});
     o.radius=*p.range+hull;o.halfArc=*p.arc*.5f;o.geometry=true;
    }
-   o.reason=!direction?"aim unavailable":!o.geometry?"runtime range/arc unavailable":o.eye?"network aim + runtime parameters; estimated footprint":"body angle fallback; low confidence";
+   o.reason=!direction?"aim unavailable":o.nearVerticalAim?"near-vertical aim; ground footprint withheld":!o.geometry?"runtime range/arc unavailable":o.eye?"network aim + runtime parameters; estimated footprint":"body angle fallback; low confidence";
    track.motion={o.origin,o.velocity,frame.tick};track.heading=o.heading;track.target=o.target?o.target->handle:0;next[r.handle]=track;out.tanks.push_back(std::move(o));
   }tracks=std::move(next);return out;
  }

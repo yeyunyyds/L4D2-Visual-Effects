@@ -10,7 +10,7 @@ inline void draw(IDirect3DDevice9* device,float width,float height){
  struct Restore{IDirect3DStateBlock9* s;~Restore(){s->Apply();s->Release();}}restore{state};
  struct Vertex{float x,y,z,w;DWORD color;};std::vector<Vertex> vertices;vertices.reserve(1200);
  auto line=[&](Vec3 a,Vec3 b,DWORD color){float ax,ay,bx,by;if(project(a,*c,width,height,ax,ay)&&project(b,*c,width,height,bx,by)){vertices.push_back({ax,ay,0,1,color});vertices.push_back({bx,by,0,1,color});}};
- for(const auto& o:f->tanks){auto center=o.origin+Vec3{0,0,5};line(center,center+forward(o.heading)*60,o.eye?0xff00ccff:0xff999999);
+ for(const auto& o:f->tanks){auto center=o.origin+Vec3{0,0,5};auto aimVector=forward(o.heading);if(o.eye){float p=o.pitch*3.14159265358979323846f/180;aimVector=aimVector*std::cos(p);aimVector.z=-std::sin(p);}line(center,center+aimVector*60,o.eye?0xff00ccff:0xff999999);
   if(o.target)line(center+Vec3{0,0,60},o.target->origin+Vec3{0,0,60},o.target->authoritativeField?0xffff8866:0xffddcc55);
   if(!o.geometry)continue;
   for(unsigned i=0;i<32;++i){float a=o.heading-o.halfArc+o.halfArc*2*i/32,b=o.heading-o.halfArc+o.halfArc*2*(i+1)/32;line(center+forward(a)*o.radius,center+forward(b)*o.radius,0xffddaa44);
