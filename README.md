@@ -24,7 +24,21 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
-## Tank观测计时实验 · 0.7.3-tank-stopwatch-preview4
+## Tank 动画来源诊断 · 0.7.3-tank-animation-preview5
+
+**[下载动画来源诊断包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-animation-preview5.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/6c87ffc) · [调查依据](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/6c87ffc/docs/tank-animation-sources.md)
+
+追踪主体之外的叠加动画层：只读解析实际 SDK UtlVector 元数据，记录所有 Tank 层的序列、进度、权重、顺序及可解析的名称。补充动画事件类字段信息和模型本地序列数量。没有新增事件 Hook，不调用接收代理，不依赖 SourceMod。
+
+本包用于定位真正的普通拳起手来源，**尚未验证普通拳自动识别或冷却恢复**。开启 Tank 预测与诊断，测试普通挥拳、挥空、投石后挥拳约 20～30 秒，再提供 schema 5 的 tank-prediction 日志。无需 F7 或人工标记。共享模型映射尚未实现，字段不可读时记录原因。
+
+19 组原生测试和 Windows x86 构建通过，未进行游戏实测。安装包根目录仅 bin/ 与 README.md；正式版仍为 0.7.2。**联机功能未经测试，不保障 VAC 安全。**
+
+SHA-256：`c8967ffe78122a4dbb423cb603e3cd11f542c385fb1c8f14989b510a07d42c78`
+
+## 历史 Tank观测计时实验 · 0.7.3-tank-stopwatch-preview4
+
+后续日志中自动出拳计时未触发，用户反馈 F7 无效。以下为历史说明，不作为当前可用性保证；请改用 preview5 调查动画来源。
 
 **[下载观测计时实验包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-stopwatch-preview4.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/5dae6c8) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experiment/tank-cooldown/docs/TANK-PREVIEW.md)
 
