@@ -13,6 +13,8 @@ inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  builder.AddText(u8"可读计时差估计秒瞄准弧度停滞预测精确命中边界");
  builder.AddText(u8"另一个注视目标");
  builder.AddText(u8"近乎竖直瞄准不以水平角推测锁向");
+ builder.AddText(u8"冷却下限部分字段客户端计时剩余秒不保证可出拳未知");
+ builder.AddText(u8"武器角色计时约束");
  builder.BuildRanges(&ranges);
 }
 }

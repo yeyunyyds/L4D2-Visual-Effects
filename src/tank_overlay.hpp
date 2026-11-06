@@ -12,6 +12,13 @@ inline void draw(IDirect3DDevice9* device,float width,float height){
  auto line=[&](Vec3 a,Vec3 b,DWORD color){float ax,ay,bx,by;if(project(a,*c,width,height,ax,ay)&&project(b,*c,width,height,bx,by)){vertices.push_back({ax,ay,0,1,color});vertices.push_back({bx,by,0,1,color});}};
  for(const auto& o:f->tanks){auto center=o.origin+Vec3{0,0,5};auto aimVector=forward(o.heading);if(o.eye){float p=o.pitch*3.14159265358979323846f/180;aimVector=aimVector*std::cos(p);aimVector.z=-std::sin(p);}line(center,center+aimVector*60,o.eye?0xff00ccff:0xff999999);
   if(o.target)line(center+Vec3{0,0,60},o.target->origin+Vec3{0,0,60},o.target->authoritativeField?0xffff8866:0xffddcc55);
+  // A compact timer bar is only a visualization of observed timer constraints.
+  // Grey = unknown, amber = a partial lower bound, cyan = both client gates read.
+  {auto start=o.origin+Vec3{0,0,100};float x,y;if(project(start,*c,width,height,x,y)){
+    DWORD color=!o.cooldown?0xff888888:o.timing.partial?0xffddaa44:0xff00ccff;
+    vertices.push_back({x-24,y,0,1,0xff666666});vertices.push_back({x+24,y,0,1,0xff666666});
+    if(o.cooldown){float scale=f->parameters.interval&&*f->parameters.interval>0?*f->parameters.interval:std::max(1.f,*o.cooldown);float fill=std::clamp(*o.cooldown/scale,0.f,1.f);vertices.push_back({x-24,y-2,0,1,color});vertices.push_back({x-24+48*fill,y-2,0,1,color});}
+   }}
   if(!o.geometry)continue;
   for(unsigned i=0;i<32;++i){float a=o.heading-o.halfArc+o.halfArc*2*i/32,b=o.heading-o.halfArc+o.halfArc*2*(i+1)/32;line(center+forward(a)*o.radius,center+forward(b)*o.radius,0xffddaa44);
    if((i%2)==0){auto p=o.predicted+Vec3{0,0,5};line(p+forward(a)*o.radius,p+forward(b)*o.radius,0xff7799cc);}

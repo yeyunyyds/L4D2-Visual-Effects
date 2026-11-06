@@ -1,5 +1,6 @@
 #pragma once
 #include "special_infected.hpp"
+#include "tank_cooldown.hpp"
 #include "dango/entity_inventory.hpp"
 #include <map>
 #include <optional>
@@ -38,15 +39,15 @@ inline std::optional<Target> inferTarget(const Record& tank,const Frame& frame,f
  if(!first||first->score<.6f||first->score-second<.12f)return {};
  return first;
 }
-struct Observation{std::uint32_t handle=0;Vec3 origin{},velocity{},predicted{};float heading=0,pitch=0,radius=0,halfArc=0;bool eye=false,geometry=false,headingStalled=false,nearVerticalAim=false;std::optional<Target> target,gaze;std::optional<std::uint32_t> lookAt;std::optional<int> sequence;std::optional<float> cycle;float headingRate=0;std::optional<float> cooldown;std::string action="unknown",reason;};
-struct Result{std::uint32_t epoch=0;std::uint64_t tick=0;Parameters parameters;std::vector<Observation> tanks;};
+struct Observation{std::uint32_t handle=0;Vec3 origin{},velocity{},predicted{};float heading=0,pitch=0,radius=0,halfArc=0;bool eye=false,geometry=false,headingStalled=false,nearVerticalAim=false;std::optional<Target> target,gaze;std::optional<std::uint32_t> lookAt;std::optional<int> sequence;std::optional<float> cycle;float headingRate=0;std::optional<float> cooldown;CooldownReading timing;std::string action="unknown",reason;};
+struct Result{std::uint32_t epoch=0;std::uint64_t tick=0;Parameters parameters;ClockReading clock;std::vector<Observation> tanks;};
 struct Track{Motion motion;float heading=0;std::uint64_t steadySince=0;std::uint32_t target=0;};
 class Predictor {
- std::uint32_t epoch=0;std::map<std::uint32_t,Track> tracks;
+ std::uint32_t epoch=0;std::map<std::uint32_t,Track> tracks;CombatClock clock;
 public:
- void reset(){tracks.clear();epoch=0;}
+ void reset(){tracks.clear();clock.reset();epoch=0;}
  Result update(const Frame& frame,const Parameters& p,const Settings& s){
-  if(epoch!=frame.epoch){tracks.clear();epoch=frame.epoch;}Result out;out.epoch=frame.epoch;out.tick=frame.tick;out.parameters=p;std::map<std::uint32_t,Track> next;
+  if(epoch!=frame.epoch){tracks.clear();epoch=frame.epoch;}Result out;out.epoch=frame.epoch;out.tick=frame.tick;out.parameters=p;out.clock=clock.update(frame);std::map<std::uint32_t,Track> next;
   for(const auto& r:frame.records){if(!tank(r)||out.tanks.size()>=8)continue;auto direction=aim(r);Observation o;o.handle=r.handle;o.origin=*r.networkOrigin;o.sequence=r.sequence;o.cycle=r.animationCycle;o.lookAt=r.lookAtHandle;
    auto previous=tracks.find(r.handle);Track track;if(previous!=tracks.end())track=previous->second;
    if(direction){o.heading=direction->yaw;o.eye=direction->eye;if(o.eye){o.pitch=std::remainder(r.eyeAngles->x,360.f);o.nearVerticalAim=std::abs(std::cos(o.pitch*3.14159265358979323846f/180))<.25f;}}
@@ -58,8 +59,7 @@ public:
    }
    if(r.velocity&&finite(*r.velocity)&&dango::length(*r.velocity)<1000)o.velocity=*r.velocity;
    o.predicted=o.origin+o.velocity*(float(std::min(s.horizonMs,500u))*.001f);
-   if(r.activeWeapon&&r.simulationTime&&std::isfinite(*r.simulationTime)){auto weapon=resolve(frame,*r.activeWeapon);std::optional<float> ready=weapon?weapon->nextPrimaryAttack:std::optional<float>{};if(r.nextAttack&&(!ready||*r.nextAttack>*ready))ready=r.nextAttack;
-    if(ready&&std::isfinite(*ready)){float delta=*ready-*r.simulationTime;if(delta>=-1&&delta<=10)o.cooldown=std::max(0.f,delta);}}
+   o.timing=readCooldown(r,frame,out.clock);o.cooldown=o.timing.remaining;
    if(r.lookAtHandle){auto looked=resolve(frame,*r.lookAtHandle);if(looked&&survivor(*looked))o.gaze=Target{looked->handle,role(*looked),"network-look-at",*looked->networkOrigin,1,false};}
    o.target=resolveTarget(r,frame);if(!o.target&&direction)o.target=inferTarget(r,frame,o.heading,track.target);
    if(!direction||!timely||std::abs(o.headingRate)>4)track.steadySince=frame.tick;

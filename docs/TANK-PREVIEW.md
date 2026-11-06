@@ -1,10 +1,23 @@
-# L4D2Visual 0.7.3-tank-preview2
+# L4D2Visual 0.7.3-tank-cooldown-preview3
 
 **L4N 客户端 Tank 行为预测实验；不是0.7.2正式版的替代稳定版。**
 
 **免责声明：联机功能未经测试，不保障 VAC 安全。Tank预测也未经游戏实机校准，不能作为精确安全范围。**
 
 本功能不依赖SourceMod、Left4DHooks、服务端插件或第三方扩展，只使用L4N插件自身已有的进程内采集和Present绘制。基础喷漆、T键仍保留0.7.2路径，不增加Source回调GPU操作。
+
+## 冷却 preview3 调整
+
+本版只补充Tank实验的攻击计时读取，不引入SourceMod或新的游戏虚函数，不改正式版0.7.2的发布包。
+
+- 读取已经在元数据中出现的零偏移嵌套表：bcc_localdata/DT_BCCLocalPlayerExclusive、LocalActiveWeaponData/DT_LocalActiveWeaponData，以及serveranimdata/DT_ServerAnimationData。分别尝试获取m_flNextAttack、m_flNextPrimaryAttack和m_flCycle；表名、类型不匹配时保持未知，不沿未知代理读实体数据。
+- m_flSimulationTime的Recv类型可能是Int，但接收代理写入已解码FLOAT。本版只对这一已知属性按浮点读取并校验，再观察活跃角色的模拟时间是否实际推进。所有剩余时间计算使用同一个Source时钟，不用Windows开机时间减游戏时间，也不在游戏暂停时用墙钟强行倒计时。
+- 同时读到且验证两个正时间戳时，显示较严格的客户端计时约束。只读到一项时，显示仍未结束的冷却下限；该项结束而另一项未知时，不显示“已经可攻击”。全零、缺失、NaN、异常未来时间、时钟不推进、武器句柄失效或归属冲突都显示未知。
+- 菜单显示数值；Tank上方小条：灰色未知，黄色仅部分计时下限，青色为两项客户端计时均读到。**这不是AI攻击资格判定；零秒也不等于Tank下一帧一定能出拳。** 动画、技能和服务器规则仍可能限制攻击。
+- 局部同步表可能仅向武器所有者发送数据。AI Tank字段在客户端可能长期为零或不更新，因此“能定位字段”不等于“已经得到准确AI冷却”。本地单人仍需实际验收。
+- 诊断schema=3新增observedGameTime、clockSourceHandle/clockReason、weaponDeadline/actorDeadline、cooldownPartial/cooldownReason，以及武器归属。参数interval仍单独记录，不能把它当作实时剩余冷却。
+
+建议开启诊断记录，连续录下至少数次普通挥拳、挥空及投石后的恢复。重点看计时条是否重新填充并随攻击变化，或菜单是否明确显示零值未同步/时钟停滞。新日志tank-prediction.jsonl用于确认实际可读性。
 
 ## preview2 调整
 
@@ -58,7 +71,7 @@
 ## 源码、安装包与回退
 
 包内顶层只有bin/和README.md，许可在bin内。
-实验源码：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/experiment/tank-threat
+实验源码：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/experiment/tank-cooldown
 正式版0.7.2：https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.7.2
 
 回退时退出游戏，换回备份DLL或重新安装0.7.2；不要同时保留两份插件DLL。

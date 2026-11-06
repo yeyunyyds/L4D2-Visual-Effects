@@ -44,6 +44,18 @@ template<class Reader> bool fields(Reader& r,uint32_t root,Fields& result,bool c
    if((name=="m_vecMins"||name=="m_vecMaxs")&&cp.type==2&&cp.offset>=0&&uint64_t(base)+p.offset+cp.offset<65536)next.emplace("m_Collision."+name,Field{base+uint32_t(p.offset)+uint32_t(cp.offset),2});
   }
  }
+ // Only these SDK-defined zero-offset embedded tables may supply combat floats.
+ // Never walk animation arrays or arbitrary proxy-backed entity storage.
+ for(const auto& p:props)if(combat&&p.type==6&&p.offset==0&&p.table){auto name=text(r,p.name);const char* expected=nullptr;const char* wanted=nullptr;
+  if(name=="bcc_localdata"){expected="DT_BCCLocalPlayerExclusive";wanted="m_flNextAttack";}
+  if(name=="LocalActiveWeaponData"){expected="DT_LocalActiveWeaponData";wanted="m_flNextPrimaryAttack";}
+  if(name=="serveranimdata"){expected="DT_ServerAnimationData";wanted="m_flCycle";}
+  if(!expected)continue;Table child;if(!load(r,p.table,child)||child.count<0||child.count>128)return false;if(text(r,child.name)!=expected)continue;
+  for(int k=0;k<child.count;++k){Prop cp;if(!load(r,child.props+uint32_t(k)*sizeof(Prop),cp))return false;
+   if(text(r,cp.name)!=wanted)continue;if(cp.type!=1)continue;if(cp.offset<0||uint64_t(base)+cp.offset+sizeof(float)>65536)return false;
+   Field value{base+uint32_t(cp.offset),1};auto existing=next.find(wanted);if(existing!=next.end()&&(existing->second.offset!=value.offset||existing->second.type!=value.type))return false;next.emplace(wanted,value);
+  }
+ }
  if(!parent){result=std::move(next);return true;}if(uint64_t(base)+parentOffset>65536)return false;base+=parentOffset;address=parent;
  }return false;
 }

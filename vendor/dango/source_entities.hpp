@@ -106,7 +106,10 @@ inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint
   r.velocity=vectorField(base,info,"m_vecVelocity[0]");if(!r.velocity)r.velocity=vectorField(base,info,"m_vecVelocity");
   r.collisionMins=vectorField(base,info,"m_Collision.m_vecMins");r.collisionMaxs=vectorField(base,info,"m_Collision.m_vecMaxs");
   r.lookAtHandle=field<uint32_t>(base,info,"m_lookatPlayer",0);r.enemyHandle=field<uint32_t>(base,info,"m_hEnemy",0);if(!r.enemyHandle)r.enemyHandle=field<uint32_t>(base,info,"m_hAttackTarget",0);
-  r.sequence=field<int>(base,info,"m_nSequence",0);r.animationCycle=field<float>(base,info,"m_flCycle",1);r.simulationTime=field<float>(base,info,"m_flSimulationTime",1);
+  r.sequence=field<int>(base,info,"m_nSequence",0);r.animationCycle=field<float>(base,info,"m_flCycle",1);if(r.animationCycle&&(!std::isfinite(*r.animationCycle)||*r.animationCycle<0||*r.animationCycle>1))r.animationCycle.reset();r.simulationTime=field<float>(base,info,"m_flSimulationTime",1);
+  // RecvProxy_SimulationTime receives an integer but stores a decoded FLOAT.
+  if(!r.simulationTime)r.simulationTime=field<float>(base,info,"m_flSimulationTime",0);
+  if(r.simulationTime&&(!std::isfinite(*r.simulationTime)||*r.simulationTime<0||*r.simulationTime>=10000000))r.simulationTime.reset();
   r.nextPrimaryAttack=field<float>(base,info,"m_flNextPrimaryAttack",1);r.nextAttack=field<float>(base,info,"m_flNextAttack",1);
  }
  r.parent=field<uint32_t>(base,info,"moveparent",0);r.parentAttachment=field<uint8_t>(base,info,"m_iParentAttachment",0);r.owner=field<uint32_t>(base,info,"m_hOwnerEntity",0);r.weaponOwner=field<uint32_t>(base,info,"m_hOwner",0);r.activeWeapon=field<uint32_t>(base,info,"m_hActiveWeapon",0);r.viewModel=field<uint32_t>(base,info,"m_hViewModel[0]",0);
