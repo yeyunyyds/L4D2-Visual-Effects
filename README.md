@@ -24,6 +24,20 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
+## Tank观测计时实验 · 0.7.3-tank-stopwatch-preview4
+
+**[下载观测计时实验包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-stopwatch-preview4.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/5dae6c8) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experiment/tank-cooldown/docs/TANK-PREVIEW.md)
+
+改为“观测到出拳后启动估算秒表”，不再把陈旧AI计时显示成0秒真实冷却。读取动态正常/挥空间隔并优先用较短值，动画起手/循环去重，不依赖扣血。投石显示动作状态与结束后经过时间，不套用拳击间隔。
+
+自动路径仅支持明确解析到的拳击活动，普通拳击可能仍位于未解析共享动画/动画层，不能声称全自动覆盖。人工校准：在Tank预测菜单开启“F7手动标记出拳”（默认关），关闭插件菜单，看见起手时按F7标记准星方向Tank；或使用菜单逐Tank标记。小条黄色=动画估算，紫色=人工估算，灰色=未知。计时结束仅表示可能恢复，不保证可攻击或安全。
+
+新日志schema=4保留事件编号/起点/间隔/来源，方便比对；需开启诊断记录。十八组回归与Windows x86构建通过，未进行Windows游戏实测，仍需人工标记与实际行为校准。
+
+仅L4N，无SourceMod，正式版仍为0.7.2。安装包顶层只有bin/与README.md。**联机功能未经测试，不保障VAC安全；Tank实验同样不提供VAC保证。**
+
+SHA-256：`7186e817807ada1e8aa0401631808b11f36ec483bd410ea15b43a0298f3e91e0`
+
 ## Tank冷却实验 · 0.7.3-tank-cooldown-preview3
 
 **[下载冷却实验包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-cooldown-preview3.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/57a40b0) · [实验说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experiment/tank-cooldown/docs/TANK-PREVIEW.md)
