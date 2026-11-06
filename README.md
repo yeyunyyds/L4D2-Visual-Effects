@@ -24,7 +24,21 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
-## Tank 实际动画事件诊断 · 0.7.3-tank-events-preview6
+## Tank 攻击叠加层自动计时 · 0.7.3-tank-layer-timer-preview7
+
+**[下载 preview7 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-layer-timer-preview7.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/66c0611) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/66c0611/docs/TANK-PREVIEW.md)
+
+已将实际识别到的 Attack_Moving / Hulk_RunAttack1_gesture / Hulk_RunAttack2_gesture 等攻击叠加动画接入自动计时。按名称、权重、播放进度识别起手，处理重复采样、同名动作重启、多层混合与权重短暂失活。无需 F7 或人工标记，也无需打开诊断记录；开启 Tank 预测与绘制即可观察加粗的头顶黄色计时条和菜单剩余秒数。
+
+使用实时攻击间隔参数估算，**不是服务器真实冷却，归零不保证可攻击或安全**。投石独立处理。事件字段校验和共享模型映射尚未修复，新的动画层计时不依赖事件 Hook。仅打开诊断时沿用事件观察，关闭诊断后恢复。
+
+21 组原生测试与 Windows x86 构建通过；用已提供的 782 条日志回放，29 次起手对应 29 次计时启动，重复输入没有再次触发。此为离线回放，新 DLL 尚需游戏内验证。反馈时可打开诊断并提供 schema 7 的 tank-prediction.jsonl 与 previous 文件。
+
+根目录仅 bin/ 和 README.md；正式版保持 0.7.2。**联机功能未经测试，不保障 VAC 安全。**
+
+SHA-256：`291e4407d74d607c2f12adef65ad1290e844c9c14221479816d08518b4696eb5`
+
+## 历史 Tank 实际动画事件诊断 · 0.7.3-tank-events-preview6
 
 **[下载 preview6 诊断包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-events-preview6.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/dc3f73d) · [测试步骤](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/dc3f73d/docs/TANK-PREVIEW.md)
 
