@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 namespace dango::animation {
+inline constexpr const char* SampledReason="sampled read-only; network values, not an event callback";
 // SDK l4d2: dt_utlvector_recv.cpp CRecvPropExtra_UtlVector. Metadata is
 // inspected only. No receive proxies, resize functions or entity methods run.
 struct LayerLayout {
@@ -59,6 +60,6 @@ template<class Reader> std::vector<AnimationLayer> animationLayers(Reader& reade
   result.push_back(layer);
  }
  if(!reader.read(uint32_t(address),after.data(),sizeof(after))||before!=after)return fail("overlay vector changed during sample");
- reason="sampled read-only; network values, not an event callback";return result;
+ reason=SampledReason;return result;
 }
 }

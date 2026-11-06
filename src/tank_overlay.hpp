@@ -22,8 +22,8 @@ inline void draw(IDirect3DDevice9* device,float width,float height){
   // Grey = unknown; amber/purple are animation/manual stopwatch ESTIMATES.
   {auto start=o.origin+Vec3{0,0,100};float x,y;if(project(start,*c,width,height,x,y)){
     auto e=estimates->find(o.handle);bool manual=e!=estimates->end()&&std::string(e->second.source)=="manual-observed-punch";DWORD color=!o.cooldown?0xff888888:manual?0xffcc88ff:0xffddaa44;
-    vertices.push_back({x-24,y,0,1,0xff666666});vertices.push_back({x+24,y,0,1,0xff666666});
-    if(o.cooldown){float scale=e!=estimates->end()&&e->second.span&&*e->second.span>0?*e->second.span:std::max(1.f,*o.cooldown);float fill=std::clamp(*o.cooldown/scale,0.f,1.f);vertices.push_back({x-24,y-2,0,1,color});vertices.push_back({x-24+48*fill,y-2,0,1,color});}
+    for(int dy=-5;dy<=3;++dy){DWORD background=(dy==-5||dy==3)?0xff999999:0xff333333;vertices.push_back({x-40,y+dy,0,1,background});vertices.push_back({x+40,y+dy,0,1,background});}
+    if(o.cooldown){float scale=e!=estimates->end()&&e->second.span&&*e->second.span>0?*e->second.span:std::max(1.f,*o.cooldown);float fill=std::clamp(*o.cooldown/scale,0.f,1.f);for(int dy=-3;dy<=1;++dy){vertices.push_back({x-38,y+dy,0,1,color});vertices.push_back({x-38+76*fill,y+dy,0,1,color});}}
    }}
   if(!o.geometry)continue;
   for(unsigned i=0;i<32;++i){float a=o.heading-o.halfArc+o.halfArc*2*i/32,b=o.heading-o.halfArc+o.halfArc*2*(i+1)/32;line(center+forward(a)*o.radius,center+forward(b)*o.radius,0xffddaa44);

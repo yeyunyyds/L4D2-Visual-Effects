@@ -12,7 +12,7 @@ class SwingStopwatch {
  const char* source="unknown";unsigned eventId=0;std::optional<float> startedAt;
 public:
  void reset(){initialized=attack=throwing=hasTimer=false;sequence=-1;cycle.reset();lastTime.reset();deadline.reset();span.reset();throwEnd.reset();startedAt.reset();eventId=0;source="unknown";}
- ObservedTimer update(std::optional<float> now,std::uint64_t tick,int seq,std::optional<float> currentCycle,const std::optional<SequenceName>& name,std::optional<float> interval,std::optional<float> miss,bool manual=false){
+ ObservedTimer update(std::optional<float> now,std::uint64_t tick,int seq,std::optional<float> currentCycle,const std::optional<SequenceName>& name,std::optional<float> interval,std::optional<float> miss,bool manual=false,bool layerOnset=false){
   (void)tick;ObservedTimer out;
   if(!now||!std::isfinite(*now)){out.reason="Source clock unavailable/stalled";return out;}
   if(lastTime&&*now<*lastTime-.001f){reset();out.reason="Source clock reset";return out;}
@@ -23,7 +23,7 @@ public:
   bool onset=known&&currentAttack&&((initialized&&(!attack||seq!=sequence||wrapped))||(!initialized&&cycleValid&&*currentCycle<.2f));
   if(known&&currentThrow&&!throwing){hasTimer=false;deadline.reset();span.reset();throwEnd.reset();}
   if(known&&throwing&&!currentThrow)throwEnd=now;
-  if(manual||onset){
+  if(manual||layerOnset||onset){
    hasTimer=false;deadline.reset();span.reset();
    if(valid(interval)){
     float duration=*interval;if(valid(miss))duration=std::min(duration,*miss);
@@ -31,7 +31,7 @@ public:
     // sample. Use the earlier bound so a delayed observation does not grant a
     // falsely long "safe" window. Manual marks start at the marked instant.
     float start=*now;if(!manual&&lastTime&&*now>=*lastTime&&*now-*lastTime<=.25f)start=*lastTime;
-    deadline=start+duration;span=duration;startedAt=start;++eventId;hasTimer=true;source=manual?"manual-observed-punch":"animation-observed-punch";out.triggered=true;
+    deadline=start+duration;span=duration;startedAt=start;++eventId;hasTimer=true;source=manual?"manual-observed-punch":layerOnset?"layer-observed-punch":"animation-observed-punch";out.triggered=true;
     out.reason=valid(miss)?"parameter-based estimate; earliest hit/miss interval":"miss interval unavailable; normal-interval estimate";
    }else out.reason="punch marked but live swing interval unavailable";
   }

@@ -4,6 +4,7 @@
 #include "tank_sequence.hpp"
 #include "tank_event_runtime.hpp"
 #include "tank_observed_timer.hpp"
+#include "tank_layer_attack.hpp"
 #include "entity_menu.hpp"
 #include <mutex>
 namespace visual::tank {
@@ -19,6 +20,8 @@ inline std::atomic<const char*> markStatus{u8"未手动标记"};
 inline std::vector<std::pair<std::uint32_t,std::uint32_t>> displayedTanks;
 inline auto emptyObserved=std::make_shared<const std::map<std::uint32_t,ObservedTimer>>();
 inline std::shared_ptr<const std::map<std::uint32_t,ObservedTimer>> observedSnapshot=emptyObserved;
+inline auto emptyLayers=std::make_shared<const std::map<std::uint32_t,LayerAttack>>();
+inline std::shared_ptr<const std::map<std::uint32_t,LayerAttack>> layerSnapshot=emptyLayers;
 inline void mark(std::uint32_t epoch,std::uint32_t handle){std::atomic_store(&markRequest,std::make_shared<const MarkRequest>(MarkRequest{epoch,handle,GetTickCount64()}));markStatus=u8"手动出拳标记已提交";}
 inline std::mutex animationMutex;inline std::map<std::uint32_t,Animation> animations;
 // CPU metadata only, called from the already verified model callback. No D3D,
@@ -67,24 +70,33 @@ inline void onFrame(const dango::GameCameraFrame& camera)try{
  auto eventCfg=std::atomic_load(&options);events::update(!faulted&&eventCfg->enabled&&eventCfg->logging,camera);
  if(faulted)return;
  static Predictor predictor;static std::shared_ptr<const Frame> previous;
- static std::uint32_t timerEpoch=0;static std::uint64_t consumedMark=0;static std::map<std::uint32_t,SwingStopwatch> timers;
+ static std::uint32_t timerEpoch=0;static std::uint64_t consumedMark=0;static std::map<std::uint32_t,SwingStopwatch> timers;static std::map<std::uint32_t,LayerAttackDetector> layerDetectors;
  auto cfg=std::atomic_load(&options);auto frame=std::atomic_load(&source_entities::combatSnapshot);
- if(!cfg->enabled||!camera.active){predictor.reset();previous.reset();timers.clear();if(std::atomic_load(&observedSnapshot)!=emptyObserved)std::atomic_store(&observedSnapshot,emptyObserved);if(std::atomic_load(&snapshot)!=emptyResult)std::atomic_store(&snapshot,emptyResult);return;}
+ if(!cfg->enabled||!camera.active){predictor.reset();previous.reset();timers.clear();layerDetectors.clear();std::atomic_store(&layerSnapshot,emptyLayers);if(std::atomic_load(&observedSnapshot)!=emptyObserved)std::atomic_store(&observedSnapshot,emptyObserved);if(std::atomic_load(&snapshot)!=emptyResult)std::atomic_store(&snapshot,emptyResult);return;}
  if(previous==frame||frame->epoch!=camera.epoch||camera.tick<frame->tick||camera.tick-frame->tick>250)return;previous=frame;
  auto out=predictor.update(*frame,*std::atomic_load(&parameters),*cfg);
- if(timerEpoch!=out.epoch){timers.clear();timerEpoch=out.epoch;}
+ if(timerEpoch!=out.epoch){timers.clear();layerDetectors.clear();timerEpoch=out.epoch;}
  auto request=std::atomic_load(&markRequest);bool requested=request->tick!=consumedMark;consumedMark=request->tick;bool matched=false,started=false;
  std::map<std::uint32_t,SwingStopwatch> nextTimers;std::map<std::uint32_t,ObservedTimer> readings;
+ std::map<std::uint32_t,LayerAttackDetector> nextDetectors;std::map<std::uint32_t,LayerAttack> layerReadings;
  {std::lock_guard<std::mutex> lock(animationMutex);for(auto& o:out.tanks){auto a=animations.find(o.handle);std::optional<SequenceName> names;
   if(a!=animations.end()&&a->second.epoch==frame->epoch&&o.sequence&&a->second.sequence==*o.sequence&&!a->second.names.label.empty()){names=a->second.names;o.action=classify(*names)+": "+names->label;}
   auto timer=timers.find(o.handle);SwingStopwatch watch=timer==timers.end()?SwingStopwatch{}:timer->second;
+  const Record* actor=nullptr;for(const auto& r:frame->records)if(r.handle==o.handle){actor=&r;break;}
+  std::vector<LayerSample> layers;if(actor)for(const auto& l:actor->animationLayers){LayerSample sample{l.index,l.sequence,l.cycle,l.weight,{}};
+   if(a!=animations.end()&&a->second.epoch==frame->epoch){auto n=a->second.layerNames.find(l.sequence);if(n!=a->second.layerNames.end())sample.names=n->second;}layers.push_back(std::move(sample));
+  }
+  auto oldDetector=layerDetectors.find(o.handle);auto detector=oldDetector==layerDetectors.end()?LayerAttackDetector{}:oldDetector->second;
+  auto layer=detector.update(out.clock.time,actor&&actor->animationLayerReason==dango::animation::SampledReason,layers);
+  layerReadings[o.handle]=layer;nextDetectors[o.handle]=std::move(detector);if(layer.active)o.action="attack-layer: "+layer.names.label;
   bool manual=requested&&request->epoch==out.epoch&&request->handle==o.handle&&camera.tick>=request->tick&&camera.tick-request->tick<=1000;
-  if(manual)matched=true;auto reading=watch.update(out.clock.time,out.tick,o.sequence.value_or(-1),o.cycle,names,out.parameters.interval,out.parameters.missInterval,manual);
+  if(manual)matched=true;auto reading=watch.update(out.clock.time,out.tick,o.sequence.value_or(-1),o.cycle,names,out.parameters.interval,out.parameters.missInterval,manual,layer.onset);
   if(manual)started=reading.triggered;
   // Raw client deadlines are diagnostic evidence only; stale AI fields must not
   // be presented as zero cooldown. The visible value is observation-based.
   o.cooldown=reading.remaining;readings[o.handle]=reading;nextTimers[o.handle]=watch;
  }}
+ layerDetectors=std::move(nextDetectors);std::atomic_store(&layerSnapshot,std::make_shared<const std::map<std::uint32_t,LayerAttack>>(std::move(layerReadings)));
  timers=std::move(nextTimers);std::atomic_store(&observedSnapshot,std::make_shared<const std::map<std::uint32_t,ObservedTimer>>(std::move(readings)));
  if(requested)markStatus=matched?(started?u8"已按手动标记启动估算":u8"时钟或间隔未知，标记未启动计时"):u8"标记已过期或目标失效";
  std::atomic_store(&snapshot,std::make_shared<const Result>(std::move(out)));
@@ -112,7 +124,7 @@ inline std::string menu(){auto cfg=std::atomic_load(&options);auto f=std::atomic
 inline bool action(std::uintptr_t id){if(id>=0x90000&&id<0x90000+displayedTanks.size()){auto pair=displayedTanks[id-0x90000];mark(pair.first,pair.second);return true;}if((id<330||id>333)&&id!=335)return false;auto s=*std::atomic_load(&options);if(id==330){source_entities::resetRequested=true;s.enabled=!s.enabled;if(s.enabled)faulted=false;}if(id==331)s.draw=!s.draw;if(id==332)s.logging=!s.logging;if(id==335)s.markKey=!s.markKey;if(id==333)s.horizonMs=s.horizonMs>=500?0:s.horizonMs+100;std::atomic_store(&options,std::make_shared<const Settings>(s));return true;}
 inline void poll(std::uint64_t now)try{events::poll();if(faulted)return;auto cfg=std::atomic_load(&options);pollCvars(now,cfg->enabled);static std::uint64_t next=0,last=0;
  if(!cfg->enabled||!cfg->logging||now<next)return;next=now+100;auto f=std::atomic_load(&snapshot);if(!f->tick||f->tick==last)return;last=f->tick;
- nlohmann::json j={{"schema",6},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
+ nlohmann::json j={{"schema",7},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
  j["eventCapture"]=events::summary();
  j["observationDiagnostics"]={{"engine",engineObservations.load()},{"studio",studioObservations.load()},{"tankHeaders",tankHeaders.load()},{"renderableMatches",renderableMatches.load()}};
  j["clockSourceHandle"]=f->clock.source;j["clockReason"]=f->clock.reason;if(f->clock.time)j["observedGameTime"]=*f->clock.time;
@@ -121,6 +133,7 @@ inline void poll(std::uint64_t now)try{events::poll();if(faulted)return;auto cfg
   {std::lock_guard<std::mutex> lock(animationMutex);auto probe=animations.find(o.handle);
    if(probe!=animations.end()&&probe->second.epoch==f->epoch){r["animationProbe"]={{"route",probe->second.route},{"reason",probe->second.reason},{"model",probe->second.model},{"sequence",probe->second.sequence},{"localSequenceCount",probe->second.localSequenceCount},{"includedModels",probe->second.includes.names},{"includeReason",probe->second.includes.reason},{"label",probe->second.names.label},{"activity",probe->second.names.activity}};}
    else r["animationProbe"]={{"reason","no matching model observation"}};}
+  auto detectedLayers=std::atomic_load(&layerSnapshot);auto detected=detectedLayers->find(o.handle);if(detected!=detectedLayers->end()){const auto& l=detected->second;r["attackLayer"]={{"sampled",l.sampled},{"active",l.active},{"onset",l.onset},{"index",l.layer},{"sequence",l.sequence},{"cycle",l.cycle},{"weight",l.weight},{"label",l.names.label},{"activity",l.names.activity}};}
   r["rawFieldCooldownReason"]=o.timing.reason;r["rawFieldPartial"]=o.timing.partial;if(o.timing.weaponDeadline)r["rawWeaponDeadline"]=*o.timing.weaponDeadline;if(o.timing.actorDeadline)r["rawActorDeadline"]=*o.timing.actorDeadline;
   auto estimates=std::atomic_load(&observedSnapshot);auto estimate=estimates->find(o.handle);if(estimate!=estimates->end()){const auto& e=estimate->second;r["stopwatch"]={{"eventId",e.eventId},{"source",e.source},{"reason",e.reason},{"triggered",e.triggered},{"expired",e.expired},{"throwing",e.throwing}};if(e.startedAt)r["stopwatch"]["startedAt"]=*e.startedAt;if(e.span)r["stopwatch"]["span"]=*e.span;if(e.sinceThrow)r["stopwatch"]["sinceThrowEnd"]=*e.sinceThrow;}
   if(o.cooldown)r["estimatedCooldown"]=*o.cooldown;if(o.sequence)r["sequence"]=*o.sequence;if(o.cycle)r["cycle"]=*o.cycle;if(o.target)r["target"]={{"handle",o.target->handle},{"name",o.target->name},{"source",o.target->source}};j["tanks"].push_back(r);

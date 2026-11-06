@@ -56,3 +56,14 @@ preview5 额外记录 `localSequenceCount`，区分本地表越界与描述符�
 独立日志及状态中的最近事件减少待机记录轮换造成的证据丢失。新绑定文件保留有限的模块相对入口和代码字节，方便后续验证实际 PostDataUpdate 路径；不会主动调用这些虚表方法。当前事件观察仍可能受引擎缓存代理或客户端预测路径影响，需用工厂/代理计数判断覆盖。
 
 模型的 include 名称仅从经边界验证的 v48 数据中读取；不把 studiohdr_t 的 private cache 指针猜成 virtualmodel_t，也不直接以导入顺序推算全局序列。
+
+
+## preview7：已确认攻击层接入自动计时
+
+后续两份日志的 schema 6 部分共有 782 条、约 97.95 秒。实际攻击层出现了 Attack_Moving / ACT_TERROR_ATTACK_MOVING、Hulk_RunAttack1_gesture、Hulk_RunAttack2_gesture；第 0 层的权重及 cycle 均有变化。以此确认之前主体动画路径漏掉了实际攻击手势，但不将动画本身当作命中证明。
+
+新增每 Tank/完整句柄的 LayerAttackDetector，识别有权重的已解析攻击标签、序列变化和 cycle 重启，合并同次多层激活，避免权重短暂失活、未解析帧或重复时间导致重复计时。输入缺失保持未知；长间隔和初次观察的中途动作不建立完整新窗口。
+
+检测到起手后直接向现有 SwingStopwatch 提交独立的 layerOnset 信号，source 为 layer-observed-punch。主体仍可保持 Run_4，投石状态保持独立。此路径在诊断关闭时照常工作，不依赖尚未成功读取的事件编号。
+
+生产检测器和秒表的离线回放得到 29 次起手/29 次计时，与人工检查的 17 段 Hulk_RunAttack1_gesture、7 段 Attack_Moving、5 段 Hulk_RunAttack2_gesture 对应；重复样本没有再次启动。回放不是实机准确率保证，也不能证明动画起手与实际冷却恢复或挥拳命中完全同步。
