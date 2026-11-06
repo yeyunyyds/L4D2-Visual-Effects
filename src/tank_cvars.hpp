@@ -5,7 +5,7 @@
 namespace visual::tank {
 inline std::shared_ptr<const Parameters> parameters=std::make_shared<const Parameters>();
 struct CvarProbe{const char* name;float low,high;std::optional<CvarValue> binding;};
-inline std::vector<CvarProbe> probes={{"tank_swing_range",1,512,{}},{"tank_swing_arc",1,360,{}},{"tank_windup_time",0,10,{}},{"tank_swing_duration",0,10,{}},{"tank_swing_interval",0,10,{}}};
+inline std::vector<CvarProbe> probes={{"tank_swing_range",1,512,{}},{"tank_swing_arc",1,360,{}},{"tank_windup_time",0,10,{}},{"tank_swing_duration",0,10,{}},{"tank_swing_interval",0,10,{}},{"tank_swing_miss_interval",0,10,{}}};
 inline bool validVtable(std::uint32_t object){std::uint32_t vt=0,code=0;return dango::entitywire::load(source_entities::reader,object,vt)&&dango::entitywire::load(source_entities::reader,vt,code)&&source_camera::executable(reinterpret_cast<void*>(uintptr_t(code)));}
 inline void scanModule(HMODULE module){
  if(!module)return;auto base=uint32_t(reinterpret_cast<uintptr_t>(module));auto& reader=source_entities::reader;IMAGE_DOS_HEADER dos{};IMAGE_NT_HEADERS nt{};
@@ -34,7 +34,7 @@ inline void pollCvars(std::uint64_t now,bool enabled){
  if(now<next)return;next=now+500;
  if(now>=rescan){rescan=now+10000;if(server)scanModule(server);else scanModule(source_camera::clientModule);}
  Parameters out;out.tick=now;out.source=desired;
- std::optional<float>* outputs[]={&out.range,&out.arc,&out.windup,&out.duration,&out.interval};
+ std::optional<float>* outputs[]={&out.range,&out.arc,&out.windup,&out.duration,&out.interval,&out.missInterval};
  for(unsigned i=0;i<probes.size();++i){auto& p=probes[i];if(!p.binding)continue;auto v=readCvar(source_entities::reader,p.binding->object,p.name,p.low,p.high);if(v)*outputs[i]=v->value;else p.binding.reset();}
  std::atomic_store(&parameters,std::make_shared<const Parameters>(std::move(out)));
 }

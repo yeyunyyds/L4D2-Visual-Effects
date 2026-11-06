@@ -6,14 +6,14 @@
 #include <optional>
 namespace visual::tank {
 using dango::Vec3;using dango::inventory::Record;using dango::inventory::Frame;
-struct Settings{bool enabled=false,draw=true,logging=false;unsigned horizonMs=200;};
+struct Settings{bool enabled=false,draw=true,logging=false,markKey=false;unsigned horizonMs=200;};
 template<class Json> Settings readSettings(const Json& j){Settings s;auto p=j.find("tankPrediction");if(p==j.end()||!p->is_object())return s;
- for(auto value:{std::pair<const char*,bool*>{"enabled",&s.enabled},{"draw",&s.draw},{"logging",&s.logging}})if(p->contains(value.first)&&(*p)[value.first].is_boolean())*value.second=(*p)[value.first].template get<bool>();
+ for(auto value:{std::pair<const char*,bool*>{"enabled",&s.enabled},{"draw",&s.draw},{"logging",&s.logging},{"markKey",&s.markKey}})if(p->contains(value.first)&&(*p)[value.first].is_boolean())*value.second=(*p)[value.first].template get<bool>();
  if(p->contains("horizonMs")&&(*p)["horizonMs"].is_number_unsigned())s.horizonMs=std::clamp((*p)["horizonMs"].template get<unsigned>(),0u,500u);
  return s;
 }
-template<class Json> void writeSettings(Json& j,const Settings& s){j["tankPrediction"]={{"enabled",s.enabled},{"draw",s.draw},{"logging",s.logging},{"horizonMs",s.horizonMs}};}
-struct Parameters{std::optional<float> range,arc,windup,duration,interval;std::uint64_t tick=0;std::string source="unavailable";};
+template<class Json> void writeSettings(Json& j,const Settings& s){j["tankPrediction"]={{"enabled",s.enabled},{"draw",s.draw},{"logging",s.logging},{"markKey",s.markKey},{"horizonMs",s.horizonMs}};}
+struct Parameters{std::optional<float> range,arc,windup,duration,interval,missInterval;std::uint64_t tick=0;std::string source="unavailable";};
 inline bool finite(Vec3 v){return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z);}
 inline float horizontal(Vec3 v){return std::hypot(v.x,v.y);}
 inline float yaw(Vec3 v){return std::atan2(v.y,v.x)*180.f/3.14159265358979323846f;}

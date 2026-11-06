@@ -1,6 +1,6 @@
 # L4D2 Visual Effects
 
-**Tank预测实验分支：0.7.3-tank-cooldown-preview3（L4N-only）**
+**Tank预测实验分支：0.7.3-tank-stopwatch-preview4（L4N-only）**
 
 默认关闭；只尝试客户端/同进程只读数据，无SourceMod依赖。正式版0.7.2仍是稳定基线。
 请先阅读[实验说明与本地单人验收](docs/TANK-PREVIEW.md)，不要把注视目标或参数估计区理解为精确AI锁敌/命中边界。

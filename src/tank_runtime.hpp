@@ -2,6 +2,7 @@
 #include "tank_cvars.hpp"
 #include "diagnostics.hpp"
 #include "tank_sequence.hpp"
+#include "tank_observed_timer.hpp"
 #include "entity_menu.hpp"
 #include <mutex>
 namespace visual::tank {
@@ -11,6 +12,13 @@ inline std::shared_ptr<const Result> emptyResult=std::make_shared<const Result>(
 inline std::shared_ptr<const Settings> options=std::make_shared<const Settings>();
 inline std::shared_ptr<const Result> snapshot=std::make_shared<const Result>();
 struct Animation{std::uint32_t epoch=0,handle=0;int sequence=-1;SequenceName names;std::string route,reason,model;};
+struct MarkRequest{std::uint32_t epoch=0,handle=0;std::uint64_t tick=0;};
+inline std::shared_ptr<const MarkRequest> markRequest=std::make_shared<const MarkRequest>();
+inline std::atomic<const char*> markStatus{u8"未手动标记"};
+inline std::vector<std::pair<std::uint32_t,std::uint32_t>> displayedTanks;
+inline auto emptyObserved=std::make_shared<const std::map<std::uint32_t,ObservedTimer>>();
+inline std::shared_ptr<const std::map<std::uint32_t,ObservedTimer>> observedSnapshot=emptyObserved;
+inline void mark(std::uint32_t epoch,std::uint32_t handle){std::atomic_store(&markRequest,std::make_shared<const MarkRequest>(MarkRequest{epoch,handle,GetTickCount64()}));markStatus=u8"手动出拳标记已提交";}
 inline std::mutex animationMutex;inline std::map<std::uint32_t,Animation> animations;
 // CPU metadata only, called from the already verified model callback. No D3D,
 // SetupBones, simulation changes or additional engine method dispatch.
@@ -55,41 +63,61 @@ inline void observeStudio(std::uint32_t header,std::uint32_t renderable){
 inline void onFrame(const dango::GameCameraFrame& camera)try{
  if(faulted)return;
  static Predictor predictor;static std::shared_ptr<const Frame> previous;
+ static std::uint32_t timerEpoch=0;static std::uint64_t consumedMark=0;static std::map<std::uint32_t,SwingStopwatch> timers;
  auto cfg=std::atomic_load(&options);auto frame=std::atomic_load(&source_entities::combatSnapshot);
- if(!cfg->enabled||!camera.active){predictor.reset();previous.reset();if(std::atomic_load(&snapshot)!=emptyResult)std::atomic_store(&snapshot,emptyResult);return;}
+ if(!cfg->enabled||!camera.active){predictor.reset();previous.reset();timers.clear();if(std::atomic_load(&observedSnapshot)!=emptyObserved)std::atomic_store(&observedSnapshot,emptyObserved);if(std::atomic_load(&snapshot)!=emptyResult)std::atomic_store(&snapshot,emptyResult);return;}
  if(previous==frame||frame->epoch!=camera.epoch||camera.tick<frame->tick||camera.tick-frame->tick>250)return;previous=frame;
  auto out=predictor.update(*frame,*std::atomic_load(&parameters),*cfg);
- {std::lock_guard<std::mutex> lock(animationMutex);for(auto& o:out.tanks){auto a=animations.find(o.handle);if(a!=animations.end()&&a->second.epoch==frame->epoch&&o.sequence&&a->second.sequence==*o.sequence&&!a->second.names.label.empty())o.action=classify(a->second.names)+": "+a->second.names.label;}}
+ if(timerEpoch!=out.epoch){timers.clear();timerEpoch=out.epoch;}
+ auto request=std::atomic_load(&markRequest);bool requested=request->tick!=consumedMark;consumedMark=request->tick;bool matched=false,started=false;
+ std::map<std::uint32_t,SwingStopwatch> nextTimers;std::map<std::uint32_t,ObservedTimer> readings;
+ {std::lock_guard<std::mutex> lock(animationMutex);for(auto& o:out.tanks){auto a=animations.find(o.handle);std::optional<SequenceName> names;
+  if(a!=animations.end()&&a->second.epoch==frame->epoch&&o.sequence&&a->second.sequence==*o.sequence&&!a->second.names.label.empty()){names=a->second.names;o.action=classify(*names)+": "+names->label;}
+  auto timer=timers.find(o.handle);SwingStopwatch watch=timer==timers.end()?SwingStopwatch{}:timer->second;
+  bool manual=requested&&request->epoch==out.epoch&&request->handle==o.handle&&camera.tick>=request->tick&&camera.tick-request->tick<=1000;
+  if(manual)matched=true;auto reading=watch.update(out.clock.time,out.tick,o.sequence.value_or(-1),o.cycle,names,out.parameters.interval,out.parameters.missInterval,manual);
+  if(manual)started=reading.triggered;
+  // Raw client deadlines are diagnostic evidence only; stale AI fields must not
+  // be presented as zero cooldown. The visible value is observation-based.
+  o.cooldown=reading.remaining;readings[o.handle]=reading;nextTimers[o.handle]=watch;
+ }}
+ timers=std::move(nextTimers);std::atomic_store(&observedSnapshot,std::make_shared<const std::map<std::uint32_t,ObservedTimer>>(std::move(readings)));
+ if(requested)markStatus=matched?(started?u8"已按手动标记启动估算":u8"时钟或间隔未知，标记未启动计时"):u8"标记已过期或目标失效";
  std::atomic_store(&snapshot,std::make_shared<const Result>(std::move(out)));
 }
 catch(...){faulted=true;std::atomic_store(&snapshot,emptyResult);}
 inline std::string menu(){auto cfg=std::atomic_load(&options);auto f=std::atomic_load(&snapshot);auto p=std::atomic_load(&parameters);
  auto number=[](std::optional<float> n){return n?std::to_string(int(*n*10)/10.f):std::string(u8"未读取");};
- std::string rows=menuItem(cfg->enabled?u8"Tank 预测：开":u8"Tank 预测：关（默认）",330)+menuItem(cfg->draw?u8"方向与范围绘制：开":u8"方向与范围绘制：关",331)+menuItem(cfg->logging?u8"诊断记录：开":u8"诊断记录：关",332)+menuItem(u8"预测时间："+std::to_string(cfg->horizonMs)+u8"毫秒（切换）",333)+menuRow(u8"手长参数 "+number(p->range)+u8" / arc参数 "+number(p->arc))+menuRow(p->source);
+ displayedTanks.clear();auto observed=std::atomic_load(&observedSnapshot);
+ std::string rows=menuItem(cfg->enabled?u8"Tank 预测：开":u8"Tank 预测：关（默认）",330)+menuItem(cfg->draw?u8"方向与范围绘制：开":u8"方向与范围绘制：关",331)+menuItem(cfg->logging?u8"诊断记录：开":u8"诊断记录：关",332)+menuItem(u8"预测时间："+std::to_string(cfg->horizonMs)+u8"毫秒（切换）",333)+menuRow(u8"手长参数 "+number(p->range)+u8" / arc参数 "+number(p->arc))+menuRow(p->source)+menuItem(cfg->markKey?u8"F7手动标记出拳：开":u8"F7手动标记出拳：关（默认）",335)+menuRow(markStatus.load());
  for(const auto& o:f->tanks){rows+=menuRow("Tank #"+std::to_string(o.handle&4095)+" / "+(o.eye?u8"瞄准角":u8"身体角回退")+" / "+o.action);
   if(o.target)rows+=menuRow(std::string(o.target->source=="network-enemy"?u8"网络敌对目标：":o.target->source=="network-look-at"?u8"注视目标（非锁敌保证）：":u8"朝向推测目标：")+o.target->name);else rows+=menuRow(u8"当前目标未知或存在歧义");
   if(o.gaze&&o.target&&o.gaze->handle!=o.target->handle)rows+=menuRow(u8"另一个注视目标："+o.gaze->name);
-  if(o.timing.weaponRemaining)rows+=menuRow(u8"武器计时约束："+std::to_string(*o.timing.weaponRemaining)+u8"秒");
-  if(o.timing.actorRemaining)rows+=menuRow(u8"角色计时约束："+std::to_string(*o.timing.actorRemaining)+u8"秒");
-  if(o.cooldown)rows+=menuRow(std::string(o.timing.partial?u8"冷却下限（部分字段）：":u8"客户端计时剩余：")+std::to_string(*o.cooldown)+u8"秒（不保证可出拳）");else rows+=menuRow(u8"冷却未知："+std::string(o.timing.reason));
+  displayedTanks.push_back({f->epoch,o.handle});rows+=menuItem(u8"手动标记此Tank刚刚出拳",0x90000+displayedTanks.size()-1);
+  auto estimate=observed->find(o.handle);if(estimate!=observed->end()){
+   if(estimate->second.remaining)rows+=menuRow(u8"观测估算剩余："+std::to_string(*estimate->second.remaining)+u8"秒（非真实冷却）");
+   else rows+=menuRow(std::string(u8"估算未知：")+estimate->second.reason);
+   if(estimate->second.sinceThrow)rows+=menuRow(u8"距投石动作结束："+std::to_string(*estimate->second.sinceThrow)+u8"秒（非倒计时）");
+  }
   if(o.nearVerticalAim)rows+=menuRow(u8"近乎竖直瞄准：不以水平角推测锁向");
   if(o.headingStalled)rows+=menuRow(u8"朝向停滞：可能锁向，尚未证实");rows+=menuRow(o.reason);
  }
  if(faulted)rows+=menuRow(u8"预测处理失败，已暂停；关闭后重开以重试");
  return menuPage(u8"Tank 行为预测 · L4N 客户端实验",rows+menuItem(u8"保存设置",101)+menuRow(u8"仅预测；不是服务器精确命中边界"));
 }
-inline bool action(std::uintptr_t id){if(id<330||id>333)return false;auto s=*std::atomic_load(&options);if(id==330){source_entities::resetRequested=true;s.enabled=!s.enabled;if(s.enabled)faulted=false;}if(id==331)s.draw=!s.draw;if(id==332)s.logging=!s.logging;if(id==333)s.horizonMs=s.horizonMs>=500?0:s.horizonMs+100;std::atomic_store(&options,std::make_shared<const Settings>(s));return true;}
+inline bool action(std::uintptr_t id){if(id>=0x90000&&id<0x90000+displayedTanks.size()){auto pair=displayedTanks[id-0x90000];mark(pair.first,pair.second);return true;}if((id<330||id>333)&&id!=335)return false;auto s=*std::atomic_load(&options);if(id==330){source_entities::resetRequested=true;s.enabled=!s.enabled;if(s.enabled)faulted=false;}if(id==331)s.draw=!s.draw;if(id==332)s.logging=!s.logging;if(id==335)s.markKey=!s.markKey;if(id==333)s.horizonMs=s.horizonMs>=500?0:s.horizonMs+100;std::atomic_store(&options,std::make_shared<const Settings>(s));return true;}
 inline void poll(std::uint64_t now)try{if(faulted)return;auto cfg=std::atomic_load(&options);pollCvars(now,cfg->enabled);static std::uint64_t next=0,last=0;
  if(!cfg->enabled||!cfg->logging||now<next)return;next=now+100;auto f=std::atomic_load(&snapshot);if(!f->tick||f->tick==last)return;last=f->tick;
- nlohmann::json j={{"schema",3},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
+ nlohmann::json j={{"schema",4},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
  j["observationDiagnostics"]={{"engine",engineObservations.load()},{"studio",studioObservations.load()},{"tankHeaders",tankHeaders.load()},{"renderableMatches",renderableMatches.load()}};
  j["clockSourceHandle"]=f->clock.source;j["clockReason"]=f->clock.reason;if(f->clock.time)j["observedGameTime"]=*f->clock.time;
- if(f->parameters.range)j["range"]=*f->parameters.range;if(f->parameters.arc)j["arc"]=*f->parameters.arc;if(f->parameters.windup)j["windup"]=*f->parameters.windup;if(f->parameters.duration)j["duration"]=*f->parameters.duration;if(f->parameters.interval)j["interval"]=*f->parameters.interval;
+ if(f->parameters.range)j["range"]=*f->parameters.range;if(f->parameters.arc)j["arc"]=*f->parameters.arc;if(f->parameters.windup)j["windup"]=*f->parameters.windup;if(f->parameters.duration)j["duration"]=*f->parameters.duration;if(f->parameters.interval)j["interval"]=*f->parameters.interval;if(f->parameters.missInterval)j["missInterval"]=*f->parameters.missInterval;
  for(const auto& o:f->tanks){nlohmann::json r={{"handle",o.handle},{"position",{o.origin.x,o.origin.y,o.origin.z}},{"yaw",o.heading},{"pitch",o.pitch},{"nearVerticalAim",o.nearVerticalAim},{"eyeAngle",o.eye},{"headingRate",o.headingRate},{"possibleHeadingLock",o.headingStalled},{"action",o.action},{"geometry",o.geometry},{"reason",o.reason}};
   {std::lock_guard<std::mutex> lock(animationMutex);auto probe=animations.find(o.handle);
    if(probe!=animations.end()&&probe->second.epoch==f->epoch){r["animationProbe"]={{"route",probe->second.route},{"reason",probe->second.reason},{"model",probe->second.model},{"sequence",probe->second.sequence},{"label",probe->second.names.label},{"activity",probe->second.names.activity}};}
    else r["animationProbe"]={{"reason","no matching model observation"}};}
-  r["cooldownReason"]=o.timing.reason;r["cooldownPartial"]=o.timing.partial;if(o.timing.weaponDeadline)r["weaponDeadline"]=*o.timing.weaponDeadline;if(o.timing.actorDeadline)r["actorDeadline"]=*o.timing.actorDeadline;
+  r["rawFieldCooldownReason"]=o.timing.reason;r["rawFieldPartial"]=o.timing.partial;if(o.timing.weaponDeadline)r["rawWeaponDeadline"]=*o.timing.weaponDeadline;if(o.timing.actorDeadline)r["rawActorDeadline"]=*o.timing.actorDeadline;
+  auto estimates=std::atomic_load(&observedSnapshot);auto estimate=estimates->find(o.handle);if(estimate!=estimates->end()){const auto& e=estimate->second;r["stopwatch"]={{"eventId",e.eventId},{"source",e.source},{"reason",e.reason},{"triggered",e.triggered},{"expired",e.expired},{"throwing",e.throwing}};if(e.startedAt)r["stopwatch"]["startedAt"]=*e.startedAt;if(e.span)r["stopwatch"]["span"]=*e.span;if(e.sinceThrow)r["stopwatch"]["sinceThrowEnd"]=*e.sinceThrow;}
   if(o.cooldown)r["estimatedCooldown"]=*o.cooldown;if(o.sequence)r["sequence"]=*o.sequence;if(o.cycle)r["cycle"]=*o.cycle;if(o.target)r["target"]={{"handle",o.target->handle},{"name",o.target->name},{"source",o.target->source}};j["tanks"].push_back(r);
  }
  auto actors=std::atomic_load(&source_entities::combatSnapshot);j["actors"]=nlohmann::json::array();j["actorTick"]=actors->tick;j["resultTick"]=f->tick;j["fieldSchemaHints"]=actors->getterHints;

@@ -15,6 +15,7 @@ inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  builder.AddText(u8"近乎竖直瞄准不以水平角推测锁向");
  builder.AddText(u8"冷却下限部分字段客户端计时剩余秒不保证可出拳未知");
  builder.AddText(u8"武器角色计时约束");
+ builder.AddText(u8"手动标记出拳估算剩余非真实冷却距投石动作结束非倒计时刚刚准星前未找到提交时钟未知过期目标失效启动");
  builder.BuildRanges(&ranges);
 }
 }
