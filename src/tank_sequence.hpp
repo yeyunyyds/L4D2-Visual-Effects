@@ -45,7 +45,7 @@ inline std::string classify(SequenceName name){auto activity=lower(name.activity
  // Semantic activity beats cosmetic sequence names, including misleading Mod labels.
  if(!activity.empty()&&activity!="act_invalid"&&activity!="act_reset"){
   if(activity.find("throw")!=std::string::npos||activity.find("range_attack")!=std::string::npos)return "throw-animation";
-  if(activity.find("melee_attack")!=std::string::npos||activity.rfind("act_terror_attack",0)==0||activity.rfind("act_tank_attack",0)==0)return "attack-animation";
+  if(activity.find("melee_attack")!=std::string::npos||activity.rfind("act_terror_attack",0)==0||activity.rfind("act_tank_attack",0)==0||activity.rfind("act_hulk_attack",0)==0)return "attack-animation";
   if(activity.find("run")!=std::string::npos||activity.find("walk")!=std::string::npos)return "movement-animation";
   return "other-animation";
  }

@@ -20,6 +20,7 @@ inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  builder.AddText(u8"总开关显示内容当前状态高级攻击计时条箭头目标连线位置前瞻摇普通间隔诊断仅用于反馈须启实体相对位置远近透视缩放左右跟随朝向上下固定世界高度");
  builder.AddText(u8"进度条大小与粗细攻击范围线宽倍率整体精调选中参数减少增加每次仅调整显示不改变距离百分比长度厚度恢复默认");
  builder.AddText(u8"动画读取状态采集原版序号备用识别实验仅本次运行生效推测不等于动作解析此页无需画面显示或诊断记录重新进入刷新模型回调未已过期让进入视野校验值局部序列数共享容器定位实体偏移不需要扫描候选根匹配主层数据活动当前没有代表失败攻击是否本轮计时编号检测到");
+ builder.AddText(u8"全序列识别模型解析优先未解析则匹配已知表主动作来源运行时映射验证或未知");
  builder.BuildRanges(&ranges);
 }
 }

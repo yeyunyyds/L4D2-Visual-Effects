@@ -20,3 +20,19 @@ SDK public/studio.cpp ResetVModel clears every m_pStudioHdrCache entry; GroupStu
 Explicit session-only vanilla index backup is guarded by that fingerprint and only used for unresolved overlay entries 40/43/45. Synthesized names are marked experimental; real descriptors always win. It never interprets these indices as local sequences and never applies to the earlier Mod fingerprint. The option is false at startup and is never serialized. Toggling resets model generation / onset history. No new game hooks, unknown calls, GPU work or P2P initialization are involved.
 
 preview2 validation: 24 native suites including font coverage; enhanced ASan/UBSan shared mapping tests cover NULL root cache, uncached selected group, discovery independent of descriptor readiness, original-fingerprint rejection and deduplicated fallback onset. Offline replay of the latest 401-row mixed log yields 0 onsets without backup, 13 backup onsets/13 stopwatch starts with no duplicate restarts; only the 246-row vanilla segment matches the backup fingerprint. The earlier 782-row resolved Mod replay remains 29/29. Offline matching is not hit/miss ground truth.
+
+
+## preview3: automatic broad sequence table matching
+
+User requested removal of the backup test switch and fingerprint restrictions. All 80 label/activity/flags entries in uploaded hulk.mdl, hulk_dlc3.mdl and hulk_l4d1.mdl were parsed with validated descriptor backlinks and found identical. Checksums differ: 795675474, 1674290501, -209254859; the observed current runtime root checksum is 1500020281 with one local sequence. This does not prove which files are modified versus original, and those three files do not provide the missing shared runtime mapping.
+
+The copied metadata table is used automatically for matched Tank entities when a real descriptor is unresolved, for both primary and all sampled overlay sequences. There is no separate test switch, session option, fingerprint requirement or persisted flag. Tank feature defaults remain off. Actual model descriptors win. The status page distinguishes table matching from descriptor resolution; schema 11 uses sequenceSource=known-index-table/model-descriptor. Indices outside 0..79 remain unresolved. This is a deliberately broad heuristic; global index reordering by models/Mods may misclassify.
+
+40/43/45 retain their known attack labels; 46/47 use ACT_HULK_ATTACK_LOW and are recognized as attack animations. 48..51 have throw activities and must enter throw observation without creating a punch onset or invented throw cooldown. 58 local entries are STUDIO_OVERRIDE forward declarations; static labels do not prove their animation data or global runtime ordering. The three raw MDLs are never bundled.
+
+Source metadata SHA256:
+- hulk.mdl: 1e30381ca37aeb66cc26b7c08f35cb37545ca4a8eeb1fcb284afd9a639a2c347
+- hulk_dlc3.mdl: 5c8d1fc3102c5fddd7e8c90be8788f405dda6c1a4c26defcb17cc400556448be
+- hulk_l4d1.mdl: ec392f900f4ef5510df86d33210f0bfe8f6569ddb238eac7e7c5729e2f24359a
+
+Offline replay --known-table of the newest 419-row raw original trace produces 9 layer onsets and 9 stopwatch starts (40=2,43=3,45=4), zero duplicate restarts. The 401-row mixed trace produces 22/22. These are automated candidate observations, not independent ground-truth hit counts. Live shared-container discovery still rejects the header-cache vector and has not been fixed in this preview.
