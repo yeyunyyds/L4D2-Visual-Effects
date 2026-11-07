@@ -1,4 +1,4 @@
-> 本分支为 **0.7.4-compat-preview1**：新增原版 Studio DLL 配置和不依赖固定序号的 Tank 动画映射。正式版仍为 0.7.3。详见 [兼容测试说明](docs/INSTALL.md)，原版 Tank 与不同 VPK 尚待游戏内验证。
+> 本分支为 **0.7.4-compat-preview2**：修正共享头缓存按需初始化的校验，增加游戏内动画状态页及默认关闭的原版序号备用测试开关。正式版仍为 0.7.3。详见 [兼容测试说明](docs/INSTALL.md)，原版 Tank 与不同 VPK 尚待游戏内验证。
 
 # L4D2 Visual Effects
 
