@@ -84,3 +84,14 @@ src/sync/roster.hpp from LDBDangoMusic experiment/steam-progress-sync commit
 6d327fcabe322771e5737165862a9db455998860 (GPL-3.0). The statically verified
 144-byte player-info contract and four-human roster bound are preserved.
 Sprays use cohort-scoped reciprocal handshakes, without music host election.
+
+Entity scaling in src/entity_transform_runtime.hpp and the matrix/pivot design
+in src/entity_transform.hpp adapt Skeeto (Copyright (C) 2026 regoists), GPL-3.0,
+commit 3598bd3afc32bccb98ac4715b2fa53cd6fe883b7:
+src/skeeto/core/skeeto_proxy.cpp, ViewModelScaleBones / Hooked_ViewModelBuild /
+WModelScale* / Hooked_WModelBuild / HookedModelScaleProxy.
+https://github.com/regoists/Skeeto
+This is an independent L4N integration. It extends categories, XYZ deformation
+and 128/256 bones, adds handle/model identity, owned-value restoration,
+explicit proxy teardown, and a Studio-render fallback; no Skeeto binaries,
+marks or game assets are bundled. The existing project GPL-3.0 LICENSE applies.

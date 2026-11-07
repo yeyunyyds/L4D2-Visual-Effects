@@ -56,5 +56,17 @@
     "all": false
   },
   "boneLimit": 128,
-  "renderCompatibility": true
+  "renderCompatibility": true,
+  "entityTransform": {
+    "enabled": false,
+    "studioOnly": false,
+    "all": {
+      "enabled": false,
+      "size": 1,
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "rules": {}
+  }
 }

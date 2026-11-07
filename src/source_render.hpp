@@ -49,7 +49,10 @@ inline std::atomic<unsigned long> drawn{0},rejected{0};
 inline std::atomic<unsigned long> engineCalls{0},identified{0},studioCalls{0};
 inline std::atomic<const char*> identifyReason{"No target draw yet"},poseReason{"No associated studio draw yet"};
 inline std::atomic<const char*> status{"Waiting for game modules"};
+using PoseModifier=bool(*)(std::uint32_t,std::uint32_t,const Matrix3x4*,const Vec3&,Matrix3x4*,unsigned,unsigned&);
+inline std::atomic<PoseModifier> poseModifier{nullptr};
 inline HMODULE studioModule=nullptr;
+inline std::atomic<const char*> studioProfile{u8"尚未匹配"};
 struct Context {bool valid=false;DrawIdentity identity{};std::uint32_t header{},renderable{};std::uint64_t age{};int classId=-1;};
 inline thread_local Context* context=nullptr;
 
@@ -251,7 +254,7 @@ template<std::size_t Capacity> __declspec(noinline) void studioTargetDraw(
         status="Stretch draws submitted; inspect feet and animation in game";
     }
 }
-inline void __fastcall studioHook(void* self,void*,void* results,const void* info,Matrix3x4* bones,
+inline void studioCore(void* self,void*,void* results,const void* info,Matrix3x4* bones,
                                   float* flex,float* delayed,const Vec3& origin,int flags) {
     studioCalls.fetch_add(1,std::memory_order_relaxed);
     if(auto observe=studioObserver.load(std::memory_order_acquire))try{
@@ -276,6 +279,16 @@ inline void __fastcall studioHook(void* self,void*,void* results,const void* inf
     if(boneLimit.load(std::memory_order_relaxed)==256)
         studioTargetDraw<256>(self,results,info,bones,flex,delayed,origin,flags,target,direct);
     else studioTargetDraw<128>(self,results,info,bones,flex,delayed,origin,flags,target,direct);
+}
+
+template<unsigned Capacity> __declspec(noinline) void studioCompose(void* self,void* results,const void* info,Matrix3x4* bones,float* flex,float* delayed,const Vec3& origin,int flags,PoseModifier modifier){
+ BasicPoseCopy<Capacity> copy;std::uint32_t header=0,renderable=0;unsigned count=0;auto at=std::uint32_t(uintptr_t(info));
+ try {if(source_entities::wire::load(source_entities::reader,at,header)&&source_entities::wire::load(source_entities::reader,at+24,renderable)&&modifier(header,renderable,bones,origin,copy.bones.data(),Capacity,count)&&count&&count<=Capacity)bones=copy.bones.data();}catch(...){poseReason="Entity transform rejected; native pose retained";}
+ studioCore(self,nullptr,results,info,bones,flex,delayed,origin,flags);
+}
+inline void __fastcall studioHook(void* self,void*,void* results,const void* info,Matrix3x4* bones,float* flex,float* delayed,const Vec3& origin,int flags){
+ auto modifier=poseModifier.load(std::memory_order_acquire);if(!modifier){studioCore(self,nullptr,results,info,bones,flex,delayed,origin,flags);return;}
+ if(boneLimit.load()==256)studioCompose<256>(self,results,info,bones,flex,delayed,origin,flags,modifier);else studioCompose<128>(self,results,info,bones,flex,delayed,origin,flags,modifier);
 }
 
 inline void connect() {
@@ -316,6 +329,7 @@ inline void connect() {
        !executable(reinterpret_cast<void*>(sb+studioBuild->draw))) {
         status="Render callback is not executable; hooks refused";return;
     }
+    studioProfile=studioBuild->imageSize==0x453000?u8"原版 Studio（已验证）":u8"旧版 Studio（已验证）";
     log(std::string("Selected Studio ABI profile: ")+studioBuild->name);
     log("Chaining engine callback owner="+targetOwner(et[19])+" studio owner="+targetOwner(st[25]));
     engineOriginal=reinterpret_cast<EngineDraw>(et[19]);studioOriginal=reinterpret_cast<StudioDraw>(st[25]);

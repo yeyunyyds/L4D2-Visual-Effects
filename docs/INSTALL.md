@@ -1,4 +1,16 @@
-# L4D2 Visual Effects 0.7.4
+# L4D2Visual 0.8.0-transform-preview1
+
+对应源码：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0-transform-preview1 。Skeeto 派生部分按 GPL-3.0 提供，版权和来源见 bin 内 NOTICE.md。
+
+新增实体缩放与拉伸预览。入口：根菜单 → 实体缩放与拉伸。各类别可设置整体大小与世界X/Y/Z比例，自动走骨骼构建/字段路径并由Studio绘制路径补充；新功能及类别默认关闭，保存到hud.json的entityTransform。开启某类、调整非100%倍率后再开启总开关。精调页按 - / = 调整，其他页同键翻页。
+
+先单类测试，运行状态可查看实际使用的路径。需要有骨骼或Studio模型，地图刷子、光束、粒子不支持。新原生路径和普感衣物表现仍需游戏内验证；这不是已完成实测的正式版。更新必须完全退出游戏，覆盖hud.json前备份。
+
+安装包根目录仅bin和README.md，许可证在bin内。不额外替换studiorender.dll，两种已验证Studio DLL继续支持。
+
+**联机功能未经测试，不保障 VAC 安全。**
+
+以下为保留功能的安装与默认说明：
 
 Windows x86 / L4N v2 客户端视觉效果插件。
 
