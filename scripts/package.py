@@ -6,7 +6,7 @@ root = Path(__file__).resolve().parents[1]
 binary = root / 'build/L4D2Visual.dll'
 if not binary.is_file():
     raise SystemExit('Build the DLL first')
-output = root / 'build/L4D2Visual-0.7.3-tank-style-preview9.zip'
+output = root / 'build/L4D2Visual-0.7.3-tank-anchor-preview10.zip'
 files = {
     'bin/neko/plugins/L4D2Visual.dll': binary,
     'README.md': root / 'docs/TANK-PREVIEW.md',

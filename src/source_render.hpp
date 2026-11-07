@@ -28,8 +28,8 @@ struct ModelInfo {
 static_assert(sizeof(DrawState)==28 && offsetof(ModelInfo,index)==48 && sizeof(ModelInfo)==68);
 using EngineDraw=void(__thiscall*)(void*,const DrawState&,const ModelInfo&,Matrix3x4*);
 using StudioDraw=void(__thiscall*)(void*,void*,const void*,Matrix3x4*,float*,float*,const Vec3&,int);
-inline std::atomic<void(*)(std::uint32_t,int)> modelObserver{nullptr};
-inline std::atomic<void(*)(std::uint32_t,std::uint32_t)> studioObserver{nullptr};
+inline std::atomic<void(*)(std::uint32_t,int,const Vec3&)> modelObserver{nullptr};
+inline std::atomic<void(*)(std::uint32_t,std::uint32_t,const Vec3&)> studioObserver{nullptr};
 inline EngineDraw engineOriginal=nullptr;
 inline StudioDraw studioOriginal=nullptr;
 inline void** engineTable=nullptr;
@@ -201,7 +201,7 @@ inline std::string targetSummary() {
 }
 inline void __fastcall engineHook(void* self,void*,const DrawState& state,const ModelInfo& info,Matrix3x4* bones) {
     engineCalls.fetch_add(1,std::memory_order_relaxed);
-    if(auto observe=modelObserver.load(std::memory_order_acquire))try{observe(state.header,info.index);}catch(...){}
+    if(auto observe=modelObserver.load(std::memory_order_acquire))try{observe(state.header,info.index,info.origin);}catch(...){}
     Context current;
     if(enabled.load())try{current=identify(state,info);}catch(...){rejected.fetch_add(1,std::memory_order_relaxed);}
     if(current.valid)identified.fetch_add(1,std::memory_order_relaxed);
@@ -255,7 +255,7 @@ inline void __fastcall studioHook(void* self,void*,void* results,const void* inf
     studioCalls.fetch_add(1,std::memory_order_relaxed);
     if(auto observe=studioObserver.load(std::memory_order_acquire))try{
         auto address=std::uint32_t(reinterpret_cast<std::uintptr_t>(info));std::uint32_t header=0,renderable=0;
-        if(source_entities::wire::load(source_entities::reader,address,header)&&source_entities::wire::load(source_entities::reader,address+24,renderable))observe(header,renderable);
+        if(source_entities::wire::load(source_entities::reader,address,header)&&source_entities::wire::load(source_entities::reader,address+24,renderable))observe(header,renderable,origin);
     }catch(...){}
 
     if(!enabled.load()){studioOriginal(self,results,info,bones,flex,delayed,origin,flags);return;}

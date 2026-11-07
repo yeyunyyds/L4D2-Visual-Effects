@@ -5,7 +5,7 @@
 using namespace dango::hud;
 void check(bool v){if(!v)throw std::runtime_error("Native menu regression");}
 int main(){
- check(opensChild(321));for(uintptr_t id=360;id<=366;++id)check(!opensChild(id));
+ check(opensChild(321)&&opensChild(322)&&opensChild(323)&&opensChild(324));for(uintptr_t id=370;id<=373;++id)check(!opensChild(id));for(uintptr_t id=360;id<=366;++id)check(!opensChild(id));
  check(opensChild(102)&&opensChild(103)&&opensChild(107));check(!opensChild(120)&&!opensChild(121));for(uintptr_t id=110;id<=118;++id)check(!opensChild(id));
  auto doc=document(R"kv("歌词菜单" { "翻译：关" { "callback" "0x1234" "user_data" "0x2" } "路径 \\ 和 \"引号\"" { "user_data" "0x0" } })kv");
  check(doc.title==u8"歌词菜单"&&doc.rows.size()==2&&doc.rows[0].action==2&&doc.rows[1].action==0);
