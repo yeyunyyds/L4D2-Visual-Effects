@@ -2,7 +2,11 @@
 #include "tank_runtime.hpp"
 #include "spray_display.hpp"
 namespace visual::tank {
-inline bool needed(){if(faulted)return false;auto s=std::atomic_load(&options);auto f=std::atomic_load(&snapshot);auto c=std::atomic_load(&source_camera::snapshot);auto now=GetTickCount64();return s->enabled&&s->draw&&!pictures::displayPaused&&c->active&&c->epoch==f->epoch&&now>=f->tick&&now-f->tick<=250&&!f->tanks.empty();}
+inline bool needed(){auto s=std::atomic_load(&options);auto f=std::atomic_load(&snapshot);auto c=std::atomic_load(&source_camera::snapshot);auto now=GetTickCount64();const char* reason=nullptr;
+ if(faulted)reason="predictor faulted";else if(!s->enabled)reason="Tank prediction disabled";else if(!s->draw)reason="Tank drawing disabled";else if(!display::foreground)reason="game not foreground";else if(display::paused)reason="Tank display suspended after Escape; rotate view or restore drawing";else if(!c->active)reason="camera inactive";else if(c->epoch!=f->epoch)reason="camera/result epoch mismatch";else if(now<f->tick||now-f->tick>250)reason="Tank result stale";else if(f->tanks.empty())reason="no Tank results";
+ display::gateReason=reason?reason:"ready";return !reason;
+}
+inline void pollDisplay(const dango::GameCameraFrame& camera,bool escape,bool pluginMenu,bool foreground){static OverlayGate gate;auto cfg=std::atomic_load(&options);gate.poll(camera,escape,pluginMenu,foreground,cfg->enabled&&cfg->draw,display::resumeRequested.exchange(false));display::foreground=foreground;display::paused=gate.paused;}
 inline bool project(Vec3 p,const dango::GameCameraFrame& c,float w,float h,float& x,float& y){Vec3 v;if(!dango::transform(c.worldToClip,p,v,true)||v.z<0||v.z>1||std::abs(v.x)>1.1f||std::abs(v.y)>1.1f)return false;x=(v.x+1)*w*.5f;y=(1-v.y)*h*.5f;return true;}
 inline void pollMarkKey(bool foreground,bool menu){static bool held=false;auto cfg=std::atomic_load(&options);bool down=foreground&&(GetAsyncKeyState(VK_F7)&0x8000);bool edge=down&&!held;held=down;
  if(!edge||menu||!cfg->enabled||!cfg->markKey)return;auto f=std::atomic_load(&snapshot);auto camera=std::atomic_load(&source_camera::snapshot);dango::CameraPose eye;
@@ -12,25 +16,26 @@ inline void pollMarkKey(bool foreground,bool menu){static bool held=false;auto c
  if(best)mark(f->epoch,best->handle);else markStatus=u8"准星前未找到Tank，标记未提交";
 }
 inline void draw(IDirect3DDevice9* device,float width,float height){
- if(!needed())return;auto estimates=std::atomic_load(&observedSnapshot);auto f=std::atomic_load(&snapshot);auto c=std::atomic_load(&source_camera::snapshot);IDirect3DStateBlock9* state=nullptr;
- if(FAILED(device->CreateStateBlock(D3DSBT_ALL,&state))||!state)return;if(FAILED(state->Capture())){state->Release();return;}
+ if(!needed())return;++display::calls;display::tick=GetTickCount64();display::visibleBars=0;display::viewportWidth=width;display::viewportHeight=height;
+ auto estimates=std::atomic_load(&observedSnapshot);auto f=std::atomic_load(&snapshot);auto c=std::atomic_load(&source_camera::snapshot);auto visual=std::atomic_load(&visualSettings);auto colors=palette(visual->preset);
+ IDirect3DStateBlock9* state=nullptr;if(FAILED(device->CreateStateBlock(D3DSBT_ALL,&state))||!state){display::stage="state block creation failed";return;}if(FAILED(state->Capture())){state->Release();display::stage="state capture failed";return;}
  struct Restore{IDirect3DStateBlock9* s;~Restore(){s->Apply();s->Release();}}restore{state};
- struct Vertex{float x,y,z,w;DWORD color;};std::vector<Vertex> vertices;vertices.reserve(1200);
- auto line=[&](Vec3 a,Vec3 b,DWORD color){float ax,ay,bx,by;if(project(a,*c,width,height,ax,ay)&&project(b,*c,width,height,bx,by)){vertices.push_back({ax,ay,0,1,color});vertices.push_back({bx,by,0,1,color});}};
- for(const auto& o:f->tanks){auto center=o.origin+Vec3{0,0,5};auto aimVector=forward(o.heading);if(o.eye){float p=o.pitch*3.14159265358979323846f/180;aimVector=aimVector*std::cos(p);aimVector.z=-std::sin(p);}line(center,center+aimVector*60,o.eye?0xff00ccff:0xff999999);
-  if(o.target)line(center+Vec3{0,0,60},o.target->origin+Vec3{0,0,60},o.target->authoritativeField?0xffff8866:0xffddcc55);
-  // Grey = unknown; amber/purple are animation/manual stopwatch ESTIMATES.
-  {auto start=o.origin+Vec3{0,0,91};float x,y;if(project(start,*c,width,height,x,y)){
-    auto e=estimates->find(o.handle);bool manual=e!=estimates->end()&&std::string(e->second.source)=="manual-observed-punch";DWORD color=!o.cooldown?0xff888888:manual?0xffcc88ff:0xffddaa44;
-    for(int dy=-5;dy<=3;++dy){DWORD background=(dy==-5||dy==3)?0xff999999:0xff333333;vertices.push_back({x-40,y+dy,0,1,background});vertices.push_back({x+40,y+dy,0,1,background});}
-    if(o.cooldown){float scale=e!=estimates->end()&&e->second.span&&*e->second.span>0?*e->second.span:std::max(1.f,*o.cooldown);float fill=std::clamp(*o.cooldown/scale,0.f,1.f);for(int dy=-3;dy<=1;++dy){vertices.push_back({x-38,y+dy,0,1,color});vertices.push_back({x-38+76*fill,y+dy,0,1,color});}}
-   }}
+ std::vector<Segment> lines;lines.reserve(1800);
+ auto line=[&](Vec3 a,Vec3 b,DWORD color,float thick=1){float ax,ay,bx,by;if(project(a,*c,width,height,ax,ay)&&project(b,*c,width,height,bx,by))stroke(lines,{ax,ay},{bx,by},color,thick);};
+ for(const auto& o:f->tanks){auto center=o.origin+Vec3{0,0,5};auto aimVector=forward(o.heading);if(o.eye){float p=o.pitch*3.14159265358979323846f/180;aimVector=aimVector*std::cos(p);aimVector.z=-std::sin(p);}auto tip=center+aimVector*60;line(center,tip,colors.direction,colors.width);auto side=forward(o.heading+90);line(tip,center+aimVector*49+side*7,colors.direction,colors.width);line(tip,center+aimVector*49-side*7,colors.direction,colors.width);
+  if(o.target)line(center+Vec3{0,0,60},o.target->origin+Vec3{0,0,60},o.target->authoritativeField?colors.direction:colors.future);
+  auto at=placeBar(*c,o.origin+Vec3{0,0,45},width,height,*visual);
+  if(at){++display::barProjected;++display::visibleBars;std::optional<float> fraction;if(o.cooldown){auto e=estimates->find(o.handle);float span=e!=estimates->end()&&e->second.span&&*e->second.span>0?*e->second.span:std::max(1.f,*o.cooldown);fraction=std::clamp(*o.cooldown/span,0.f,1.f);}barGeometry(lines,*at,*visual,std::clamp(height/1080.f,.5f,2.f),fraction);}else ++display::barRejected;
   if(!o.geometry)continue;
-  for(unsigned i=0;i<32;++i){float a=o.heading-o.halfArc+o.halfArc*2*i/32,b=o.heading-o.halfArc+o.halfArc*2*(i+1)/32;line(center+forward(a)*o.radius,center+forward(b)*o.radius,0xffddaa44);
-   if((i%2)==0){auto p=o.predicted+Vec3{0,0,5};line(p+forward(a)*o.radius,p+forward(b)*o.radius,0xff7799cc);}
-  }line(center,center+forward(o.heading-o.halfArc)*o.radius,0xffddaa44);line(center,center+forward(o.heading+o.halfArc)*o.radius,0xffddaa44);
+  for(unsigned i=0;i<40;++i){float a=o.heading-o.halfArc+o.halfArc*2*i/40,b=o.heading-o.halfArc+o.halfArc*2*(i+1)/40;if(!colors.dashed||i%2==0)line(center+forward(a)*o.radius,center+forward(b)*o.radius,colors.range,colors.width);
+   if(colors.ticks&&i%10==0)line(center+forward(a)*o.radius*.95f,center+forward(a)*o.radius*1.04f,colors.range);
+   if(i%2==0){auto p=o.predicted+Vec3{0,0,5};line(p+forward(a)*o.radius,p+forward(b)*o.radius,colors.future);}
+  }line(center,center+forward(o.heading-o.halfArc)*o.radius,colors.range);line(center,center+forward(o.heading+o.halfArc)*o.radius,colors.range);
  }
- if(vertices.empty())return;device->SetVertexShader(nullptr);device->SetPixelShader(nullptr);device->SetFVF(D3DFVF_XYZRHW|D3DFVF_DIFFUSE);device->SetTexture(0,nullptr);device->SetRenderState(D3DRS_ZENABLE,FALSE);device->SetRenderState(D3DRS_ZWRITEENABLE,FALSE);device->SetRenderState(D3DRS_LIGHTING,FALSE);device->SetRenderState(D3DRS_FOGENABLE,FALSE);device->SetRenderState(D3DRS_CULLMODE,D3DCULL_NONE);device->SetRenderState(D3DRS_STENCILENABLE,FALSE);device->SetRenderState(D3DRS_SCISSORTESTENABLE,FALSE);device->SetRenderState(D3DRS_ALPHATESTENABLE,FALSE);device->SetRenderState(D3DRS_ALPHABLENDENABLE,FALSE);device->SetRenderState(D3DRS_COLORWRITEENABLE,15);device->SetRenderState(D3DRS_CLIPPLANEENABLE,0);device->SetTextureStageState(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);device->SetTextureStageState(0,D3DTSS_COLORARG1,D3DTA_DIFFUSE);device->SetTextureStageState(0,D3DTSS_ALPHAOP,D3DTOP_SELECTARG1);device->SetTextureStageState(0,D3DTSS_ALPHAARG1,D3DTA_DIFFUSE);device->SetTextureStageState(1,D3DTSS_COLOROP,D3DTOP_DISABLE);
- D3DVIEWPORT9 viewport{0,0,DWORD(width),DWORD(height),0,1};device->SetViewport(&viewport);device->DrawPrimitiveUP(D3DPT_LINELIST,UINT(vertices.size()/2),vertices.data(),sizeof(Vertex));
+ struct Vertex{float x,y,z,w;DWORD color;};std::vector<Vertex> vertices;vertices.reserve(lines.size()*4);
+ for(const auto& l:lines){auto dx=l.b.x-l.a.x,dy=l.b.y-l.a.y;float length=std::sqrt(dx*dx+dy*dy);float nx=length>.001f?-dy/length:0,ny=length>.001f?dx/length:0;unsigned count=unsigned(std::clamp(std::ceil(l.width),1.f,3.f));for(unsigned i=0;i<count;++i){float d=float(i)-(count-1)*.5f;vertices.push_back({l.a.x+nx*d,l.a.y+ny*d,0,1,l.color});vertices.push_back({l.b.x+nx*d,l.b.y+ny*d,0,1,l.color});}}
+ if(vertices.empty()){display::stage="no projected overlay vertices";return;}
+ device->SetVertexShader(nullptr);device->SetPixelShader(nullptr);device->SetFVF(D3DFVF_XYZRHW|D3DFVF_DIFFUSE);device->SetTexture(0,nullptr);device->SetRenderState(D3DRS_ZENABLE,FALSE);device->SetRenderState(D3DRS_ZWRITEENABLE,FALSE);device->SetRenderState(D3DRS_LIGHTING,FALSE);device->SetRenderState(D3DRS_FOGENABLE,FALSE);device->SetRenderState(D3DRS_CULLMODE,D3DCULL_NONE);device->SetRenderState(D3DRS_STENCILENABLE,FALSE);device->SetRenderState(D3DRS_SCISSORTESTENABLE,FALSE);device->SetRenderState(D3DRS_ALPHATESTENABLE,FALSE);device->SetRenderState(D3DRS_ALPHABLENDENABLE,FALSE);device->SetRenderState(D3DRS_COLORWRITEENABLE,15);device->SetRenderState(D3DRS_CLIPPLANEENABLE,0);device->SetTextureStageState(0,D3DTSS_COLOROP,D3DTA_DIFFUSE);device->SetTextureStageState(0,D3DTSS_COLORARG1,D3DTA_DIFFUSE);device->SetTextureStageState(0,D3DTSS_ALPHAOP,D3DTOP_SELECTARG1);device->SetTextureStageState(0,D3DTSS_ALPHAARG1,D3DTA_DIFFUSE);device->SetTextureStageState(1,D3DTSS_COLOROP,D3DTOP_DISABLE);
+ D3DVIEWPORT9 viewport{0,0,DWORD(width),DWORD(height),0,1};device->SetViewport(&viewport);auto hr=device->DrawPrimitiveUP(D3DPT_LINELIST,UINT(vertices.size()/2),vertices.data(),sizeof(Vertex));display::result=hr;display::stage=SUCCEEDED(hr)?"overlay submitted":"DrawPrimitiveUP failed";if(SUCCEEDED(hr))++display::submitted;
 }
 }

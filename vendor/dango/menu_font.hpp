@@ -16,6 +16,7 @@ inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  builder.AddText(u8"冷却下限部分字段客户端计时剩余秒不保证可出拳未知");
  builder.AddText(u8"武器角色计时约束");
  builder.AddText(u8"手动标记出拳估算剩余非真实冷却距投石动作结束非倒计时刚刚准星前未找到提交时钟未知过期目标失效启动");
+ builder.AddText(u8"样式位置预览模拟无需地图移动步长长度厚度重置方向恢复显示保存设置青金简约琥珀战术冰蓝刻度横条竖条切换立即两秒演示循环范围为示意");
  builder.BuildRanges(&ranges);
 }
 }

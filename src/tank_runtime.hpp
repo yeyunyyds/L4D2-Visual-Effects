@@ -5,6 +5,7 @@
 #include "tank_event_runtime.hpp"
 #include "tank_observed_timer.hpp"
 #include "tank_layer_attack.hpp"
+#include "tank_visual_state.hpp"
 #include "entity_menu.hpp"
 #include <mutex>
 namespace visual::tank {
@@ -105,7 +106,7 @@ catch(...){faulted=true;std::atomic_store(&snapshot,emptyResult);}
 inline std::string menu(){auto cfg=std::atomic_load(&options);auto f=std::atomic_load(&snapshot);auto p=std::atomic_load(&parameters);
  auto number=[](std::optional<float> n){return n?std::to_string(int(*n*10)/10.f):std::string(u8"未读取");};
  displayedTanks.clear();auto observed=std::atomic_load(&observedSnapshot);
- std::string rows=menuItem(cfg->enabled?u8"Tank 预测：开":u8"Tank 预测：关（默认）",330)+menuItem(cfg->draw?u8"方向与范围绘制：开":u8"方向与范围绘制：关",331)+menuItem(cfg->logging?u8"诊断记录：开":u8"诊断记录：关",332)+menuItem(u8"预测时间："+std::to_string(cfg->horizonMs)+u8"毫秒（切换）",333)+menuRow(u8"手长参数 "+number(p->range)+u8" / arc参数 "+number(p->arc))+menuRow(p->source)+menuItem(cfg->markKey?u8"F7手动标记出拳：开":u8"F7手动标记出拳：关（默认）",335)+menuRow(markStatus.load());
+ std::string rows=menuItem(cfg->enabled?u8"Tank 预测：开":u8"Tank 预测：关（默认）",330)+menuItem(cfg->draw?u8"方向与范围绘制：开":u8"方向与范围绘制：关",331)+menuItem(u8"样式预设与位置预览",321)+menuItem(cfg->logging?u8"诊断记录：开":u8"诊断记录：关",332)+menuItem(u8"预测时间："+std::to_string(cfg->horizonMs)+u8"毫秒（切换）",333)+menuRow(u8"手长参数 "+number(p->range)+u8" / arc参数 "+number(p->arc))+menuRow(p->source)+menuItem(cfg->markKey?u8"F7手动标记出拳：开":u8"F7手动标记出拳：关（默认）",335)+menuRow(markStatus.load());
  for(const auto& o:f->tanks){rows+=menuRow("Tank #"+std::to_string(o.handle&4095)+" / "+(o.eye?u8"瞄准角":u8"身体角回退")+" / "+o.action);
   if(o.target)rows+=menuRow(std::string(o.target->source=="network-enemy"?u8"网络敌对目标：":o.target->source=="network-look-at"?u8"注视目标（非锁敌保证）：":u8"朝向推测目标：")+o.target->name);else rows+=menuRow(u8"当前目标未知或存在歧义");
   if(o.gaze&&o.target&&o.gaze->handle!=o.target->handle)rows+=menuRow(u8"另一个注视目标："+o.gaze->name);
@@ -121,11 +122,12 @@ inline std::string menu(){auto cfg=std::atomic_load(&options);auto f=std::atomic
  if(faulted)rows+=menuRow(u8"预测处理失败，已暂停；关闭后重开以重试");
  return menuPage(u8"Tank 行为预测 · L4N 客户端实验",rows+menuItem(u8"保存设置",101)+menuRow(u8"仅预测；不是服务器精确命中边界"));
 }
-inline bool action(std::uintptr_t id){if(id>=0x90000&&id<0x90000+displayedTanks.size()){auto pair=displayedTanks[id-0x90000];mark(pair.first,pair.second);return true;}if((id<330||id>333)&&id!=335)return false;auto s=*std::atomic_load(&options);if(id==330){source_entities::resetRequested=true;s.enabled=!s.enabled;if(s.enabled)faulted=false;}if(id==331)s.draw=!s.draw;if(id==332)s.logging=!s.logging;if(id==335)s.markKey=!s.markKey;if(id==333)s.horizonMs=s.horizonMs>=500?0:s.horizonMs+100;std::atomic_store(&options,std::make_shared<const Settings>(s));return true;}
+inline bool action(std::uintptr_t id){if(id>=0x90000&&id<0x90000+displayedTanks.size()){auto pair=displayedTanks[id-0x90000];mark(pair.first,pair.second);return true;}if((id<330||id>333)&&id!=335)return false;auto s=*std::atomic_load(&options);if(id==330){source_entities::resetRequested=true;s.enabled=!s.enabled;if(s.enabled){faulted=false;display::resumeRequested=true;}}if(id==331){s.draw=!s.draw;if(s.draw)display::resumeRequested=true;}if(id==332)s.logging=!s.logging;if(id==335)s.markKey=!s.markKey;if(id==333)s.horizonMs=s.horizonMs>=500?0:s.horizonMs+100;std::atomic_store(&options,std::make_shared<const Settings>(s));return true;}
 inline void poll(std::uint64_t now)try{events::poll();if(faulted)return;auto cfg=std::atomic_load(&options);pollCvars(now,cfg->enabled);static std::uint64_t next=0,last=0;
  if(!cfg->enabled||!cfg->logging||now<next)return;next=now+100;auto f=std::atomic_load(&snapshot);if(!f->tick||f->tick==last)return;last=f->tick;
- nlohmann::json j={{"schema",7},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
+ nlohmann::json j={{"schema",8},{"epoch",f->epoch},{"tick",f->tick},{"parameterSource",f->parameters.source},{"tanks",nlohmann::json::array()}};
  j["eventCapture"]=events::summary();
+ j["display"]={{"enabled",cfg->enabled},{"drawing",cfg->draw},{"paused",display::paused.load()},{"foreground",display::foreground.load()},{"gate",display::gateReason.load()},{"stage",display::stage.load()},{"calls",display::calls.load()},{"submitted",display::submitted.load()},{"barProjected",display::barProjected.load()},{"barRejected",display::barRejected.load()},{"visibleBars",display::visibleBars.load()},{"tick",display::tick.load()},{"result",display::result.load()}};writeVisual(j,*std::atomic_load(&visualSettings));auto displayCamera=std::atomic_load(&source_camera::snapshot);j["display"]["cameraEpoch"]=displayCamera->epoch;j["display"]["cameraTick"]=displayCamera->tick;j["display"]["worldToClip"]=displayCamera->worldToClip;j["display"]["viewportWidth"]=display::viewportWidth.load();j["display"]["viewportHeight"]=display::viewportHeight.load();
  j["observationDiagnostics"]={{"engine",engineObservations.load()},{"studio",studioObservations.load()},{"tankHeaders",tankHeaders.load()},{"renderableMatches",renderableMatches.load()}};
  j["clockSourceHandle"]=f->clock.source;j["clockReason"]=f->clock.reason;if(f->clock.time)j["observedGameTime"]=*f->clock.time;
  if(f->parameters.range)j["range"]=*f->parameters.range;if(f->parameters.arc)j["arc"]=*f->parameters.arc;if(f->parameters.windup)j["windup"]=*f->parameters.windup;if(f->parameters.duration)j["duration"]=*f->parameters.duration;if(f->parameters.interval)j["interval"]=*f->parameters.interval;if(f->parameters.missInterval)j["missInterval"]=*f->parameters.missInterval;
