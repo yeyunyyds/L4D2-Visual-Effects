@@ -6,7 +6,7 @@
 #include <optional>
 namespace visual::tank {
 using dango::Vec3;using dango::inventory::Record;using dango::inventory::Frame;
-struct Settings{bool enabled=false,draw=true,logging=false,markKey=false;unsigned horizonMs=200;};
+struct Settings{bool enabled=false,draw=false,logging=false,markKey=false;unsigned horizonMs=200;};
 template<class Json> Settings readSettings(const Json& j){Settings s;auto p=j.find("tankPrediction");if(p==j.end()||!p->is_object())return s;
  for(auto value:{std::pair<const char*,bool*>{"enabled",&s.enabled},{"draw",&s.draw},{"logging",&s.logging}})if(p->contains(value.first)&&(*p)[value.first].is_boolean())*value.second=(*p)[value.first].template get<bool>();
  if(p->contains("horizonMs")&&(*p)["horizonMs"].is_number_unsigned())s.horizonMs=std::clamp((*p)["horizonMs"].template get<unsigned>(),0u,500u);

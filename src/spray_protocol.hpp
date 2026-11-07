@@ -10,7 +10,7 @@ inline bool steamId(Peer id){return (id>>56)==1&&((id>>52)&15)==1&&((id>>32)&0xf
 inline Peer peer(const std::string& text){if(text.empty()||text.size()>20)return 0;Peer value=0;for(char c:text){if(c<'0'||c>'9'||value>(UINT64_MAX-unsigned(c-'0'))/10)return 0;value=value*10+unsigned(c-'0');}return steamId(value)?value:0;}
 struct Packet{Peer from;std::string bytes;};
 struct Transport{virtual ~Transport()=default;virtual Peer self()const=0;virtual bool send(Peer,const std::string&)=0;virtual bool receive(Packet&)=0;};
-struct Settings{bool enabled=false,automatic=true;std::string room;std::set<Peer> peers;};
+struct Settings{bool enabled=false,automatic=false;std::string room;std::set<Peer> peers;};
 template<class Json> Settings readSettings(const Json& j){Settings s;auto p=j.find("sprayP2P");if(p==j.end()||!p->is_object())return s;
  if(p->contains("enabled")&&(*p)["enabled"].is_boolean())s.enabled=(*p)["enabled"].template get<bool>();
  if(p->contains("automatic")&&(*p)["automatic"].is_boolean())s.automatic=(*p)["automatic"].template get<bool>();

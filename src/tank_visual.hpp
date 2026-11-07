@@ -4,13 +4,13 @@
 #include <string>
 #include <vector>
 namespace visual::tank {
-struct VisualSettings {unsigned preset=0,step=4;bool vertical=false,showDirection=true,showRange=true,showBar=true,showTarget=true;float x=0,y=-58,length=88,thickness=8,barSize=.8f,arrowWidth=2,rangeWidth=2,arrowSize=1;};
+struct VisualSettings {unsigned preset=2,step=4;bool vertical=true,showDirection=false,showRange=false,showBar=false,showTarget=false;float x=-32,y=-24,length=88,thickness=8,barSize=.55f,arrowWidth=3,rangeWidth=3,arrowSize=1;};
 inline const char* visualName(unsigned p){return p==1?u8"琥珀战术":p==2?u8"冰蓝刻度":u8"青金简约";}
 inline void normalizeVisual(VisualSettings& s){s.preset=std::min(s.preset,2u);if(s.step!=2&&s.step!=4&&s.step!=8&&s.step!=16)s.step=4;
- auto bound=[](float v,float fallback,float lo,float hi){return std::isfinite(v)?std::clamp(v,lo,hi):fallback;};s.x=bound(s.x,0,-200,200);s.y=bound(s.y,-58,-200,200);s.length=bound(s.length,88,40,200);s.thickness=bound(s.thickness,8,1,24);s.barSize=bound(s.barSize,.8f,.2f,2);s.arrowWidth=bound(s.arrowWidth,2,.5f,6);s.rangeWidth=bound(s.rangeWidth,2,.5f,6);s.arrowSize=bound(s.arrowSize,1,.25f,3);}
+ auto bound=[](float v,float fallback,float lo,float hi){return std::isfinite(v)?std::clamp(v,lo,hi):fallback;};s.x=bound(s.x,-32,-200,200);s.y=bound(s.y,-24,-200,200);s.length=bound(s.length,88,40,200);s.thickness=bound(s.thickness,8,1,24);s.barSize=bound(s.barSize,.55f,.2f,2);s.arrowWidth=bound(s.arrowWidth,3,.5f,6);s.rangeWidth=bound(s.rangeWidth,3,.5f,6);s.arrowSize=bound(s.arrowSize,1,.25f,3);}
 template<class Json> VisualSettings readVisual(const Json& j){VisualSettings s;auto p=j.find("tankVisual");if(p==j.end()||!p->is_object())return s;
  auto integer=[&](const char* name,unsigned fallback,unsigned max){auto i=p->find(name);if(i==p->end())return fallback;if(i->is_number_unsigned())return unsigned(std::min(i->template get<std::uint64_t>(),std::uint64_t(max)));if(i->is_number_integer())return unsigned(std::clamp(i->template get<std::int64_t>(),std::int64_t(0),std::int64_t(max)));return fallback;};
- s.preset=integer("preset",0,2);s.step=integer("step",4,64);
+ s.preset=integer("preset",2,2);s.step=integer("step",4,64);
  for(auto value:{std::pair<const char*,bool*>{"vertical",&s.vertical},{"showDirection",&s.showDirection},{"showRange",&s.showRange},{"showBar",&s.showBar},{"showTarget",&s.showTarget}})if(p->contains(value.first)&&(*p)[value.first].is_boolean())*value.second=(*p)[value.first].template get<bool>();
  for(auto pair:{std::pair<const char*,float*>{"x",&s.x},{"y",&s.y},{"length",&s.length},{"thickness",&s.thickness},{"barSize",&s.barSize},{"arrowWidth",&s.arrowWidth},{"rangeWidth",&s.rangeWidth},{"arrowSize",&s.arrowSize}})if(p->contains(pair.first)&&(*p)[pair.first].is_number())*pair.second=(*p)[pair.first].template get<float>();
  normalizeVisual(s);return s;}

@@ -18,11 +18,11 @@ inline std::string visualFineMenu(std::uintptr_t page){auto s=std::atomic_load(&
 inline bool visualAdjust(std::uintptr_t page,int delta){if(!finePage(page))return false;if(!delta)return true;auto s=*std::atomic_load(&visualSettings);auto field=page==325?barField.load():page==326?arrowField.load():FineField::RangeWidth;adjustFine(s,field,delta);std::atomic_store(&visualSettings,std::make_shared<const VisualSettings>(s));return true;}
 inline bool visualAction(std::uintptr_t id){if((id<360||id>366)&&(id<370||id>373)&&(id<380||id>388))return false;auto s=*std::atomic_load(&visualSettings);
  if(id==360)s.preset=(s.preset+1)%3;if(id==361)s.vertical=!s.vertical;if(id==362)s.step=s.step==2?4:s.step==4?8:s.step==8?16:2;
- if(id==363){s.x=0;s.y=-58;s.vertical=false;}
+ if(id==363){s.x=-32;s.y=-24;s.vertical=true;}
  if(id==364)display::resumeRequested=true;if(id==365)s.length=s.length<88?88:s.length<112?112:s.length<136?136:64;if(id==366)s.thickness=s.thickness<6?6:s.thickness<8?8:s.thickness<10?10:4;
  if(id==370)s.showDirection=!s.showDirection;if(id==371)s.showRange=!s.showRange;if(id==372)s.showBar=!s.showBar;if(id==373)s.showTarget=!s.showTarget;
  if(id==380)barField=FineField::BarSize;if(id==381)barField=FineField::Length;if(id==382)barField=FineField::Thickness;if(id==384)arrowField=FineField::ArrowWidth;if(id==385)arrowField=FineField::ArrowSize;
- if(id==383){s.barSize=.8f;s.length=88;s.thickness=8;}if(id==387){s.arrowWidth=2;s.arrowSize=1;}if(id==388)s.rangeWidth=2;
+ if(id==383){s.barSize=.55f;s.length=88;s.thickness=8;}if(id==387){s.arrowWidth=3;s.arrowSize=1;}if(id==388)s.rangeWidth=3;
  normalizeVisual(s);std::atomic_store(&visualSettings,std::make_shared<const VisualSettings>(s));return true;}
 inline ImU32 previewColor(std::uint32_t c){return IM_COL32((c>>16)&255,(c>>8)&255,c&255,(c>>24)&255);}
 inline bool visualPreviewKeys(std::uintptr_t id){return id==321||finePage(id);}

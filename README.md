@@ -1,14 +1,14 @@
 # L4D2 Visual Effects
 
-**Tank预测实验分支：0.7.3-tank-fine-preview11（L4N-only）**
+**正式版 0.7.3 · Windows x86 / L4N v2**
 
-默认关闭；只尝试客户端/同进程只读数据，无SourceMod依赖。正式版0.7.2仍是稳定基线。
-本次默认进度条缩为 80%，箭头与范围线宽加倍，并增加三个独立精调页：选中参数后用 - / = 以 1% 或 0.1 步进调整，即时预览并保存。见[调查依据](docs/tank-animation-sources.md)与[preview11 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-fine-preview11.zip)。
-请先阅读[实验说明与本地单人验收](docs/TANK-PREVIEW.md)，不要把注视目标或参数估计区理解为精确AI锁敌/命中边界。
+[下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.7.3) · [安装与默认开关](docs/INSTALL.md) · [更新说明](docs/releases/v0.7.3.md)
 
-![Tank 样式设计示意（非游戏截图）](docs/tank-style-preview.svg)
+**所有功能默认关闭。联机功能未经测试，不保障 VAC 安全。**
 
-**求生之路 2 视觉效果插件 · 正式版 0.7.2**
+默认 Tank 样式：冰蓝刻度、竖条、55%、位置 -32/-24、箭头和范围线宽3倍。样式不会自动启用预测、绘制、P2P 或诊断。安装包附全关闭的默认 hud.json，覆盖旧配置前请备份。
+
+**求生之路 2 视觉效果插件**
 
 **免责声明：联机功能未经测试，不保障 VAC 安全。**
 
@@ -18,7 +18,7 @@
 
 项目名称为 **L4D2 Visual Effects（求生之路 2 视觉效果）**，覆盖项目整体的视觉效果方向；拉伸是当前实现的功能。插件标识、游戏内菜单、DLL 和安装包使用 `L4D2Visual`。
 
-[下载 0.7.2 正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.2.zip) · [历史0.4.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
+[历史 0.7.2](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.2.zip) · [历史0.4.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/2dd0a515a8dbbe552698464903ef84e7638b517a/L4D2Visual-0.4.0.zip) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip) · [验证记录](docs/validation.md) · [渲染接口研究](docs/research/render-abi.md)
 
 ## 下载与分支
 
@@ -37,19 +37,19 @@
 f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 ```
 
-0.7.2 安装包顶层仅包含 `bin/` 和 `README.md`；源码通过同一Release的Source code归档独立提供，许可证在bin内。不含游戏DLL、模型或纹理。GitHub 的 **Code → Download ZIP** 下载的是当前分支快照；安装游戏插件请使用上方对应安装包链接。
+0.7.3 安装包顶层仅包含 `bin/` 和 `README.md`；源码通过同一Release的Source code归档独立提供，许可证在bin内。不含游戏DLL、模型或纹理。GitHub 的 **Code → Download ZIP** 下载的是当前分支快照；安装游戏插件请使用上方对应安装包链接。
 
 ## 安装与启用
 
 1. 准备已安装 **L4N v2** 的 Windows x86 游戏环境。游戏构建必须匹配 [render-profile.json](docs/research/render-profile.json) 中记录的 `client.dll`、`engine.dll`、`studiorender.dll`。
 2. 完整退出游戏，解压所选版本安装包，将 `bin` 合并到游戏根目录。确认插件位于 `bin/neko/plugins/L4D2Visual.dll`，且只加载一份。
-3. 启动游戏并进入地图，在 **L4N → L4D2Visual 0.7.2 → 邦友的酒[关] → 实体分类** 中开启需要的角色或类型，再返回邦友的酒子菜单开启总开关。正式版 0.4.0 沿用原特感开关。
+3. 启动游戏并进入地图，在 **L4N → L4D2Visual 0.7.3 → 邦友的酒[关] → 实体分类** 中开启需要的角色或类型，再返回邦友的酒子菜单开启总开关。正式版 0.4.0 沿用原特感开关。
 4. 在邦友的酒子菜单进入 **动画预设与细调** 调整效果；使用 **保存设置** 保存动画参数、类别规则、骨骼容量、渲染模式与菜单外观。
 5. 关闭拉伸后检查外观恢复。更新或移除插件前完整退出游戏，不要运行时卸载。
 
 拉伸开关默认关闭，且不跨游戏会话保存。卸载时删除该 DLL 即可停止加载；配置与日志保存在同目录下的 `L4D2Visual/` 文件夹，可按需备份或删除。
 
-## 自定义喷漆（0.7.2）
+## 自定义喷漆
 
 主菜单按 **邦友的酒[开/关]**、**自定义喷漆** 收纳功能；喷漆独立于拉伸，默认关闭。联机实验也默认关闭；关闭联机时仅本机显示。普通客户端看不到，原版 spray 保持独立。
 
@@ -72,7 +72,7 @@ f3d14172d534e305598c2805f83d22ec2ff1b2e6e0381cd67462a06fcfe287c2
 
 参考 DangoMusic `experiment/steam-progress-sync` 的 Steam P2P 适配，使用独立通道 **45632** 分发图片和墙面位置。**双方均需 L4N v2 + 本版 L4D2Visual**，只有 L4N 或 DangoMusic 无法接收本插件的喷漆协议。
 
-**自动模式（默认）：** 双方安装本版，进入同一局，在 **自定义喷漆 → 联机喷漆（实验）** 开启联机。**同局自动匹配** 默认开启，无需填 SteamID 或 room；从已校验的 Source 玩家列表中找当前局最多三名其他真人，再通过本插件协议握手。双方均开启联机才同步图片；机器人和 TV 排除，玩家变化 / 切图后重新匹配。不会搜索全网或向非本插件客户端发送图片。沿用 DangoMusic 的四人名单上限，多人服超出此范围可改手动名单。
+**自动模式（需手动开启）：** 双方安装本版，进入同一局，在 **自定义喷漆 → 联机喷漆（实验）** 开启联机。**同局自动匹配** 默认关闭，需双方手动开启，无需填 SteamID 或 room；从已校验的 Source 玩家列表中找当前局最多三名其他真人，再通过本插件协议握手。双方均开启联机才同步图片；机器人和 TV 排除，玩家变化 / 切图后重新匹配。不会搜索全网或向非本插件客户端发送图片。沿用 DangoMusic 的四人名单上限，多人服超出此范围可改手动名单。
 
 **手动模式：** 关闭同局自动匹配，先保存并退出游戏，编辑双方 `bin/neko/plugins/L4D2Visual/hud.json`，保留其他字段：
 
@@ -202,7 +202,7 @@ ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
 # Windows x86 DLL，可用 CXX_X86 指定编译器
 bash scripts/build-mingw.sh
 
-# 生成 build/L4D2Visual-0.7.2.zip（顶层仅bin/与README.md）
+# 生成 build/L4D2Visual-0.7.3.zip（顶层仅bin/与README.md）
 python3 scripts/package.py
 
 # 可选：使用自己合法持有的游戏 DLL 进行离线构建核对

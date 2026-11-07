@@ -1,0 +1,62 @@
+{
+  "preset": 0,
+  "font": 22.0,
+  "opacity": 0.47999998927116394,
+  "x": 8.0,
+  "y": 14.0,
+  "centerY": true,
+  "step": 8,
+  "f10": false,
+  "tankVisual": {
+    "arrowSize": 1.0,
+    "arrowWidth": 3.0,
+    "barSize": 0.55,
+    "coordinateSpace": "tank-world",
+    "length": 88.0,
+    "preset": 2,
+    "rangeWidth": 3.0,
+    "showBar": false,
+    "showDirection": false,
+    "showRange": false,
+    "showTarget": false,
+    "step": 4,
+    "thickness": 8.0,
+    "vertical": true,
+    "x": -32.0,
+    "y": -24.0
+  },
+  "tankPrediction": {
+    "enabled": false,
+    "draw": false,
+    "logging": false,
+    "markKey": false,
+    "horizonMs": 200
+  },
+  "sprayP2P": {
+    "enabled": false,
+    "automatic": false,
+    "room": "",
+    "peers": []
+  },
+  "wallPictures": {
+    "enabled": false,
+    "bindT": false,
+    "autoNext": false,
+    "selected": "",
+    "size": 60,
+    "rotation": 0,
+    "opacity": 10,
+    "maximum": 2,
+    "sizes": {},
+    "sizeProfileVersion": 1
+  },
+  "proximityStretch": {
+    "enabled": false,
+    "includeCommon": false
+  },
+  "entitySelection": {
+    "all": false
+  },
+  "boneLimit": 128,
+  "renderCompatibility": true
+}
