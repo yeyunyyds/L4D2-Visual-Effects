@@ -24,7 +24,23 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
-## Tank 实体跟随与菜单整理 · 0.7.3-tank-anchor-preview10
+## Tank 独立细调与新默认尺寸 · 0.7.3-tank-fine-preview11
+
+**[下载 preview11 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-fine-preview11.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/049ddc8) · [操作说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/049ddc8/docs/TANK-PREVIEW.md)
+
+默认进度条整体缩为上一版的 80%，朝向箭头与攻击范围线宽各为原预设的 2 倍。位置和实体跟随/透视缩放不变；旧配置缺少新增倍率时自动采用新默认，已有长度、厚度、位置、预设与开关数值保留。
+
+进入 **Tank 预测 → 样式与位置预览**，分别选择“进度条大小与粗细”“朝向箭头大小与粗细”“攻击范围线宽”。用数字键选参数，- 减少、= 增加，右侧即时预览；普通菜单仍用 - / = 翻页。
+
+进度条：大小每步 1%、长度 1、厚度 0.1；箭头：线宽 0.1 倍、大小 1%；范围：线宽 0.1 倍。范围细调不改变真实攻击距离。每页可恢复各自默认并保存，位置重置不再覆盖独立尺寸设置。
+
+22 组原生测试与 Windows x86 构建、安装包检查通过，新增比例、独立步进与保存、上下限和菜单路由回归。尚无 L4D2/DXVK 新 DLL 实机验证。计时、范围参数、源回调、P2P 和正式版 0.7.2 保持不变。
+
+根目录仅 bin/ 和 README.md。**联机功能未经测试，不保障 VAC 安全。**
+
+SHA-256：`e4511e9259b3dd6a49055234e1e02f82869b78622879c2efa146c8811fe1bba7`
+
+## 历史 Tank 实体跟随与菜单整理 · 0.7.3-tank-anchor-preview10
 
 **[下载 preview10 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-anchor-preview10.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/9f177e6) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/9f177e6/docs/TANK-PREVIEW.md)
 
