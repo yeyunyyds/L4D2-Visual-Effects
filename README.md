@@ -24,7 +24,23 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
-## Tank 完整周期与黄条位置修复 · 0.7.3-tank-cycle-preview8
+## Tank 三套样式与布局预览 · 0.7.3-tank-style-preview9
+
+**[下载 preview9 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-style-preview9.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/c82032a) · [样式设计示意](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/c82032a/docs/tank-style-preview.svg) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/c82032a/docs/TANK-PREVIEW.md)
+
+新增青金简约、琥珀战术、冰蓝刻度三套朝向/范围/计时条整体预设。进入 **Tank 行为预测 → 样式预设与位置预览**，右侧显示居中的 Tank 简图和动态演示条；无需地图或实际 Tank。方向键移动，菜单切换横竖、步长、长度、厚度，支持重置和保存，下次启动恢复。翻页仍为 - / =。
+
+预览与游戏内使用同一套条形布局计算，条相对投影后的躯干中心偏移，按分辨率缩放并在视口边缘钳制。切换配色保留自定义布局。设计图来自生产几何的离线绘制，不是游戏截图。
+
+同时修复 Tank 误用喷漆暂停状态的代码问题：Esc 后的 Tank 覆盖层可在视角重新旋转后恢复，也可点击“恢复 Tank 显示”；喷漆仍手动恢复。旋转只是恢复依据，不是已验证的游戏菜单可见性接口。schema 8 补充实际绘制门限、投影计数、D3D 阶段与返回值；旧日志不足以断言此前不可见的唯一原因。
+
+22 组原生测试与 Windows x86 构建、安装包检查通过，尚未进行 L4D2 / DXVK 实机验证。计时沿用 preview8 的普通周期估算；事件样本和共享模型映射限制保持。正式版仍为 0.7.2。
+
+根目录仅 bin/ 和 README.md。**联机功能未经测试，不保障 VAC 安全。**
+
+SHA-256：`e2587b0150af8013381c657bcddbb23718a09555ce2ee86577ae445ae1fac8ec`
+
+## 历史 Tank 完整周期与黄条位置修复 · 0.7.3-tank-cycle-preview8
 
 **[下载 preview8 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-cycle-preview8.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/ffa4749) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/ffa4749/docs/TANK-PREVIEW.md)
 
