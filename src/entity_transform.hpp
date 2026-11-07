@@ -12,6 +12,20 @@ inline bool uniform(const Rule& r){auto s=factors(r);return std::abs(s[0]-s[1])<
 struct Settings{bool enabled=false,studioOnly=false;Rule all;std::map<std::string,Rule> rules;};
 template<class Record> std::vector<std::string> keys(const Record& r){std::vector<std::string> k;auto special=specialCharacter(r);if(special>=0)k.push_back("s:"+std::to_string(special));if(survivorRecord(r))k.push_back("v:"+std::to_string(survivorCharacter(r)));k.push_back("c:"+std::to_string(r.classId)+":"+r.className);k.push_back("t:"+r.className);k.push_back("g:"+std::to_string(unsigned(special>=0?EntityGroup::Special:survivorRecord(r)?EntityGroup::Survivors:groupForName(r.className))));return k;}
 template<class Record> Rule selected(const Settings& s,const Record& r){for(const auto& k:keys(r)){auto i=s.rules.find(k);if(i!=s.rules.end())return i->second;}return s.all;}
+// A manual recognition locks a configuration type, never a recycled entity index.
+struct AimTarget {
+ bool valid=false;std::uint64_t epoch=0;int classId=-1;std::string key,label,className;std::vector<std::string> hierarchy;
+ Rule rule(const Settings& s)const{for(const auto& k:hierarchy){auto i=s.rules.find(k);if(i!=s.rules.end())return i->second;}return s.all;}
+ void clear(){*this=AimTarget{};}
+ void validate(std::uint64_t currentEpoch){if(epoch!=currentEpoch)clear();}
+ template<class Record> void remember(const Record& r,std::uint64_t currentEpoch){
+  clear();if(r.classId<0||r.className.empty())return;
+  auto candidates=keys(r);if(candidates.empty())return;
+  valid=true;epoch=currentEpoch;classId=r.classId;className=r.className;key=candidates.front();hierarchy=std::move(candidates);
+  int special=specialCharacter(r),survivor=survivorRecord(r)?survivorCharacter(r):-1;
+  label=special>=0?SpecialNames[special]:survivor>=0?SurvivorNames[survivor]:className;
+ }
+};
 inline bool any(const Settings& s){if(!s.enabled)return false;if(s.all.enabled&&!identity(s.all))return true;for(const auto& i:s.rules)if(i.second.enabled&&!identity(i.second))return true;return false;}
 inline bool transform(const Matrix3x4* src,Matrix3x4* dst,std::size_t count,const float* pivot,const Rule& rule,const unsigned* flags=nullptr,int mask=-1){
  if(!src||!dst||!count||count>256||!pivot)return false;

@@ -1,4 +1,4 @@
-> 当前分支：0.8.0-transform-preview1。新增基于Skeeto路径的实体缩放与XYZ拉伸，扩展角色/道具/手持模型及动态Class ID，默认关闭。见[使用和验证说明](docs/ENTITY-TRANSFORM.md)。正式版仍为0.7.4，尚需游戏内验证新路径。
+> 当前分支：0.8.0-transform-preview2。新增准星手动识别、类别开关与参数调整；基于Skeeto路径的实体缩放与XYZ拉伸，扩展角色/道具/手持模型及动态Class ID，默认关闭。见[使用和验证说明](docs/ENTITY-TRANSFORM.md)。正式版仍为0.7.4，尚需游戏内验证新路径。
 
 # L4D2 Visual Effects
 

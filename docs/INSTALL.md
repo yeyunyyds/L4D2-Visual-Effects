@@ -1,6 +1,8 @@
-# L4D2Visual 0.8.0-transform-preview1
+# L4D2Visual 0.8.0-transform-preview2
 
-对应源码：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0-transform-preview1 。Skeeto 派生部分按 GPL-3.0 提供，版权和来源见 bin 内 NOTICE.md。
+对应源码：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0-transform-preview2 。Skeeto 派生部分按 GPL-3.0 提供，版权和来源见 bin 内 NOTICE.md。
+
+新增准星识别页：实体缩放与拉伸 → 准星识别与调整 → 手动识别；可切换识别类别并调整整体/XYZ，使用 - / = 微调，保存后写入 hud.json。按角色/类别共用设置，总开关默认关闭。识别使用准星附近候选，目标重叠时请核对显示的类型。
 
 新增实体缩放与拉伸预览。入口：根菜单 → 实体缩放与拉伸。各类别可设置整体大小与世界X/Y/Z比例，自动走骨骼构建/字段路径并由Studio绘制路径补充；新功能及类别默认关闭，保存到hud.json的entityTransform。开启某类、调整非100%倍率后再开启总开关。精调页按 - / = 调整，其他页同键翻页。
 
