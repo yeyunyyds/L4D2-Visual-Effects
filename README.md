@@ -24,7 +24,23 @@ SHA-256：
 
 历史测试包保留原结构和哈希；其README中的旧验收状态以本节为准。
 
-## Tank 三套样式与布局预览 · 0.7.3-tank-style-preview9
+## Tank 实体跟随与菜单整理 · 0.7.3-tank-anchor-preview10
+
+**[下载 preview10 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-anchor-preview10.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/9f177e6) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/9f177e6/docs/TANK-PREVIEW.md)
+
+修复 preview9 固定屏幕偏移/尺寸导致远处条过大、离 Tank 太远。现在先计算实体世界锚点，再投影位置及尺寸；横向偏移沿 Tank 自身左右，竖向沿世界上下。优先复制已有绘制回调中身份匹配的新鲜渲染原点，失效时回退网络位置，减少插值差异。距离变远、FOV 改变时，条随实体同比缩放；取消屏幕边缘吸附。
+
+菜单首页精简为总开关、显示内容、样式位置、当前状态、高级诊断、恢复显示、保存。计时条、朝向箭头、范围和目标连线可独立切换。诊断和原始参数放入高级页；旧 F7/手动标记入口及按键读取移除。已有配色和布局数值保留，以实体相对设计单位换算，预览比例同步调整。
+
+22 组原生测试、Windows x86 构建与安装包检查通过。新增距离/FOV/分辨率比例、相机独立世界锚点、Tank 局部转向、边缘裁剪、渲染原点新鲜度/地图/serial、菜单导航和显示开关保存回归。最近日志回放仍是 13 次起手/13 次计时，没有重复启动。尚待 L4D2/DXVK 实机验证。
+
+普通周期估算公式、P2P 配置和正式版 0.7.2 保持不变。根目录仅 bin/ 和 README.md。**联机功能未经测试，不保障 VAC 安全。**
+
+SHA-256：`35902281626014937aaa1f3e50ac1d1bd7e52fbf7937e7882ee9bc114199abd8`
+
+## 历史 Tank 三套样式与布局预览 · 0.7.3-tank-style-preview9
+
+本版为固定屏幕偏移，距离变远时条的相对大小和位置不正确；请升级 preview10。
 
 **[下载 preview9 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-style-preview9.zip)** · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/c82032a) · [样式设计示意](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/c82032a/docs/tank-style-preview.svg) · [使用说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/c82032a/docs/TANK-PREVIEW.md)
 
