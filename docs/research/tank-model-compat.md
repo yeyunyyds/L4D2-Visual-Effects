@@ -36,3 +36,10 @@ Source metadata SHA256:
 - hulk_l4d1.mdl: ec392f900f4ef5510df86d33210f0bfe8f6569ddb238eac7e7c5729e2f24359a
 
 Offline replay --known-table of the newest 419-row raw original trace produces 9 layer onsets and 9 stopwatch starts (40=2,43=3,45=4), zero duplicate restarts. The 401-row mixed trace produces 22/22. These are automated candidate observations, not independent ground-truth hit counts. Live shared-container discovery still rejects the header-cache vector and has not been fixed in this preview.
+
+
+## 0.7.4 formal minimal core
+
+User confirmed original Tank, the tested Mod and original uploaded Studio DLL work and authorized a formal release using index matching only. The production plugin removes all direct/local MDL and virtual model mappings, entity-memory container discovery, animation event factory/receive-proxy taps and diagnostic file writers. Network main/overlay indices resolve directly via knownTankSequence, independent of model draw visibility. Render callbacks now only maintain validated entity-following positions. The test animation status page is removed; layout preview and normal current-state menus remain. Old logging/markKey fields are ignored and removed when settings are saved. Historical research descriptions above are no longer production code.
+
+Default Tank enabled=false, draw=true and all four visual display preferences=true; style values unchanged. Other active features default off. Windows x86 build, 23 native suites and original/Mod offline traces validate the retained core. The installer root contains only bin and README.md, and binary checks exclude Tank diagnostic writer paths and event descriptor strings.

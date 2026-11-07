@@ -2,6 +2,7 @@
 #include "tank_sequence.hpp"
 #include <map>
 #include <cmath>
+#include <vector>
 namespace visual::tank {
 struct LayerSample {
  int index=0,sequence=0;float cycle=0,weight=0;std::optional<SequenceName> names;

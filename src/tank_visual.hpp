@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 namespace visual::tank {
-struct VisualSettings {unsigned preset=2,step=4;bool vertical=true,showDirection=false,showRange=false,showBar=false,showTarget=false;float x=-32,y=-24,length=88,thickness=8,barSize=.55f,arrowWidth=3,rangeWidth=3,arrowSize=1;};
+struct VisualSettings {unsigned preset=2,step=4;bool vertical=true,showDirection=true,showRange=true,showBar=true,showTarget=true;float x=-32,y=-24,length=88,thickness=8,barSize=.55f,arrowWidth=3,rangeWidth=3,arrowSize=1;};
 inline const char* visualName(unsigned p){return p==1?u8"琥珀战术":p==2?u8"冰蓝刻度":u8"青金简约";}
 inline void normalizeVisual(VisualSettings& s){s.preset=std::min(s.preset,2u);if(s.step!=2&&s.step!=4&&s.step!=8&&s.step!=16)s.step=4;
  auto bound=[](float v,float fallback,float lo,float hi){return std::isfinite(v)?std::clamp(v,lo,hi):fallback;};s.x=bound(s.x,-32,-200,200);s.y=bound(s.y,-24,-200,200);s.length=bound(s.length,88,40,200);s.thickness=bound(s.thickness,8,1,24);s.barSize=bound(s.barSize,.55f,.2f,2);s.arrowWidth=bound(s.arrowWidth,3,.5f,6);s.rangeWidth=bound(s.rangeWidth,3,.5f,6);s.arrowSize=bound(s.arrowSize,1,.25f,3);}

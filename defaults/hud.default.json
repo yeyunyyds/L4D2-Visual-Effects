@@ -15,10 +15,10 @@
     "length": 88.0,
     "preset": 2,
     "rangeWidth": 3.0,
-    "showBar": false,
-    "showDirection": false,
-    "showRange": false,
-    "showTarget": false,
+    "showBar": true,
+    "showDirection": true,
+    "showRange": true,
+    "showTarget": true,
     "step": 4,
     "thickness": 8.0,
     "vertical": true,
@@ -27,9 +27,7 @@
   },
   "tankPrediction": {
     "enabled": false,
-    "draw": false,
-    "logging": false,
-    "markKey": false,
+    "draw": true,
     "horizonMs": 200
   },
   "sprayP2P": {

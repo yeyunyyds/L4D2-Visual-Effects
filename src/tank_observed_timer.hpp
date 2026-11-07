@@ -1,6 +1,7 @@
 #pragma once
 #include "tank_sequence.hpp"
 #include <optional>
+#include <cstdint>
 #include <cmath>
 namespace visual::tank {
 struct ObservedTimer {

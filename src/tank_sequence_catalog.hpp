@@ -2,8 +2,8 @@
 #include "tank_sequence.hpp"
 namespace visual::tank {
 // Identical local name/activity tables in all three uploaded Tank MDLs.
-// Best-effort runtime index matching, without a model fingerprint restriction.
-// Real mapped descriptors take priority. A Mod may reorder global indices.
+// Runtime index matching is the sole recognition path. A Mod that reorders
+// global sequence indices may be misclassified; unknown indices stay unknown.
 struct KnownTankSequence{const char* label;const char* activity;int flags;};
 inline constexpr KnownTankSequence knownTankSequences[]={
  {"ragdoll","ACT_DIERAGDOLL",0},
