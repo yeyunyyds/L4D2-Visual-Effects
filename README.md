@@ -4,7 +4,19 @@
 
 本分支 `zip` **仅用于保存下载包**。源码、开发说明、完整安装指南和兼容性说明请前往 **[main 分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/main)**。
 
-## 当前正式版 0.7.2
+## 当前正式版 0.7.3
+
+**[下载 0.7.3 安装包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3.zip)** · [GitHub Release](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.7.3) · [完整源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.7.3) · [安装说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/v0.7.3/docs/INSTALL.md)
+
+Tank 默认样式来自用户提供配置：冰蓝刻度、竖条、位置 -32/-24、整体55%、箭头/范围线宽3倍。所有功能默认关闭，包括 Tank 总开关和显示项、喷漆与快捷操作、P2P/自动匹配、拉伸实体选择/范围实验、诊断和 F10。
+
+包内包含默认 hud.json，升级覆盖时请先备份；保留旧配置则沿用原开关。根目录仅 bin/ 与 README.md，源码独立下载。23组原生测试、x86构建及安装包检查通过，预测估算及联机仍有已知限制。
+
+**联机功能未经测试，不保障 VAC 安全。**
+
+SHA-256：`f2b6566f2f8d74f2e38f3b40236398928717f40f8e503891ffdbc8e56616c5b3`
+
+## 历史正式版 0.7.2
 
 **免责声明：联机功能未经测试，不保障 VAC 安全。**
 
