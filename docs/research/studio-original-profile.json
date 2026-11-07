@@ -1,0 +1,39 @@
+{
+  "sha256": "3f5f5b0f539e8ad22bcfc4381be41571257c0c29e8061057682f9b8525ca7b85",
+  "timestamp": 1782844886,
+  "image_size": 4534272,
+  "samples": [
+    {
+      "rva": 434512,
+      "bytes": "558bec83ec3c538b5d0857894dfc",
+      "mask": "ffffffffffffffffffffffffffff"
+    },
+    {
+      "rva": 434808,
+      "bytes": "8b4d108b178b829c000000",
+      "mask": "ffffffffffffffffffffff"
+    },
+    {
+      "rva": 435164,
+      "bytes": "c21c00",
+      "mask": "ffffff"
+    },
+    {
+      "rva": 421533,
+      "bytes": "8d3c7fc1e704",
+      "mask": "ffffffffffff"
+    },
+    {
+      "rva": 421553,
+      "bytes": "575350e8a77700008b4508",
+      "mask": "ffffffffffffffffffffff"
+    }
+  ],
+  "interface": "VStudioRender026",
+  "factory_rva": 414912,
+  "object_rva": 4419608,
+  "vtable_rva": 520252,
+  "slot": 25,
+  "method_rva": 434512,
+  "constructor_rva": 439505
+}

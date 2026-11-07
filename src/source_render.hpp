@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include "render_profile.hpp"
 #include "module_verification.hpp"
+#include "studio_profiles.hpp"
 
 namespace visual::render {
 using dango::Vec3;
@@ -285,12 +286,12 @@ inline void connect() {
     if(!studioModule)studioModule=GetModuleHandleW(L"studiorender.dll");
     if(!engineModule || !clientModule || !studioModule){status="Waiting for client/engine/studiorender modules";return;}
     status="Render ABI check failed; original drawing retained";
+    auto studioBuild=visual::studioabi::select(source_entities::reader,std::uint32_t(reinterpret_cast<std::uintptr_t>(studioModule)));if(!studioBuild){status="Unsupported Studio PE profile; original drawing retained";return;}
     if(!matchesImage(engineModule,EngineTimestamp,EngineImageSize,"visual engine") ||
-       !matchesImage(clientModule,ClientTimestamp,ClientImageSize,"visual client") ||
-       !matchesImage(studioModule,1782844886,6631424,"visual studio"))return;
+       !matchesImage(clientModule,ClientTimestamp,ClientImageSize,"visual client"))return;
     if(!verifiedModuleFile(engineModule,"8a6d468059394bf4cfce32f11dcba12ef45de88da1373084d5a2916d0bf7ba86") ||
        !verifiedModuleFile(clientModule,"c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f") ||
-       !verifiedModuleFile(studioModule,"03964dedcf8b7f4ebde24cd3d0738873d37c075a7a9b313dad001bb937f9d1b6")) {
+       !verifiedModuleFile(studioModule,studioBuild->sha256)) {
         status="Disk game DLL hash mismatch; render hooks refused";return;
     }
     if(!samples(engineModule,visual::profile::engineSamples) ||
@@ -303,18 +304,19 @@ inline void connect() {
     if(!ef || !sf){status="CreateInterface export missing";return;}
     auto e=ef("VEngineModel016",nullptr),s=sf("VStudioRender026",nullptr);
     auto eb=reinterpret_cast<std::uintptr_t>(engineModule),sb=reinterpret_cast<std::uintptr_t>(studioModule);
-    if(reinterpret_cast<std::uintptr_t>(e)!=eb+0x604248 || reinterpret_cast<std::uintptr_t>(s)!=sb+0x437018 ||
+    if(reinterpret_cast<std::uintptr_t>(e)!=eb+0x604248 || reinterpret_cast<std::uintptr_t>(s)!=sb+studioBuild->object ||
        !readable(e,4)||!readable(s,4)){status="Render interface object mismatch";return;}
     auto et=*reinterpret_cast<void***>(e),st=*reinterpret_cast<void***>(s);
-    if(reinterpret_cast<std::uintptr_t>(et)!=eb+0x373864 || reinterpret_cast<std::uintptr_t>(st)!=sb+0x7f03c ||
+    if(reinterpret_cast<std::uintptr_t>(et)!=eb+0x373864 || reinterpret_cast<std::uintptr_t>(st)!=sb+studioBuild->vtable ||
        !readable(et,20*4)||!readable(st,26*4)){status="Render vtable mismatch";return;}
     // The original file's full hash proves the profiled ABI. Chain the live
     // targets, including existing vtable hooks / inline detours, without bypass.
     if(!executable(et[19]) || !executable(st[25]) ||
        !executable(reinterpret_cast<void*>(eb+0xe0600)) ||
-       !executable(reinterpret_cast<void*>(sb+0x6a150))) {
+       !executable(reinterpret_cast<void*>(sb+studioBuild->draw))) {
         status="Render callback is not executable; hooks refused";return;
     }
+    log(std::string("Selected Studio ABI profile: ")+studioBuild->name);
     log("Chaining engine callback owner="+targetOwner(et[19])+" studio owner="+targetOwner(st[25]));
     engineOriginal=reinterpret_cast<EngineDraw>(et[19]);studioOriginal=reinterpret_cast<StudioDraw>(st[25]);
     engineTable=et;studioTable=st;

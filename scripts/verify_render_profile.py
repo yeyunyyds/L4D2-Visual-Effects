@@ -8,10 +8,18 @@ from pe_reader import PE
 
 parser = argparse.ArgumentParser(description=__doc__)
 for name in ('client', 'engine', 'studio'):
-    parser.add_argument('--' + name, required=True)
+    parser.add_argument('--' + name)
 args = parser.parse_args()
 profiles = json.loads((Path(__file__).resolve().parents[1] / 'docs/research/render-profile.json').read_text())
+if not any(vars(args).values()):
+    parser.error('Provide at least one DLL path')
 for name, profile in profiles.items():
+    if not getattr(args, name):
+        continue
+    if name == 'studio':
+        original = json.loads((Path(__file__).resolve().parents[1] / 'docs/research/studio-original-profile.json').read_text())
+        if hashlib.sha256(Path(args.studio).read_bytes()).hexdigest() == original['sha256']:
+            profile = original
     image = PE(getattr(args, name))
     assert hashlib.sha256(image.data).hexdigest() == profile['sha256'], name + ' SHA mismatch'
     assert (image.timestamp, image.image_size) == (profile['timestamp'], profile['image_size'])

@@ -2,6 +2,7 @@
 #include "tank_cvars.hpp"
 #include "diagnostics.hpp"
 #include "tank_sequence.hpp"
+#include "tank_virtual_sequence.hpp"
 #include "tank_event_runtime.hpp"
 #include "tank_observed_timer.hpp"
 #include "tank_layer_attack.hpp"
@@ -14,7 +15,7 @@ inline std::atomic<unsigned long> engineObservations{0},studioObservations{0},ta
 inline std::shared_ptr<const Result> emptyResult=std::make_shared<const Result>();
 inline std::shared_ptr<const Settings> options=std::make_shared<const Settings>();
 inline std::shared_ptr<const Result> snapshot=std::make_shared<const Result>();
-struct Animation{std::uint32_t epoch=0,handle=0;int sequence=-1;SequenceName names;std::string route,reason,model;std::map<int,SequenceName> layerNames;std::map<int,std::string> layerReasons;std::uint32_t header=0;int localSequenceCount=0;ModelIncludes includes{};};
+struct Animation{std::uint32_t epoch=0,handle=0;int sequence=-1;SequenceName names;std::string route,reason,model;std::map<int,SequenceName> layerNames;std::map<int,std::string> layerReasons;std::uint32_t header=0;int localSequenceCount=0;ModelIncludes includes{};ModelKey key{};std::uint32_t wrapper=0;std::uint64_t resolvedAt=0,lastProbe=0,generation=0;};
 inline auto emptyObserved=std::make_shared<const std::map<std::uint32_t,ObservedTimer>>();
 inline std::shared_ptr<const std::map<std::uint32_t,ObservedTimer>> observedSnapshot=emptyObserved;
 inline auto emptyLayers=std::make_shared<const std::map<std::uint32_t,LayerAttack>>();
@@ -22,31 +23,32 @@ inline std::shared_ptr<const std::map<std::uint32_t,LayerAttack>> layerSnapshot=
 inline std::mutex animationMutex;inline std::map<std::uint32_t,Animation> animations;inline std::map<std::uint32_t,RenderAnchor> renderAnchors;
 // CPU metadata only, called from the already verified model callback. No D3D,
 // SetupBones, simulation changes or additional engine method dispatch.
-inline bool tankModel(std::uint32_t header){
- static thread_local std::uint32_t epoch=0;static thread_local std::map<std::uint32_t,bool> known;
- auto camera=std::atomic_load(&source_camera::snapshot);if(epoch!=camera->epoch){known.clear();epoch=camera->epoch;}
- auto i=known.find(header);if(i!=known.end())return i->second;
- auto name=dango::entitywire::text(source_entities::reader,header+12,64);for(char& c:name)if(c>='A'&&c<='Z')c=char(c+32);
- bool accepted=name.find("hulk")!=std::string::npos||name.find("tank")!=std::string::npos;if(known.size()>=512)known.clear();known[header]=accepted;return accepted;
-}
-inline void observeRecord(std::uint32_t header,const Record& record,std::uint32_t epoch,const char* route,const Vec3& origin){
- if(!record.sequence)return;std::lock_guard<std::mutex> lock(animationMutex);RenderAnchor pose{epoch,record.handle,GetTickCount64(),origin};if(record.networkOrigin&&validRenderAnchor(pose,epoch,record.handle,pose.tick,*record.networkOrigin)){if(renderAnchors.size()>16)renderAnchors.clear();renderAnchors[record.handle]=pose;}auto old=animations.find(record.handle);
- std::string routes=route;
- if(old!=animations.end()&&old->second.epoch==epoch&&old->second.sequence==*record.sequence&&old->second.header==header){
-  std::set<int> unique;for(const auto& layer:record.animationLayers)unique.insert(layer.sequence);bool sameLayers=old->second.layerReasons.size()==unique.size();for(const auto& layer:record.animationLayers)if(!old->second.layerReasons.count(layer.sequence))sameLayers=false;
-  if(old->second.route.find(route)!=std::string::npos&&sameLayers)return;
-  routes=old->second.route;if(routes.find(route)==std::string::npos)routes+="+"+std::string(route);if(!old->second.names.label.empty()&&sameLayers){old->second.route=routes;return;}
+inline std::atomic<std::uint64_t> modelGeneration{0};
+inline void observeRecord(std::uint32_t header,const Record& record,std::uint32_t epoch,const char* route,const Vec3& origin,std::uint32_t entity){
+ if(!record.sequence)return;auto key=modelKey(source_entities::reader,header);if(!key)return;
+ std::lock_guard<std::mutex> lock(animationMutex);auto now=GetTickCount64();RenderAnchor pose{epoch,record.handle,now,origin};if(record.networkOrigin&&validRenderAnchor(pose,epoch,record.handle,pose.tick,*record.networkOrigin)){if(renderAnchors.size()>16)renderAnchors.clear();renderAnchors[record.handle]=pose;}
+ auto old=animations.find(record.handle);bool sameModel=old!=animations.end()&&old->second.epoch==epoch&&old->second.key==*key;
+ std::set<int> sequences{*record.sequence};for(const auto& layer:record.animationLayers)sequences.insert(layer.sequence);
+ if(sameModel&&old->second.sequence==*record.sequence){std::set<int> previous{old->second.sequence};for(const auto& l:old->second.layerReasons)previous.insert(l.first);bool complete=!old->second.names.label.empty();for(const auto& l:record.animationLayers)complete=complete&&old->second.layerNames.count(l.sequence);
+  if(previous==sequences&&now>=old->second.resolvedAt&&now-old->second.resolvedAt<(complete?1000:100)){if(old->second.route.find(route)==std::string::npos)old->second.route+="+"+std::string(route);return;}
  }
- if(animations.size()>16)animations.clear();const char* reason="not attempted";auto name=sequenceName(source_entities::reader,header,*record.sequence,&reason);
- animations[record.handle]={epoch,record.handle,*record.sequence,name?*name:SequenceName{},routes,reason,dango::entitywire::text(source_entities::reader,header+12,64),{}, {}};
- auto& current=animations[record.handle];current.header=header;current.includes=modelIncludes(source_entities::reader,header);dango::entitywire::load(source_entities::reader,header+188,current.localSequenceCount);for(const auto& layer:record.animationLayers){const char* why="not attempted";auto n=sequenceName(source_entities::reader,header,layer.sequence,&why);current.layerReasons[layer.sequence]=why;if(n)current.layerNames[layer.sequence]=*n;}
+ Animation next;next.epoch=epoch;next.handle=record.handle;next.sequence=*record.sequence;next.header=header;next.key=*key;next.localSequenceCount=key->count;next.model=key->name;next.route=route;next.resolvedAt=now;next.generation=sameModel?old->second.generation:++modelGeneration;next.wrapper=sameModel?old->second.wrapper:0;next.lastProbe=sameModel?old->second.lastProbe:0;next.includes=modelIncludes(source_entities::reader,header);
+ bool shared=key->includes>0;int probe=*record.sequence;for(auto seq:sequences)if(seq>=key->count){shared=true;probe=seq;break;}
+ if(shared&&(!next.wrapper||!virtualSequence(source_entities::reader,next.wrapper,header,probe))&&(!next.lastProbe||now-next.lastProbe>=1000)){next.wrapper=findStudioWrapper(source_entities::reader,entity,header,probe);next.lastProbe=now;}
+ auto resolve=[&](int seq,const char** why)->std::optional<SequenceName>{if(shared){auto mapped=virtualSequence(source_entities::reader,next.wrapper,header,seq);if(mapped){*why="resolved via validated virtual-model group cache";return mapped->names;}*why="shared sequence mapping unavailable or changed; not guessed";return {};}return sequenceName(source_entities::reader,header,seq,why);};
+ const char* why="not attempted";auto main=resolve(next.sequence,&why);next.reason=why;if(main)next.names=*main;
+ for(const auto& l:record.animationLayers){auto n=resolve(l.sequence,&why);next.layerReasons[l.sequence]=why;if(n)next.layerNames[l.sequence]=*n;}
+ // Same address/checksum can still be reused by unusual model reloaders. A
+ // periodic name refresh must invalidate onset history when semantics change.
+ if(sameModel){bool changed=old->second.sequence==next.sequence&&!old->second.names.label.empty()&&!next.names.label.empty()&&(old->second.names.label!=next.names.label||old->second.names.activity!=next.names.activity);for(const auto& l:next.layerNames){auto before=old->second.layerNames.find(l.first);if(before!=old->second.layerNames.end()&&(before->second.label!=l.second.label||before->second.activity!=l.second.activity))changed=true;}if(changed)next.generation=++modelGeneration;}
+ if(animations.size()>16)animations.clear();animations[record.handle]=std::move(next);
 }
 inline void observeModel(std::uint32_t header,int index,const Vec3& origin){
  if(faulted||!std::atomic_load(&options)->enabled)return;++engineObservations;auto frame=std::atomic_load(&source_entities::combatSnapshot);auto camera=std::atomic_load(&source_camera::snapshot);auto now=GetTickCount64();
  if(!camera->active||camera->epoch!=frame->epoch||now<frame->tick||now-frame->tick>250)return;
- for(const auto& r:frame->records)if(r.index==unsigned(index)&&tank(r)&&tankModel(header)){
+ for(const auto& r:frame->records)if(r.index==unsigned(index)&&tank(r)){
   if(!source_entities::list)break;auto object=std::uint32_t(reinterpret_cast<std::uintptr_t>(source_entities::list));auto entries=std::uint32_t(std::int64_t(object)+source_entities::profile::EntryBaseDelta);source_entities::wire::Entry entry;
-  if(source_entities::wire::load(source_entities::reader,entries+r.index*sizeof(entry),entry)&&entry.entity&&entry.serial==r.serial)observeRecord(header,r,frame->epoch,"engine",origin);break;
+  if(source_entities::wire::load(source_entities::reader,entries+r.index*sizeof(entry),entry)&&entry.entity&&entry.serial==r.serial)observeRecord(header,r,frame->epoch,"engine",origin,entry.entity);break;
  }
 }
 // The fast model path can bypass DrawModelExecute. Observe the existing Studio
@@ -56,29 +58,35 @@ inline void observeStudio(std::uint32_t header,std::uint32_t renderable,const Ve
  if(faulted||!std::atomic_load(&options)->enabled)return;++studioObservations;
  auto camera=std::atomic_load(&source_camera::snapshot);auto frame=std::atomic_load(&source_entities::combatSnapshot);auto now=GetTickCount64();
  if(!camera->active||frame->epoch!=camera->epoch||now<frame->tick||now-frame->tick>250||!source_entities::list)return;
- if(!header||!renderable||!tankModel(header))return;++tankHeaders;
- std::uint32_t getter=0;if(!source_entities::method(renderable,0,getter))return;
- auto base=source_entities::wire::addressGetter(source_entities::reader,getter,renderable);if(!base)return;
- auto object=std::uint32_t(reinterpret_cast<std::uintptr_t>(source_entities::list));
- auto entries=std::uint32_t(std::int64_t(object)+source_entities::profile::EntryBaseDelta);
- for(const auto& r:frame->records)if(tank(r)){
-  source_entities::wire::Entry entry;if(source_entities::wire::load(source_entities::reader,entries+r.index*sizeof(entry),entry)&&entry.entity==*base&&entry.serial==r.serial){++renderableMatches;observeRecord(header,r,frame->epoch,"studio",origin);break;}
- }
+ if(!header||!renderable)return;
+ // Cache only the decoded getter result, never a class/serial decision. Models
+ // may have arbitrary filenames; identity comes from the matched Tank entity.
+ struct CachedBase{std::uint32_t base=0;std::uint64_t tick=0;};static thread_local std::uint32_t cacheEpoch=0;static thread_local std::map<std::uint32_t,CachedBase> bases;
+ if(cacheEpoch!=frame->epoch){bases.clear();cacheEpoch=frame->epoch;}auto found=bases.find(renderable);
+ if(found==bases.end()||now<found->second.tick||now-found->second.tick>250){std::uint32_t getter=0;std::optional<std::uint32_t> decoded;if(source_entities::method(renderable,0,getter))decoded=source_entities::wire::addressGetter(source_entities::reader,getter,renderable);if(bases.size()>=2048)bases.clear();found=bases.insert_or_assign(renderable,CachedBase{decoded.value_or(0),now}).first;}
+ if(!found->second.base)return;
+ struct Identity{const Record* record;};static thread_local std::shared_ptr<const Frame> indexed;static thread_local std::map<std::uint32_t,Identity> tanks;
+ auto object=std::uint32_t(reinterpret_cast<std::uintptr_t>(source_entities::list));auto entries=std::uint32_t(std::int64_t(object)+source_entities::profile::EntryBaseDelta);
+ if(indexed!=frame){indexed=frame;tanks.clear();for(const auto& r:frame->records)if(tank(r)){source_entities::wire::Entry e;if(source_entities::wire::load(source_entities::reader,entries+r.index*sizeof(e),e)&&e.entity&&e.serial==r.serial)tanks[e.entity]={&r};}}
+ auto match=tanks.find(found->second.base);if(match==tanks.end())return;auto& r=*match->second.record;source_entities::wire::Entry entry;
+ if(source_entities::wire::load(source_entities::reader,entries+r.index*sizeof(entry),entry)&&entry.entity==found->second.base&&entry.serial==r.serial){++tankHeaders;++renderableMatches;observeRecord(header,r,frame->epoch,"studio",origin,entry.entity);}
+
 }
 inline void onFrame(const dango::GameCameraFrame& camera)try{
  auto eventCfg=std::atomic_load(&options);events::update(!faulted&&eventCfg->enabled&&eventCfg->logging,camera);
  if(faulted)return;
  static Predictor predictor;static std::shared_ptr<const Frame> previous;
- static std::uint32_t timerEpoch=0;static std::map<std::uint32_t,SwingStopwatch> timers;static std::map<std::uint32_t,LayerAttackDetector> layerDetectors;
+ static std::uint32_t timerEpoch=0;static std::map<std::uint32_t,SwingStopwatch> timers;static std::map<std::uint32_t,LayerAttackDetector> layerDetectors;static std::map<std::uint32_t,std::uint64_t> generations;
  auto cfg=std::atomic_load(&options);auto frame=std::atomic_load(&source_entities::combatSnapshot);
- if(!cfg->enabled||!camera.active){predictor.reset();previous.reset();timers.clear();layerDetectors.clear();std::atomic_store(&layerSnapshot,emptyLayers);if(std::atomic_load(&observedSnapshot)!=emptyObserved)std::atomic_store(&observedSnapshot,emptyObserved);if(std::atomic_load(&snapshot)!=emptyResult)std::atomic_store(&snapshot,emptyResult);return;}
+ if(!cfg->enabled||!camera.active){predictor.reset();previous.reset();timers.clear();layerDetectors.clear();generations.clear();std::atomic_store(&layerSnapshot,emptyLayers);if(std::atomic_load(&observedSnapshot)!=emptyObserved)std::atomic_store(&observedSnapshot,emptyObserved);if(std::atomic_load(&snapshot)!=emptyResult)std::atomic_store(&snapshot,emptyResult);return;}
  if(previous==frame||frame->epoch!=camera.epoch||camera.tick<frame->tick||camera.tick-frame->tick>250)return;previous=frame;
  auto out=predictor.update(*frame,*std::atomic_load(&parameters),*cfg);
- if(timerEpoch!=out.epoch){timers.clear();layerDetectors.clear();timerEpoch=out.epoch;}
+ if(timerEpoch!=out.epoch){timers.clear();layerDetectors.clear();generations.clear();timerEpoch=out.epoch;}
  std::map<std::uint32_t,SwingStopwatch> nextTimers;std::map<std::uint32_t,ObservedTimer> readings;
  std::map<std::uint32_t,LayerAttackDetector> nextDetectors;std::map<std::uint32_t,LayerAttack> layerReadings;
  {std::lock_guard<std::mutex> lock(animationMutex);for(auto& o:out.tanks){auto a=animations.find(o.handle);std::optional<SequenceName> names;
   if(a!=animations.end()&&a->second.epoch==frame->epoch&&o.sequence&&a->second.sequence==*o.sequence&&!a->second.names.label.empty()){names=a->second.names;o.action=classify(*names)+": "+names->label;}
+  if(a!=animations.end()&&a->second.epoch==frame->epoch&&generations[o.handle]!=a->second.generation){timers.erase(o.handle);layerDetectors.erase(o.handle);generations[o.handle]=a->second.generation;}
   auto timer=timers.find(o.handle);SwingStopwatch watch=timer==timers.end()?SwingStopwatch{}:timer->second;
   const Record* actor=nullptr;for(const auto& r:frame->records)if(r.handle==o.handle){actor=&r;break;}
   std::vector<LayerSample> layers;if(actor)for(const auto& l:actor->animationLayers){LayerSample sample{l.index,l.sequence,l.cycle,l.weight,{}};
@@ -92,6 +100,7 @@ inline void onFrame(const dango::GameCameraFrame& camera)try{
   // be presented as zero cooldown. The visible value is observation-based.
   o.cooldown=reading.remaining;readings[o.handle]=reading;nextTimers[o.handle]=watch;
  }}
+ for(auto i=generations.begin();i!=generations.end();)if(!nextDetectors.count(i->first))i=generations.erase(i);else ++i;
  layerDetectors=std::move(nextDetectors);std::atomic_store(&layerSnapshot,std::make_shared<const std::map<std::uint32_t,LayerAttack>>(std::move(layerReadings)));
  timers=std::move(nextTimers);std::atomic_store(&observedSnapshot,std::make_shared<const std::map<std::uint32_t,ObservedTimer>>(std::move(readings)));
  std::atomic_store(&snapshot,std::make_shared<const Result>(std::move(out)));
@@ -118,7 +127,7 @@ inline void poll(std::uint64_t now)try{events::poll();if(faulted)return;auto cfg
  if(f->parameters.range)j["range"]=*f->parameters.range;if(f->parameters.arc)j["arc"]=*f->parameters.arc;if(f->parameters.windup)j["windup"]=*f->parameters.windup;if(f->parameters.duration)j["duration"]=*f->parameters.duration;if(f->parameters.interval)j["interval"]=*f->parameters.interval;if(f->parameters.missInterval)j["missInterval"]=*f->parameters.missInterval;
  for(const auto& o:f->tanks){nlohmann::json r={{"handle",o.handle},{"position",{o.origin.x,o.origin.y,o.origin.z}},{"yaw",o.heading},{"pitch",o.pitch},{"nearVerticalAim",o.nearVerticalAim},{"eyeAngle",o.eye},{"headingRate",o.headingRate},{"possibleHeadingLock",o.headingStalled},{"action",o.action},{"geometry",o.geometry},{"reason",o.reason}};
   {std::lock_guard<std::mutex> lock(animationMutex);auto probe=animations.find(o.handle);
-   if(probe!=animations.end()&&probe->second.epoch==f->epoch){r["animationProbe"]={{"route",probe->second.route},{"reason",probe->second.reason},{"model",probe->second.model},{"sequence",probe->second.sequence},{"localSequenceCount",probe->second.localSequenceCount},{"includedModels",probe->second.includes.names},{"includeReason",probe->second.includes.reason},{"label",probe->second.names.label},{"activity",probe->second.names.activity}};}
+   if(probe!=animations.end()&&probe->second.epoch==f->epoch){r["animationProbe"]={{"route",probe->second.route},{"reason",probe->second.reason},{"model",probe->second.model},{"sequence",probe->second.sequence},{"localSequenceCount",probe->second.localSequenceCount},{"modelVersion",probe->second.key.version},{"modelChecksum",probe->second.key.checksum},{"generation",probe->second.generation},{"virtualMappingAvailable",probe->second.wrapper!=0},{"includedModels",probe->second.includes.names},{"includeReason",probe->second.includes.reason},{"label",probe->second.names.label},{"activity",probe->second.names.activity},{"activityId",probe->second.names.activityId}};}
    else r["animationProbe"]={{"reason","no matching model observation"}};}
   auto detectedLayers=std::atomic_load(&layerSnapshot);auto detected=detectedLayers->find(o.handle);if(detected!=detectedLayers->end()){const auto& l=detected->second;r["attackLayer"]={{"sampled",l.sampled},{"active",l.active},{"onset",l.onset},{"index",l.layer},{"sequence",l.sequence},{"cycle",l.cycle},{"weight",l.weight},{"label",l.names.label},{"activity",l.names.activity}};}
   r["rawFieldCooldownReason"]=o.timing.reason;r["rawFieldPartial"]=o.timing.partial;if(o.timing.weaponDeadline)r["rawWeaponDeadline"]=*o.timing.weaponDeadline;if(o.timing.actorDeadline)r["rawActorDeadline"]=*o.timing.actorDeadline;
@@ -128,7 +137,7 @@ inline void poll(std::uint64_t now)try{events::poll();if(faulted)return;auto cfg
  auto actors=std::atomic_load(&source_entities::combatSnapshot);j["actors"]=nlohmann::json::array();j["actorTick"]=actors->tick;j["resultTick"]=f->tick;j["fieldSchemaHints"]=actors->getterHints;j["animationEventSchemas"]=actors->animationEventSchemas;
  if(actors->epoch==f->epoch)for(const auto& a:actors->records){nlohmann::json r={{"handle",a.handle},{"class",a.className}};
   auto vector=[&](const char* key,const std::optional<Vec3>& v){if(v)r[key]={v->x,v->y,v->z};};vector("position",a.networkOrigin);vector("bodyAngles",a.networkAngles);vector("eyeAngles",a.eyeAngles);vector("collisionMins",a.collisionMins);vector("collisionMaxs",a.collisionMaxs);
-  if(!a.animationLayerReason.empty()){r["animationLayerReason"]=a.animationLayerReason;r["animationLayers"]=nlohmann::json::array();std::lock_guard<std::mutex> lock(animationMutex);auto probe=animations.find(a.handle);for(const auto& layer:a.animationLayers){nlohmann::json l={{"index",layer.index},{"sequence",layer.sequence},{"cycle",layer.cycle},{"previousCycle",layer.previousCycle},{"weight",layer.weight},{"order",layer.order}};if(probe!=animations.end()&&probe->second.epoch==actors->epoch){auto n=probe->second.layerNames.find(layer.sequence);if(n!=probe->second.layerNames.end()){l["label"]=n->second.label;l["activity"]=n->second.activity;}auto why=probe->second.layerReasons.find(layer.sequence);if(why!=probe->second.layerReasons.end())l["resolution"]=why->second;}r["animationLayers"].push_back(l);}}
+  if(!a.animationLayerReason.empty()){r["animationLayerReason"]=a.animationLayerReason;r["animationLayers"]=nlohmann::json::array();std::lock_guard<std::mutex> lock(animationMutex);auto probe=animations.find(a.handle);for(const auto& layer:a.animationLayers){nlohmann::json l={{"index",layer.index},{"sequence",layer.sequence},{"cycle",layer.cycle},{"previousCycle",layer.previousCycle},{"weight",layer.weight},{"order",layer.order}};if(probe!=animations.end()&&probe->second.epoch==actors->epoch){auto n=probe->second.layerNames.find(layer.sequence);if(n!=probe->second.layerNames.end()){l["label"]=n->second.label;l["activity"]=n->second.activity;l["activityId"]=n->second.activityId;}auto why=probe->second.layerReasons.find(layer.sequence);if(why!=probe->second.layerReasons.end())l["resolution"]=why->second;}r["animationLayers"].push_back(l);}}
   if(a.weaponOwner)r["weaponOwner"]=*a.weaponOwner;if(a.owner)r["owner"]=*a.owner;if(a.animationCycle)r["animationCycle"]=*a.animationCycle;
   if(a.health)r["health"]=*a.health;if(a.lookAtHandle)r["lookAtHandle"]=*a.lookAtHandle;if(a.enemyHandle)r["enemyHandle"]=*a.enemyHandle;if(a.activeWeapon)r["activeWeapon"]=*a.activeWeapon;if(a.nextPrimaryAttack)r["nextPrimaryAttack"]=*a.nextPrimaryAttack;if(a.nextAttack)r["nextAttack"]=*a.nextAttack;if(a.simulationTime)r["simulationTime"]=*a.simulationTime;j["actors"].push_back(r);
  }
