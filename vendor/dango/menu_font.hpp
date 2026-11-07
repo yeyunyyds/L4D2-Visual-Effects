@@ -18,6 +18,7 @@ inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  builder.AddText(u8"手动标记出拳估算剩余非真实冷却距投石动作结束非倒计时刚刚准星前未找到提交时钟未知过期目标失效启动");
  builder.AddText(u8"样式位置预览模拟无需地图移动步长长度厚度重置方向恢复显示保存设置青金简约琥珀战术冰蓝刻度横条竖条切换立即两秒演示循环范围为示意");
  builder.AddText(u8"总开关显示内容当前状态高级攻击计时条箭头目标连线位置前瞻摇普通间隔诊断仅用于反馈须启实体相对位置远近透视缩放左右跟随朝向上下固定世界高度");
+ builder.AddText(u8"进度条大小与粗细攻击范围线宽倍率整体精调选中参数减少增加每次仅调整显示不改变距离百分比长度厚度恢复默认");
  builder.BuildRanges(&ranges);
 }
 }

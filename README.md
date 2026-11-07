@@ -1,9 +1,9 @@
 # L4D2 Visual Effects
 
-**Tank预测实验分支：0.7.3-tank-anchor-preview10（L4N-only）**
+**Tank预测实验分支：0.7.3-tank-fine-preview11（L4N-only）**
 
 默认关闭；只尝试客户端/同进程只读数据，无SourceMod依赖。正式版0.7.2仍是稳定基线。
-本次将条的位置和大小改为实体坐标锚定与透视缩放，修复远处过大、与 Tank 分离的问题；菜单分为显示内容、样式位置、当前状态和高级诊断。见[调查依据](docs/tank-animation-sources.md)与[preview10 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-anchor-preview10.zip)。
+本次默认进度条缩为 80%，箭头与范围线宽加倍，并增加三个独立精调页：选中参数后用 - / = 以 1% 或 0.1 步进调整，即时预览并保存。见[调查依据](docs/tank-animation-sources.md)与[preview11 测试包](https://github.com/yeyunyyds/L4D2-Visual-Effects/raw/refs/heads/zip/L4D2Visual-0.7.3-tank-fine-preview11.zip)。
 请先阅读[实验说明与本地单人验收](docs/TANK-PREVIEW.md)，不要把注视目标或参数估计区理解为精确AI锁敌/命中边界。
 
 ![Tank 样式设计示意（非游戏截图）](docs/tank-style-preview.svg)

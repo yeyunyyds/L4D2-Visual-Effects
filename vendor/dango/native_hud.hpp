@@ -23,6 +23,7 @@ class NativeHud {
  using Notice=std::string(*)();
  using Log=void(*)(const std::string&);
  using AppearanceWrite=void(*)(const Appearance&);
+ using Adjustment=bool(*)(uintptr_t,int);Adjustment adjustment=nullptr;
  using Addon=void(*)(uintptr_t,float,float,bool);using AddonKeys=bool(*)(uintptr_t);Addon addon=nullptr;AddonKeys addonKeys=nullptr;std::atomic<bool> addonArrows{false};
  Builder build=nullptr;Action act=nullptr;Close closed=nullptr;Notice notice=nullptr;Log log=nullptr;AppearanceWrite appearanceWrite=nullptr;
  std::atomic<bool> opened{false},restart{false},f10{false};
@@ -81,6 +82,7 @@ class NativeHud {
  row(3,u8"字体大小："+std::to_string(int(fontPixels))+" px"+(selected==2?"  [- / =]":""));row(4,std::string("F10: ")+(f10?u8"开":u8"关"));row(5,u8"调整菜单位置");text(u8"外观修改后请返回主菜单保存设置",{.58f,.60f,.60f,1});
  }
 public:
+ void configureAdjustment(Adjustment callback){adjustment=callback;}
  void configureAddon(Addon draw,AddonKeys keys){addon=draw;addonKeys=keys;}
  void configure(Builder b,Action a,Close c,Notice n,Log l,AppearanceWrite w){build=b;act=a;closed=c;notice=n;log=l;appearanceWrite=w;}
  Appearance appearanceValue()const{Appearance a;a.preset=preset;a.step=step;a.opacity=opacity;a.font=fontPixels;a.x=x;a.y=y;a.centerY=centerY;a.f10=f10;return a;}
@@ -103,10 +105,10 @@ public:
  if(ImGui::Begin("L4D2DangoMusic Native HUD",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_AlwaysAutoResize)){
  ImGui::SetWindowFontScale(fontPixels/24.f);
  if(page==Page::Settings){auto doc=document(build(stack.current().page));stack.clamp(doc.rows.size());
- if(edge[12])stack.previous();if(edge[13])stack.next(doc.rows.size());
+ bool fine=adjustment&&adjustment(stack.current().page,0);if(fine){if(edge[12]||edge[13])adjustment(stack.current().page,int(edge[13])-int(edge[12]));}else{if(edge[12])stack.previous();if(edge[13])stack.next(doc.rows.size());}
  text(doc.title,{1,.84f,.22f,1});ImGui::Separator();size_t first=stack.current().sheet*MenuStack::PageSize;
  for(size_t i=first;i<doc.rows.size()&&i<first+MenuStack::PageSize;++i){auto& item=doc.rows[i];unsigned n=unsigned(i-first+1);row(n,item.label,item.action!=0);if(edge[n]&&item.action)action=item.action;}
- size_t count=std::max<size_t>(1,(doc.rows.size()+MenuStack::PageSize-1)/MenuStack::PageSize);if(count>1)text(u8"[-] 上页    [=] 下页    "+std::to_string(stack.current().sheet+1)+" / "+std::to_string(count),{.58f,.60f,.60f,1});
+ size_t count=std::max<size_t>(1,(doc.rows.size()+MenuStack::PageSize-1)/MenuStack::PageSize);if(fine)text(u8"[-] 减少    [=] 增加选中参数",{1,.84f,.22f,1});else if(count>1)text(u8"[-] 上页    [=] 下页    "+std::to_string(stack.current().sheet+1)+" / "+std::to_string(count),{.58f,.60f,.60f,1});
  openAppearance=action==9000;
  }else if(page==Page::Appearance){text(u8"菜单外观",{1,.84f,.22f,1});ImGui::Separator();appearance(edge);
  }else{text(u8"调整菜单位置",{1,.84f,.22f,1});ImGui::Separator();if(edge[12]&&step>1)--step;if(edge[13]&&step<64)++step;if(edge[1]){x=8;y=14;centerY=true;}move(focused);text(u8"位置："+std::to_string(int(x))+", "+std::to_string(int(centerY?ImGui::GetWindowPos().y:y)));text(u8"方向键移动菜单；[- / =] 步宽："+std::to_string(step)+" px",{1,.84f,.22f,1});row(1,u8"重置到默认位置");}

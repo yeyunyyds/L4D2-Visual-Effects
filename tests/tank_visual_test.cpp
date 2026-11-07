@@ -6,8 +6,18 @@ void check(bool b){if(!b)throw std::runtime_error("Tank visual regression");}
 int main(){using namespace visual::tank;using nlohmann::json;
  check(readVisual(json{{"tankVisual",{{"preset",2},{"step",8}}}}).preset==2);
  auto s=readVisual(json::object());check(s.preset==0&&!s.vertical&&s.y==-58);s.preset=2;s.vertical=true;s.x=44;s.y=72;json j;writeVisual(j,s);auto back=readVisual(j);check(back.preset==2&&back.vertical&&back.x==44&&back.y==72);
- j["tankVisual"]["x"]=1e50;j["tankVisual"]["y"]=-1e50;j["tankVisual"]["thickness"]=-99;back=readVisual(j);check(back.x==0&&back.y==-58&&back.thickness==4);
+ j["tankVisual"]["x"]=1e50;j["tankVisual"]["y"]=-1e50;j["tankVisual"]["thickness"]=-99;back=readVisual(j);check(back.x==0&&back.y==-58&&back.thickness==1);
  for(unsigned preset=0;preset<3;++preset){s.preset=preset;for(bool vertical:{false,true}){s.vertical=vertical;std::vector<Segment> geometry;barGeometry(geometry,{300,200},s,1,.5f);demoRange(geometry,{300,200},1,preset);check(!geometry.empty());for(const auto& l:geometry)check(std::isfinite(l.a.x)&&std::isfinite(l.a.y)&&std::isfinite(l.b.x)&&std::isfinite(l.b.y));}}
+ // New defaults apply to legacy files without rewriting their offsets/aspect.
+ auto defaults=readVisual(json{{"tankVisual",{{"x",17},{"length",100}}}});check(std::abs(defaults.barSize-.8f)<.001f&&defaults.arrowWidth==2&&defaults.rangeWidth==2&&defaults.x==17&&defaults.length==100);
+ auto before=defaults;adjustFine(defaults,FineField::BarSize,1);check(std::abs(defaults.barSize-.81f)<.001f&&defaults.x==before.x&&defaults.length==before.length&&defaults.arrowWidth==before.arrowWidth);
+ adjustFine(defaults,FineField::ArrowWidth,1);check(std::abs(defaults.arrowWidth-2.1f)<.001f&&defaults.rangeWidth==2);adjustFine(defaults,FineField::RangeWidth,-1);check(std::abs(defaults.rangeWidth-1.9f)<.001f);adjustFine(defaults,FineField::Thickness,-1);check(std::abs(defaults.thickness-7.9f)<.001f);
+ writeVisual(j,defaults);auto fine=readVisual(j);check(std::abs(fine.barSize-.81f)<.001f&&std::abs(fine.arrowWidth-2.1f)<.001f&&std::abs(fine.rangeWidth-1.9f)<.001f&&std::abs(fine.thickness-7.9f)<.001f);
+ defaults.barSize=.2f;adjustFine(defaults,FineField::BarSize,-1);check(std::abs(defaults.barSize-.2f)<.001f);defaults.arrowWidth=6;adjustFine(defaults,FineField::ArrowWidth,1);check(defaults.arrowWidth==6);check(finePage(325)&&finePage(326)&&finePage(327)&&!finePage(321)&&!finePage(320));
+ // Entire bar geometry (including the frame) shrinks by 80%, without moving its center.
+ auto extent=[](const std::vector<Segment>& geometry){float lo=1e9f,hi=-1e9f;for(const auto& l:geometry){lo=std::min(lo,std::min(l.a.x,l.b.x));hi=std::max(hi,std::max(l.a.x,l.b.x));}return hi-lo;};
+ VisualSettings full,smallStyle;full.barSize=1;std::vector<Segment> fullLines,smallLines;barGeometry(fullLines,{200,200},full,1,.5f);barGeometry(smallLines,{200,200},smallStyle,1,.5f);check(std::abs(extent(smallLines)/extent(fullLines)-.8f)<.001f);
+ for(unsigned preset=0;preset<3;++preset){VisualSettings style;style.preset=preset;std::vector<Segment> geometry;demoRange(geometry,{0,0},1,style);auto colors=palette(preset);check(geometry.front().width==colors.width*2);check(geometry.back().width==colors.width*2);style.arrowWidth=3.2f;style.rangeWidth=1.4f;geometry.clear();demoRange(geometry,{0,0},1,style);check(std::abs(geometry.front().width-colors.width*1.4f)<.001f&&std::abs(geometry.back().width-colors.width*3.2f)<.001f);}
  // Perspective camera looking along +X, with Z up and a square-pixel projection.
  dango::GameCameraFrame projection;projection.worldToView={0,-1,0,0,0,0,1,0,1,0,0,0,0,0,0,1};projection.worldToClip={0,-.5625f,0,0,0,0,1,0,1,0,0,-1,1,0,0,0};
  s=VisualSettings{};auto nearBar=placeBar(projection,{200,0,45},1920,1080,s,180),farBar=placeBar(projection,{800,0,45},1920,1080,s,180);check(nearBar&&farBar&&std::abs(nearBar->scale/farBar->scale-4)<.001f);
