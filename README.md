@@ -1,6 +1,6 @@
 # L4D2 Visual Effects 下载
 
-Tank 石头实验（基于 0.7.2）：[demo1 安装包](L4D2Visual-0.7.2-tank-rock-demo1.zip) · [匹配源码](L4D2Visual-0.7.2-tank-rock-demo1-source.zip)。A/B/C 与日志默认关闭；通过“Tank 石头实验”菜单启用。**首次实机验证用，尚未验证实际追踪；理论轨迹无碰撞截断或绝对延迟补偿。** 不包含后续 0.7.4 / 0.8.0 的变更。请退出游戏并备份插件和配置后替换。安装包内附报告与诊断说明。
+Tank 石头实验（基于 0.7.2）：[demo2 安装包](L4D2Visual-0.7.2-tank-rock-demo2.zip) · [匹配源码](L4D2Visual-0.7.2-tank-rock-demo2-source.zip)。针对 demo1 空列表日志新增共享投射物 + Tank 归属推断、未确认候选标记及 schema2 诊断；A/B/C 与日志默认关闭。**demo2 仍待实机验证；无碰撞截断或绝对延迟补偿。** 不包含后续 0.7.4 / 0.8.0 的变更。实验子菜单标题为“Tank 石头实验 demo2”，包内附再测步骤与报告。[demo1 历史包](L4D2Visual-0.7.2-tank-rock-demo1.zip)。
 
 当前正式版：[0.7.4](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.7.4)。本分支仅提供安装包与校验文件；源码在默认 main 分支。
 
