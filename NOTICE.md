@@ -95,3 +95,9 @@ This is an independent L4N integration. It extends categories, XYZ deformation
 and 128/256 bones, adds handle/model identity, owned-value restoration,
 explicit proxy teardown, and a Studio-render fallback; no Skeeto binaries,
 marks or game assets are bundled. The existing project GPL-3.0 LICENSE applies.
+
+Tank range-warning native outline code in src/tank_outline.hpp adapts the
+CampaignOutline* glow ownership and native color-proxy route from the same
+Skeeto commit above (Copyright (C) 2026 regoists), under GPL-3.0. It validates
+the exact client image/native entry points and embedded glow layout, preserves
+existing glows and restores only values still owned by this feature.

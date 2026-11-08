@@ -1,6 +1,8 @@
-# L4D2Visual 0.8.0-transform-preview2
+# L4D2Visual 0.8.0-transform-preview3
 
-对应源码：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0-transform-preview2 。Skeeto 派生部分按 GPL-3.0 提供，版权和来源见 bin 内 NOTICE.md。
+对应源码：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0-transform-preview3 。Skeeto 派生部分按 GPL-3.0 提供，版权和来源见 bin 内 NOTICE.md。
+
+新增 Tank 攻击范围内提醒：Tank 预测 → 攻击范围内提醒。计时条红色与红底、范围红线、半透明红色填充、原生红色描边分别开关，默认均关闭。检测本机存活求生者在当前攻击扇区内，不按冷却或前瞻虚线判断；支持多 Tank 分别提醒。条/范围提醒需打开对应显示项，保存到 hud.json。描边为实验功能，保留已有描边，接口或布局未验证会拒绝调用；更新请完全退出游戏。提醒是估算，不代表下一拳一定命中，也不判断墙体遮挡。
 
 新增准星识别页：实体缩放与拉伸 → 准星识别与调整 → 手动识别；可切换识别类别并调整整体/XYZ，使用 - / = 微调，保存后写入 hud.json。按角色/类别共用设置，总开关默认关闭。识别使用准星附近候选，目标重叠时请核对显示的类型。
 

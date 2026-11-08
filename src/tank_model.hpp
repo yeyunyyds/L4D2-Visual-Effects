@@ -6,13 +6,13 @@
 #include <optional>
 namespace visual::tank {
 using dango::Vec3;using dango::inventory::Record;using dango::inventory::Frame;
-struct Settings{bool enabled=false,draw=true;unsigned horizonMs=200;};
+struct Settings{bool enabled=false,draw=true;unsigned horizonMs=200;bool warnBar=false,warnRange=false,warnFill=false,warnOutline=false;};
 template<class Json> Settings readSettings(const Json& j){Settings s;auto p=j.find("tankPrediction");if(p==j.end()||!p->is_object())return s;
- for(auto value:{std::pair<const char*,bool*>{"enabled",&s.enabled},{"draw",&s.draw}})if(p->contains(value.first)&&(*p)[value.first].is_boolean())*value.second=(*p)[value.first].template get<bool>();
+ for(auto value:{std::pair<const char*,bool*>{"enabled",&s.enabled},{"draw",&s.draw},{"warnBar",&s.warnBar},{"warnRange",&s.warnRange},{"warnFill",&s.warnFill},{"warnOutline",&s.warnOutline}})if(p->contains(value.first)&&(*p)[value.first].is_boolean())*value.second=(*p)[value.first].template get<bool>();
  if(p->contains("horizonMs")&&(*p)["horizonMs"].is_number_unsigned())s.horizonMs=std::clamp((*p)["horizonMs"].template get<unsigned>(),0u,500u);
  return s;
 }
-template<class Json> void writeSettings(Json& j,const Settings& s){j["tankPrediction"]={{"enabled",s.enabled},{"draw",s.draw},{"horizonMs",s.horizonMs}};}
+template<class Json> void writeSettings(Json& j,const Settings& s){j["tankPrediction"]={{"enabled",s.enabled},{"draw",s.draw},{"horizonMs",s.horizonMs},{"warnBar",s.warnBar},{"warnRange",s.warnRange},{"warnFill",s.warnFill},{"warnOutline",s.warnOutline}};}
 struct Parameters{std::optional<float> range,arc,windup,duration,interval,missInterval;std::uint64_t tick=0;std::string source="unavailable";};
 inline bool finite(Vec3 v){return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z);}
 inline float horizontal(Vec3 v){return std::hypot(v.x,v.y);}
@@ -39,14 +39,26 @@ inline std::optional<Target> inferTarget(const Record& tank,const Frame& frame,f
  if(!first||first->score<.6f||first->score-second<.12f)return {};
  return first;
 }
-struct Observation{std::uint32_t handle=0;Vec3 origin{},velocity{},predicted{};float heading=0,pitch=0,radius=0,halfArc=0;bool eye=false,geometry=false,headingStalled=false,nearVerticalAim=false;std::optional<Target> target,gaze;std::optional<std::uint32_t> lookAt;std::optional<int> sequence;std::optional<float> cycle;float headingRate=0;std::optional<float> cooldown;CooldownReading timing;std::string action="unknown",reason;};
+struct RangeWarning{bool known=false,inside=false;float distance=0;};
+struct Observation{RangeWarning warning;std::uint32_t handle=0;Vec3 origin{},velocity{},predicted{};float heading=0,pitch=0,radius=0,halfArc=0;bool eye=false,geometry=false,headingStalled=false,nearVerticalAim=false;std::optional<Target> target,gaze;std::optional<std::uint32_t> lookAt;std::optional<int> sequence;std::optional<float> cycle;float headingRate=0;std::optional<float> cooldown;CooldownReading timing;std::string action="unknown",reason;};
+inline bool warningRequested(const Settings& s){return s.warnBar||s.warnRange||s.warnFill||s.warnOutline;}
+// Match the displayed current sector, not the future dashed arc or a cooldown window.
+inline RangeWarning rangeWarning(const Observation& o,const Record* local,const Record* actor){
+ RangeWarning w;if(!o.geometry||!local||!actor||!survivor(*local)||!local->health||!tank(*actor)||!finite(o.origin)||!std::isfinite(o.radius)||o.radius<=0||!std::isfinite(o.heading)||!std::isfinite(o.halfArc)||o.halfArc<=0||o.halfArc>180)return w;
+ auto delta=*local->networkOrigin-o.origin;w.known=true;w.distance=horizontal(delta);
+ bool height=std::abs(delta.z)<=o.radius;
+ auto bounds=[](const Record& r){return r.collisionMins&&r.collisionMaxs&&finite(*r.collisionMins)&&finite(*r.collisionMaxs)&&r.collisionMins->z<=r.collisionMaxs->z&&std::abs(r.collisionMins->z)<=256&&std::abs(r.collisionMaxs->z)<=256;};
+ if(bounds(*local)&&bounds(*actor))height=local->networkOrigin->z+local->collisionMaxs->z>=o.origin.z+actor->collisionMins->z&&local->networkOrigin->z+local->collisionMins->z<=o.origin.z+actor->collisionMaxs->z;
+ w.inside=height&&w.distance<=o.radius&&(w.distance<.001f||std::abs(difference(yaw(delta),o.heading))<=o.halfArc);
+ return w;
+}
 struct Result{std::uint32_t epoch=0;std::uint64_t tick=0;Parameters parameters;ClockReading clock;std::vector<Observation> tanks;};
 struct Track{Motion motion;float heading=0;std::uint64_t steadySince=0;std::uint32_t target=0;};
 class Predictor {
  std::uint32_t epoch=0;std::map<std::uint32_t,Track> tracks;CombatClock clock;
 public:
  void reset(){tracks.clear();clock.reset();epoch=0;}
- Result update(const Frame& frame,const Parameters& p,const Settings& s){
+ Result update(const Frame& frame,const Parameters& p,const Settings& s,std::uint32_t localHandle=0xffffffffu){
   if(epoch!=frame.epoch){tracks.clear();epoch=frame.epoch;}Result out;out.epoch=frame.epoch;out.tick=frame.tick;out.parameters=p;out.clock=clock.update(frame);std::map<std::uint32_t,Track> next;
   for(const auto& r:frame.records){if(!tank(r)||out.tanks.size()>=8)continue;auto direction=aim(r);Observation o;o.handle=r.handle;o.origin=*r.networkOrigin;o.sequence=r.sequence;o.cycle=r.animationCycle;o.lookAt=r.lookAtHandle;
    auto previous=tracks.find(r.handle);Track track;if(previous!=tracks.end())track=previous->second;
@@ -70,6 +82,7 @@ public:
     float hull=0;if(r.collisionMins&&r.collisionMaxs&&horizontal(*r.collisionMins)<128&&horizontal(*r.collisionMaxs)<128)hull=std::max({std::abs(r.collisionMins->x),std::abs(r.collisionMins->y),std::abs(r.collisionMaxs->x),std::abs(r.collisionMaxs->y)});
     o.radius=*p.range+hull;o.halfArc=*p.arc*.5f;o.geometry=true;
    }
+   if(warningRequested(s))o.warning=rangeWarning(o,resolve(frame,localHandle),&r);
    o.reason=!direction?"aim unavailable":o.nearVerticalAim?"near-vertical aim; ground footprint withheld":!o.geometry?"runtime range/arc unavailable":o.eye?"network aim + runtime parameters; estimated footprint":"body angle fallback; low confidence";
    track.motion={o.origin,o.velocity,frame.tick};track.heading=o.heading;track.target=o.target?o.target->handle:0;next[r.handle]=track;out.tanks.push_back(std::move(o));
   }tracks=std::move(next);return out;

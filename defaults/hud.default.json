@@ -28,7 +28,11 @@
   "tankPrediction": {
     "enabled": false,
     "draw": true,
-    "horizonMs": 200
+    "horizonMs": 200,
+    "warnBar": false,
+    "warnRange": false,
+    "warnFill": false,
+    "warnOutline": false
   },
   "sprayP2P": {
     "enabled": false,
