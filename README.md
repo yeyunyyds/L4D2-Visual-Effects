@@ -1,5 +1,7 @@
 # L4D2 Visual Effects 下载
 
+主线整合测试：[0.8.0-main-test1 安装包](L4D2Visual-0.8.0-main-test1.zip) · [配套完整源码](L4D2Visual-0.8.0-main-test1-source.zip) · [安装包校验](L4D2Visual-0.8.0-main-test1.zip.sha256)。整合石头预测功能分支、实体形变、准星识别修复及 Tank 范围提醒；28组回归与 x86 构建通过，等待实机测试。所有功能总开关默认关闭，新配置范围红线提醒默认开，其余提醒默认关。对应本地 main 提交 `922d02e`，远端 main 尚未更新；此包不是正式 Release，不含旧 demo 的刀石/采集实验。请完全退出游戏并备份 DLL、hud.json 后替换。
+
 Tank 石头实验（基于 0.7.2）：[demo4 安装包](L4D2Visual-0.7.2-tank-rock-demo4.zip) · [匹配源码](L4D2Visual-0.7.2-tank-rock-demo4-source.zip)。新增可调假定 AABB 扫掠和手动刀石几何提示：准星有限射线与预知位置的假定箱相交时记录候选；距离、提前量、前摇假定与偏移可手调。**仅只读实验提示，不自动攻击，不证明实际刀中；新扫掠与提示仍待实机验证。** 功能开关默认关闭，参数可保存。子菜单标题“Tank 石头实验 demo4”，包内附模型、测试步骤与限制说明。不包含后续 0.7.4 / 0.8.0 的变更。[demo3 历史包](L4D2Visual-0.7.2-tank-rock-demo3.zip)。
 
 当前正式版：[0.7.4](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.7.4)。本分支仅提供安装包与校验文件；源码在默认 main 分支。
