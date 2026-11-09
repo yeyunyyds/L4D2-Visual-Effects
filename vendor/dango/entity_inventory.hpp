@@ -9,7 +9,7 @@ namespace dango::inventory {
 struct Record {
  uint32_t handle=0,index=0,serial=0;std::string className,modelName;int classId=-1;
  std::optional<bool> dormant,isCarryable;std::optional<Vec3> networkOrigin,networkAngles;
- std::optional<int> team,modelIndex,worldModelIndex,effects,character,zombieClass,health;std::optional<uint8_t> lifeState;std::optional<uint32_t> owner,weaponOwner,activeWeapon,viewModel,parent,weaponParent;
+ std::optional<int> team,modelIndex,worldModelIndex,effects,character,zombieClass,health;std::optional<uint8_t> lifeState;std::optional<uint32_t> owner,weaponOwner,activeWeapon,viewModel,parent,weaponParent,thrower;
  std::optional<uint8_t> parentAttachment;
  std::optional<Vec3> eyeAngles,velocity,collisionMins,collisionMaxs;
  std::optional<uint32_t> lookAtHandle,enemyHandle;

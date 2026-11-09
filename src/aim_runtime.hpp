@@ -9,6 +9,7 @@ inline std::shared_ptr<const Request> pending;
 inline std::shared_ptr<const AimResult> completed=std::make_shared<const AimResult>();
 inline std::atomic<std::uint64_t> sequence{0},failed{0};
 inline std::atomic<bool> stopped{false};
+inline picturetrace::Binding traceBinding;
 inline bool traceFaulted=false;inline std::uint32_t traceEpoch=0;
 inline bool hasPending(){return bool(std::atomic_load(&pending));}
 inline void cancel(AimSession& session){auto queued=std::atomic_load(&pending);if(queued&&queued->id==session.request)std::atomic_compare_exchange_strong(&pending,&queued,std::shared_ptr<const Request>{});session.clear();}
@@ -44,15 +45,15 @@ inline void onFrame(const dango::GameCameraFrame& camera){
  AimQuery query;query.localHandle=localplayer::handle(verified);query.handsOnly=request->hands;
  if(query.localHandle==0xffffffffu){result.status=u8"本机玩家身份不可用，未执行识别";finish();return;}
  if(!query.handsOnly){
-  if(traceEpoch!=camera.epoch){traceEpoch=camera.epoch;traceFaulted=false;}
-  if(traceFaulted||picturetrace::faulted){result.status=u8"射线校验失败，本地图停止场景识别";finish();return;}
-  dango::CameraPose eye;if(!dango::cameraPose(camera,eye)||!picturetrace::connect()){result.status=u8"射线接口未验证，未执行识别";finish();return;}
+  if(traceEpoch!=camera.epoch){traceEpoch=camera.epoch;traceFaulted=false;traceBinding.reset();}
+  if(traceFaulted||traceBinding.faulted){result.status=u8"射线校验失败，本地图停止场景识别";finish();return;}
+  dango::CameraPose eye;if(!dango::cameraPose(camera,eye)||!picturetrace::connectBinding(traceBinding)){result.status=u8"射线接口未验证，未执行识别";finish();return;}
   Filter filter;auto links=aimOwnerLinks(verified);
   for(const auto& r:verified.records)if(r.index<identities.size()&&identities[r.index].serial==r.serial&&(r.handle==query.localHandle||aimActorOwner(verified,r,&links)==query.localHandle))filter.ignored.insert(identities[r.index].entity);
   static bool pinned=false;if(!pinned){HMODULE module=nullptr;pinned=GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN|GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,reinterpret_cast<const wchar_t*>(&pending),&module)!=FALSE;}if(!pinned){result.status=u8"识别模块未就绪";finish();return;}
   auto end=eye.eye+eye.forward*query.limit;auto ray=dango::trace::ray(eye.eye,end);dango::trace::GuardedResult trace;
   using Call=void(__thiscall*)(void*,const dango::trace::Ray&,unsigned,void*,dango::trace::Result*);
-  auto table=*reinterpret_cast<void***>(picturetrace::object);reinterpret_cast<Call>(table[5])(picturetrace::object,ray,0x4600400b,&filter,&trace.result);
+  auto table=*reinterpret_cast<void***>(traceBinding.object);reinterpret_cast<Call>(table[5])(traceBinding.object,ray,0x4600400b,&filter,&trace.result);
   if(!trace.intact()||!dango::trace::valid(trace.result,eye.eye,end)){traceFaulted=true;result.status=u8"射线校验失败，本地图停止场景识别";finish();return;}
   if(trace.result.startSolid||trace.result.allSolid){result.status=u8"射线起点在实体内部，请换位置";finish();return;}
   query.limit=std::max(.01f,1200*trace.result.fraction+1);

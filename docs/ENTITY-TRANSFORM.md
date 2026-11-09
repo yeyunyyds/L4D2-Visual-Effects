@@ -1,3 +1,5 @@
+> 本文所述内容已纳入本地 0.8.0-main-test1，见[主线整合记录](MAIN-INTEGRATION.md)。尚未推送或发布正式版本。
+
 > 当前工作区包含[未发布识别修复](UNRELEASED-AIM-FIX.md)，下列 preview2 / preview3 使用说明保留作为已发布版本记录。
 
 ## 准星识别与调整（preview2）

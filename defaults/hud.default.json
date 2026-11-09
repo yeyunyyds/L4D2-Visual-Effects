@@ -72,5 +72,16 @@
       "z": 1
     },
     "rules": {}
+  },
+  "tankRockPrediction": {
+    "enabled": false,
+    "trajectory": true,
+    "landingCircle": true,
+    "horizonMs": 500,
+    "color": 0,
+    "opacity": 0.8,
+    "lineWidth": 2,
+    "landingRadius": 32,
+    "landingOpacity": 0.5
   }
 }

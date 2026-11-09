@@ -1,12 +1,13 @@
 """Build an install-only archive: bin/ and README.md at the archive root."""
 from pathlib import Path
 import zipfile
+import subprocess
 
 root = Path(__file__).resolve().parents[1]
 binary = root / 'build/L4D2Visual.dll'
 if not binary.is_file():
     raise SystemExit('Build the DLL first')
-output = root / 'build/L4D2Visual-0.8.0-transform-preview3.zip'
+output = root / 'build/L4D2Visual-0.8.0-main-test1.zip'
 files = {
     'bin/neko/plugins/L4D2Visual/hud.json': root / 'defaults/hud.default.json',
     'bin/neko/plugins/L4D2Visual.dll': binary,
@@ -20,7 +21,14 @@ for path in sorted((root / 'vendor').rglob('*')):
         files['bin/neko/plugins/L4D2Visual/licenses/vendor/' + path.relative_to(root / 'vendor').as_posix()] = path
 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
     for target, source in files.items():
-        archive.write(source, target)
+        if target == 'README.md':
+            try:
+                revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+            except (OSError, subprocess.CalledProcessError):
+                revision = 'source archive'
+            archive.writestr(target, source.read_text(encoding='utf-8') + '\nSource commit: ' + revision + '\n')
+        else:
+            archive.write(source, target)
 with zipfile.ZipFile(output) as archive:
     assert {name.split('/')[0] for name in archive.namelist()} == {'bin', 'README.md'}
     assert archive.testzip() is None
