@@ -1,3 +1,5 @@
+> 本工作区包含未发布识别修复；已有 preview3 安装包未更新。新代码不升级版本号、不生成安装包。详见源码 docs/UNRELEASED-AIM-FIX.md。
+
 # L4D2Visual 0.8.0-transform-preview3
 
 对应源码：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0-transform-preview3 。Skeeto 派生部分按 GPL-3.0 提供，版权和来源见 bin 内 NOTICE.md。

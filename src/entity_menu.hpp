@@ -5,10 +5,11 @@ namespace visual {
 inline std::string menuRow(const std::string& label){return "\""+label+"\" { \"user_data\" \"0\" }\n";}
 inline std::string menuItem(const std::string& label,std::uintptr_t id){std::ostringstream s;s<<"0x"<<std::hex<<id;return "\""+label+"\" { \"user_data\" \""+s.str()+"\" }\n";}
 inline std::string menuPage(const std::string& title,const std::string& body){return "\""+title+"\" {"+body+"}";}
-struct EntityMenuState {
+struct EntityMenuState : AimSession {
  std::map<int,std::string> known;
- AimSelection aimed;
  void observe(const dango::inventory::Frame& frame,const EntitySelection& selection){
+  if(aimEpoch!=frame.epoch)known.clear();
+  validateEpoch(frame.epoch);
   for(const auto& c:frame.classCatalog)known[c.first]=c.second;
   for(const auto& r:frame.records)if(r.classId>=0&&r.classId<=4096&&!r.className.empty())known[r.classId]=r.className;
   for(const auto& c:selection.names)if(!known.count(c.first))known[c.first]=c.second;
@@ -48,13 +49,16 @@ struct EntityMenuState {
   return menuPage(groupName(group),body+menuItem(u8"保存设置",101));
  }
  std::string recognition(const EntitySelection& selection,bool experimentActive=false)const {
-  std::string body=menuItem(u8"手动识别准星附近实体",122);
+  std::string body=menuItem(handsOnly?u8"识别模式：本机手持（切换）":u8"识别模式：场景本体（切换）",127)+menuItem(pending?u8"正在识别（点击重试）":u8"手动识别准星目标",122);
   if(aimed.classId>=0){
-   body+=menuRow(u8"上次识别 #"+std::to_string(aimed.classId)+" "+aimed.name);
-   body+=menuRow(selection.selected(aimed.classId,aimed.name)?u8"手动类别开关：开":u8"手动类别开关：关");
-   body+=menuItem(u8"开启该 Class ID 的全部实体",124)+menuItem(u8"关闭该 Class ID 的全部实体",125)+
+   body+=menuItem(u8"切换候选："+std::to_string(candidate+1)+" / "+std::to_string(candidates.empty()?1:candidates.size())+" · "+aimLabel(aimed),128);
+   body+=menuRow(u8"当前识别 #"+std::to_string(aimed.classId)+" "+aimed.name);
+   body+=menuRow(selection.selectedAim(aimed)?u8"手动类别开关：开":u8"手动类别开关：关");
+   body+=menuItem(u8"开启该类型或角色",124)+menuItem(u8"关闭该类型或角色",125)+
     menuItem(u8"用作范围实验触发类别",191)+menuItem(u8"清除识别结果",126);
   }else body+=menuRow(u8"尚未识别；对准目标后选择手动识别");
+  if(!aimStatus.empty())body+=menuRow(aimStatus);
+  if(aimed.classId>=0&&aimed.attachment)body+=menuRow(u8"已手动选择附属实体，设置不会作用于角色本体");
   if(experimentActive)body+=menuRow(u8"范围实验已开，仅范围内实体生效");
   return menuPage(u8"手动识别与开关",body+menuItem(u8"保存设置",101));
  }

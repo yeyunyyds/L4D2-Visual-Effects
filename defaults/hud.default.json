@@ -30,7 +30,7 @@
     "draw": true,
     "horizonMs": 200,
     "warnBar": false,
-    "warnRange": false,
+    "warnRange": true,
     "warnFill": false,
     "warnOutline": false
   },

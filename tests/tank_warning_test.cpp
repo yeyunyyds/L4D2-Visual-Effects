@@ -9,7 +9,7 @@ using namespace visual::tank;
 void check(bool b){if(!b)throw std::runtime_error("Tank range warning regression");}
 struct Memory{std::array<unsigned char,8192> bytes{};bool read(std::uint32_t at,void* out,std::size_t n){if(!at||std::uint64_t(at)+n>bytes.size())return false;std::memcpy(out,bytes.data()+at,n);return true;}template<class T>void put(unsigned at,const T& v){std::memcpy(bytes.data()+at,&v,sizeof(v));}void text(unsigned at,const char* v){std::memcpy(bytes.data()+at,v,std::strlen(v)+1);}};
 int main(){
- Settings s;check(!warningRequested(s));nlohmann::json j;s.warnBar=s.warnRange=s.warnFill=s.warnOutline=true;writeSettings(j,s);auto saved=readSettings(j);check(saved.warnBar&&saved.warnRange&&saved.warnFill&&saved.warnOutline&&!saved.enabled);check(dango::hud::opensChild(328)&&!dango::hud::opensChild(334)&&!dango::hud::opensChild(337));
+ Settings s;check(s.warnRange&&!s.warnBar&&!s.warnFill&&!s.warnOutline&&!s.enabled);nlohmann::json j;s.warnBar=s.warnRange=s.warnFill=s.warnOutline=true;writeSettings(j,s);auto saved=readSettings(j);check(saved.warnBar&&saved.warnRange&&saved.warnFill&&saved.warnOutline&&!saved.enabled);check(dango::hud::opensChild(328)&&!dango::hud::opensChild(334)&&!dango::hud::opensChild(337));
  Record actor;actor.className="Tank";actor.handle=4097;actor.index=1;actor.zombieClass=8;actor.networkOrigin=Vec3{};actor.eyeAngles=Vec3{};actor.health=6000;
  Record player;player.className="CTerrorPlayer";player.handle=8194;player.index=2;player.team=2;player.health=100;player.networkOrigin=Vec3{50,0,0};
  Observation o;o.geometry=true;o.origin={};o.radius=100;o.halfArc=45;o.heading=0;

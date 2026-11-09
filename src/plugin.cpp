@@ -32,8 +32,8 @@ void onFrame(const dango::GameCameraFrame& frame){
  auto selection=std::atomic_load(&visual::render::selection);
  auto proximity=std::atomic_load(&visual::render::proximity);
  auto tankCfg=std::atomic_load(&visual::tank::options);source_entities::combatRequested=tankCfg->enabled&&!visual::tank::faulted;visual::render::modelObserver=(tankCfg->enabled&&!visual::tank::faulted)?visual::tank::observeModel:nullptr;visual::render::studioObserver=(tankCfg->enabled&&!visual::tank::faulted)?visual::tank::observeStudio:nullptr;
- source_entities::browseRequested=!visual::tank::outline::clean.load()||(tankCfg->enabled&&!visual::tank::faulted)||visual::hudruntime::hud.isOpen()||visual::deform::any(*std::atomic_load(&visual::deform::options))||(requested&&(selection->anyEnabled()||proximity->enabled));
- source_entities::onFrame(frame);
+ source_entities::browseRequested=visual::aimruntime::hasPending()||!visual::tank::outline::clean.load()||(tankCfg->enabled&&!visual::tank::faulted)||visual::hudruntime::hud.isOpen()||visual::deform::any(*std::atomic_load(&visual::deform::options))||(requested&&(selection->anyEnabled()||proximity->enabled));
+ source_entities::onFrame(frame);visual::aimruntime::onFrame(frame);
  auto deformCamera=frame;if(!visual::render::bound)deformCamera.active=false;visual::deform::onFrame(deformCamera,visual::render::boneLimit.load());visual::render::poseModifier=visual::deform::live?visual::deform::studio:nullptr;
  visual::tank::onFrame(frame);visual::tank::outline::onFrame(frame);
  auto inventory=std::atomic_load(&source_entities::snapshot);
@@ -71,15 +71,12 @@ void storeProximity(visual::ProximitySettings settings){
  saveMessage=u8"范围实验设置未保存";
 }
 bool entityAction(uintptr_t id){
- if(id==122){
-  auto frame=std::atomic_load(&source_entities::snapshot);auto camera=std::atomic_load(&source_camera::snapshot);
-  entityMenus.aimed=visual::identifyAim(*frame,*camera,GetTickCount64());
-  const auto& aim=entityMenus.aimed;
-  if(aim.classId>=0){entityMenus.known[aim.classId]=aim.name;saveMessage=u8"已识别，请手动选择开启或关闭";}
-  else saveMessage=u8"未识别到目标，请对准实体并稍等";
-  return true;
- }
- if(id==126){entityMenus.aimed={};return true;}
+ auto frame=std::atomic_load(&source_entities::snapshot);entityMenus.observe(*frame,*std::atomic_load(&visual::render::selection));visual::aimruntime::poll(entityMenus,frame->epoch);
+ if(id==122){visual::aimruntime::start(entityMenus);saveMessage=u8"已提交识别，等待游戏帧";return true;}
+ if(id==126){visual::aimruntime::cancel(entityMenus);return true;}
+ if(id==127){entityMenus.handsOnly=!entityMenus.handsOnly;visual::aimruntime::cancel(entityMenus);saveMessage=u8"已切换模式，请手动识别";return true;}
+ if(id==128){entityMenus.next();saveMessage=u8"已切换候选，请核对类型";return true;}
+
  if((id>=180&&id<=186)||id==190||id==191||(id>=0x20000&&id<=0x21000)||(id>=0x40000&&id<0x40000+visual::BuiltinEntityClassCount)){
   auto settings=*std::atomic_load(&visual::render::proximity);
   if(id==180){settings.enabled=!settings.enabled;if(settings.enabled&&!requested)toggle();}
@@ -87,7 +84,7 @@ bool entityAction(uintptr_t id){
   if(id==185)settings.includeCommon=!settings.includeCommon;
   if(id==186)settings=visual::ProximitySettings{};
   if(id==190){settings.triggerClassId=-1;settings.triggerName="Tank";}
-  if(id==191){if(entityMenus.aimed.classId<0)return true;settings.triggerClassId=entityMenus.aimed.classId;settings.triggerName=entityMenus.aimed.name;}
+  if(id==191){if(entityMenus.aimed.classId<0)return true;auto r=visual::aimRecord(entityMenus.aimed);bool role=visual::specialCharacter(r)>=0||visual::survivorCharacter(r)>=0;settings.triggerClassId=role?-1:entityMenus.aimed.classId;settings.triggerName=role?visual::aimLabel(entityMenus.aimed):entityMenus.aimed.name;}
   if(id>=0x20000&&id<=0x21000){int key=int(id-0x20000);auto label=entityMenus.known.find(key);if(label==entityMenus.known.end())return true;settings.triggerClassId=key;settings.triggerName=label->second;}
   if(id>=0x40000&&id<0x40000+visual::BuiltinEntityClassCount){settings.triggerClassId=-1;settings.triggerName=visual::BuiltinEntityClasses[id-0x40000];}
   storeProximity(std::move(settings));return true;
@@ -124,10 +121,12 @@ bool entityAction(uintptr_t id){
  }else if(group){
   for(const auto& c:entityMenus.known)selection.names[c.first]=c.second;
   selection.setGroup(visual::EntityGroup((id-130)/2),(id-130)%2==0);
+ }else if(aimed){
+  if(!selection.setAim(entityMenus.aimed,id==124)){saveMessage=u8"角色资料不足，请重新识别";return true;}
  }else{
-  int classId=aimed?entityMenus.aimed.classId:int(id-0x10000);auto label=entityMenus.known.find(classId);
+  int classId=int(id-0x10000);auto label=entityMenus.known.find(classId);
   if(label==entityMenus.known.end())return true;
-  bool value=aimed?id==124:!selection.selected(classId,label->second);selection.setClass(classId,label->second,value);
+  bool value=!selection.selected(classId,label->second);selection.setClass(classId,label->second,value);
  }
  std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(std::move(selection)));
  saveMessage=u8"实体类别设置未保存";return true;
@@ -136,7 +135,7 @@ std::string buildMenu(uintptr_t id){
  if(visual::deform::isPage(id))return visual::deform::page(id);
  auto parameters=std::atomic_load(&visual::render::animation);
  auto f=std::atomic_load(&source_entities::snapshot);
- auto selection=std::atomic_load(&visual::render::selection);entityMenus.observe(*f,*selection);
+ auto selection=std::atomic_load(&visual::render::selection);entityMenus.observe(*f,*selection);visual::aimruntime::poll(entityMenus,f->epoch);
  if(id==328)return visual::tank::menu(id,visual::tank::outline::status.load());
  if(id==320||id==322||id==323||id==324)return visual::tank::menu(id);
  if(id==321)return visual::tank::visualMenu();
@@ -202,7 +201,7 @@ public:
  void OnGameLaunch()override{note("OnGameLaunch");connect();}
  void OnD3DDeviceCreated(void* d,bool dxvk)override{note(std::string("OnD3DDeviceCreated dxvk=")+(dxvk?"yes":"no"));visual::hudruntime::created(static_cast<IDirect3DDevice9*>(d));}
  const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.8.0-transform-preview3";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开视觉效果菜单\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
- void stop(){visual::tank::outline::stop();visual::deform::stop();visual::render::poseModifier=nullptr;stopping=true;if(worker.joinable())worker.join();visual::spraysync::network.stop();requested=false;visual::render::modelObserver=nullptr;visual::render::studioObserver=nullptr;source_entities::combatRequested=false;visual::modelpath::apply(false);visual::hudruntime::stop();visual::render::stop();source_entities::browseRequested=false;source_camera::frameListener=nullptr;source_camera::stop();}
+ void stop(){visual::aimruntime::stop();visual::tank::outline::stop();visual::deform::stop();visual::render::poseModifier=nullptr;stopping=true;if(worker.joinable())worker.join();visual::spraysync::network.stop();requested=false;visual::render::modelObserver=nullptr;visual::render::studioObserver=nullptr;source_entities::combatRequested=false;visual::modelpath::apply(false);visual::hudruntime::stop();visual::render::stop();source_entities::browseRequested=false;source_camera::frameListener=nullptr;source_camera::stop();}
  ~Plugin()override{stop();}
 };
 Plugin& instance(){static Plugin object;return object;}
