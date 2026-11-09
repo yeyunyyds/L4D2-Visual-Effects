@@ -26,6 +26,7 @@ class NativeHud {
  using Adjustment=bool(*)(uintptr_t,int);Adjustment adjustment=nullptr;
  using Addon=void(*)(uintptr_t,float,float,bool);using AddonKeys=bool(*)(uintptr_t);Addon addon=nullptr;AddonKeys addonKeys=nullptr;std::atomic<bool> addonArrows{false};
  Builder build=nullptr;Action act=nullptr;Close closed=nullptr;Notice notice=nullptr;Log log=nullptr;AppearanceWrite appearanceWrite=nullptr;
+ bool(*overlayNeeded)()=nullptr;void(*overlayDraw)(float,float)=nullptr;
  std::atomic<bool> opened{false},restart{false},f10{false};
  ImGuiContext* context=nullptr;ImVector<ImWchar> fontRanges;IDirect3DDevice9* device=nullptr;HWND window=nullptr;bool backend=false,subclass=false,hotkeyHeld=false;
  KeyGate gate;MenuStack stack;enum class Page {Settings,Appearance,Position};std::atomic<Page> page{Page::Settings};
@@ -82,6 +83,7 @@ class NativeHud {
  row(3,u8"字体大小："+std::to_string(int(fontPixels))+" px"+(selected==2?"  [- / =]":""));row(4,std::string("F10: ")+(f10?u8"开":u8"关"));row(5,u8"调整菜单位置");text(u8"外观修改后请返回主菜单保存设置",{.58f,.60f,.60f,1});
  }
 public:
+ void configureOverlay(bool(*needed)(),void(*draw)(float,float)){overlayNeeded=needed;overlayDraw=draw;}
  void configureAdjustment(Adjustment callback){adjustment=callback;}
  void configureAddon(Addon draw,AddonKeys keys){addon=draw;addonKeys=keys;}
  void configure(Builder b,Action a,Close c,Notice n,Log l,AppearanceWrite w){build=b;act=a;closed=c;notice=n;log=l;appearanceWrite=w;}
@@ -92,16 +94,17 @@ public:
  void pollHotkey(IDirect3DDevice9* d){if(!f10)return;bool held=down(VK_F10);HWND target=window;if(!target){D3DDEVICE_CREATION_PARAMETERS c{};if(SUCCEEDED(d->GetCreationParameters(&c)))target=c.hFocusWindow;}
  auto foreground=GetForegroundWindow();bool focused=target&&(foreground==target||foreground==GetAncestor(target,GA_ROOT));if(focused&&held&&!hotkeyHeld){if(isOpen())close();else open();}hotkeyHeld=held;}
  void frame(IDirect3DDevice9* d,float width,float height){
- if(!isOpen()||!build||!act)return;if(GetTickCount64()<retryAfter)return;if(!attach(d)){retryAfter=GetTickCount64()+1000;return;}retryAfter=0;ContextScope scope(context);auto originalAppearance=appearanceValue();
+ if((!isOpen()&&!(overlayNeeded&&overlayNeeded()))||!build||!act)return;if(GetTickCount64()<retryAfter)return;if(!attach(d)){retryAfter=GetTickCount64()+1000;return;}retryAfter=0;ContextScope scope(context);auto originalAppearance=appearanceValue();
  if(restart.exchange(false)){stack.reset();page=Page::Settings;gate.reset();arrows.fill(false);}
  if(!localWindow(window))window=findWindow(d);auto foreground=GetForegroundWindow();bool focused=localWindow(foreground)&&(!window||foreground==window||foreground==GetAncestor(window,GA_ROOT));
- auto edge=gate.update(keys(),focused);if(edge[10]||edge[11]){close();return;}
- if(edge[0]){if(page==Page::Position)page=Page::Appearance;else if(page==Page::Appearance)page=Page::Settings;else if(!stack.back()){close();return;}}
+ auto edge=gate.update(keys(),focused&&isOpen());if(isOpen()&&(edge[10]||edge[11])){close();return;}
+ if(isOpen()&&edge[0]){if(page==Page::Position)page=Page::Appearance;else if(page==Page::Appearance)page=Page::Settings;else if(!stack.back()){close();return;}}
  auto& io=ImGui::GetIO();io.DisplaySize={width,height};static thread_local LARGE_INTEGER last{};LARGE_INTEGER tick{},frequency{};QueryPerformanceCounter(&tick);QueryPerformanceFrequency(&frequency);io.DeltaTime=last.QuadPart?float(double(tick.QuadPart-last.QuadPart)/double(frequency.QuadPart)):1.f/60;io.DeltaTime=std::clamp(io.DeltaTime,.001f,.1f);last=tick;
  if(!fontReady){fontReady=ImGui_ImplDX9_CreateDeviceObjects();if(!fontReady){ImGui_ImplDX9_InvalidateDeviceObjects();if(log)log("Native HUD font texture creation failed; retrying");retryAfter=GetTickCount64()+1000;return;}}
- ImGui_ImplDX9_NewFrame();ImGui::NewFrame();bool split=page==Page::Settings&&addonKeys&&addonKeys(stack.current().page);addonArrows=split;float panelWidth=split?std::min(600.f,width*.46f):std::min(680.f,std::max(180.f,width-16));x=std::clamp(x,0.f,std::max(0.f,width-120));y=std::clamp(y,0.f,std::max(0.f,height-50));
+ ImGui_ImplDX9_NewFrame();ImGui::NewFrame();if(overlayDraw&&overlayNeeded&&overlayNeeded())overlayDraw(width,height);
+ uintptr_t action=0;bool openAppearance=false;addonArrows=false;
+ if(isOpen()){bool split=page==Page::Settings&&addonKeys&&addonKeys(stack.current().page);addonArrows=split;float panelWidth=split?std::min(600.f,width*.46f):std::min(680.f,std::max(180.f,width-16));x=std::clamp(x,0.f,std::max(0.f,width-120));y=std::clamp(y,0.f,std::max(0.f,height-50));
  ImGui::SetNextWindowPos({split?8.f:x,(split||centerY)?height*.5f:y},ImGuiCond_Always,{0,(split||centerY)?.5f:0.f});ImGui::SetNextWindowSizeConstraints({panelWidth,0},{panelWidth,std::max(50.f,(split||centerY)?height-16:height-y-8)});ImGui::SetNextWindowBgAlpha(opacity);ImGui::PushStyleColor(ImGuiCol_WindowBg,background);
- uintptr_t action=0;bool openAppearance=false;
  if(ImGui::Begin("L4D2DangoMusic Native HUD",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_AlwaysAutoResize)){
  ImGui::SetWindowFontScale(fontPixels/24.f);
  if(page==Page::Settings){auto doc=document(build(stack.current().page));stack.clamp(doc.rows.size());
@@ -114,7 +117,8 @@ public:
  }else{text(u8"调整菜单位置",{1,.84f,.22f,1});ImGui::Separator();if(edge[12]&&step>1)--step;if(edge[13]&&step<64)++step;if(edge[1]){x=8;y=14;centerY=true;}move(focused);text(u8"位置："+std::to_string(int(x))+", "+std::to_string(int(centerY?ImGui::GetWindowPos().y:y)));text(u8"方向键移动菜单；[- / =] 步宽："+std::to_string(step)+" px",{1,.84f,.22f,1});row(1,u8"重置到默认位置");}
  if(notice){auto message=notice();if(!message.empty()){ImGui::Separator();text(message,{1,.84f,.22f,1});}}
  ImGui::Separator();text(stack.frames.size()==1&&page==Page::Settings?u8"[0] 关闭    [/ / Esc] 关闭":u8"[0] 返回    [/ / Esc] 关闭",{1,.84f,.22f,1});
- }ImGui::End();ImGui::PopStyleColor();if(addon)addon(page==Page::Settings?stack.current().page:0,width,height,focused&&gate.armed);ImGui::Render();auto data=ImGui::GetDrawData();ImGui_ImplDX9_RenderDrawData(data);if(!submitted&&data&&data->TotalVtxCount){submitted=true;if(log)log("Native HUD first frame submitted vertices="+std::to_string(data->TotalVtxCount));}
+ }ImGui::End();ImGui::PopStyleColor();if(addon)addon(page==Page::Settings?stack.current().page:0,width,height,focused&&gate.armed);}
+ ImGui::Render();auto data=ImGui::GetDrawData();ImGui_ImplDX9_RenderDrawData(data);if(!submitted&&data&&data->TotalVtxCount){submitted=true;if(log)log("Native HUD first frame submitted vertices="+std::to_string(data->TotalVtxCount));}
  if(appearanceWrite&&originalAppearance!=appearanceValue())appearanceWrite(appearanceValue());
  if(openAppearance){page=Page::Appearance;return;}if(action){act(action);if(action==2098||action==2099)stack.reset();else if(opensChild(action))stack.enter(action);}
  }

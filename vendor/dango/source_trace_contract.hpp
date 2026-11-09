@@ -18,6 +18,15 @@ inline bool valid(const Result& r,Vec3 start,Vec3 end){
  if(length(r.start-start)>2||length(r.end-(start+(end-start)*r.fraction))>2)return false;
  return r.fraction>=1||(wall::finite(r.plane.normal)&&std::isfinite(r.plane.distance)&&length(r.plane.normal)>.95f&&length(r.plane.normal)<1.05f&&std::abs(wall::dot(r.plane.normal,r.end)-r.plane.distance)<2);
 }
+// Axis-aligned experimental box centered on the tracked origin. This is not an entity hull read.
+inline bool validExtents(Vec3 half){return wall::finite(half)&&half.x>=0&&half.y>=0&&half.z>=0&&std::max({half.x,half.y,half.z})<=64;}
+inline Ray boxRay(Vec3 start,Vec3 end,Vec3 half){auto r=ray(start,end);r.extents={half.x,half.y,half.z,0};r.isRay=length(half)<1e-6f;return r;}
+inline Vec3 boxSupport(Vec3 normal,Vec3 half){return {normal.x>0?half.x:normal.x<0?-half.x:0,normal.y>0?half.y:normal.y<0?-half.y:0,normal.z>0?half.z:normal.z<0?-half.z:0};}
+inline bool validSweep(const Result& r,Vec3 start,Vec3 end,Vec3 half){
+ if(!validExtents(half))return false;
+ // Hull trace end is the box origin, not the point on the original surface.
+ auto adjusted=r;auto support=boxSupport(r.plane.normal,half);adjusted.plane.distance+=wall::dot(r.plane.normal,support);return valid(adjusted,start,end);
+}
 inline bool wallHit(const Result& r){return r.fraction<1&&!r.startSolid&&!r.allSolid&&!(r.surface.flags&(0x2|0x4|0x80))&&!(r.contents&0x2);}
 // World-only support checks are a finite sampling heuristic, not a proof that
 // the whole rectangle lies inside one BSP face.

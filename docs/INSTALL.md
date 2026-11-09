@@ -4,7 +4,7 @@ Windows x86 / L4N v2 客户端视觉效果插件。
 
 **联机功能未经测试，不保障 VAC 安全。**
 
-退出游戏后，将安装包的 bin 合并到游戏根目录。安装包根目录只有 bin/ 和 README.md；许可证位于 bin/neko/plugins/L4D2Visual/licenses。不要额外替换游戏的 studiorender.dll，本插件兼容已经验证的两种 Studio DLL。
+退出游戏后，将安装包的 bin 合并到游戏根目录。新包的 bin/ 仅含运行文件；README.md、licenses/、docs/ 留在包根目录，不必复制进游戏目录。不要额外替换游戏的 studiorender.dll，本插件兼容已经验证的两种 Studio DLL。
 
 包内配置是 bin/neko/plugins/L4D2Visual/hud.json。覆盖前备份旧配置；如果保留旧文件，会继续沿用旧开关和样式。诊断 logging / markKey 旧字段已被移除并忽略，旧配置无法重新开启已删除的诊断功能。
 
@@ -19,3 +19,11 @@ Tank 行为预测：总开关默认关闭。画面显示、攻击计时条、朝
 用户已反馈原版 Tank、当前测试 Mod Tank 与上传的原版 studiorender.dll 可用。这不表示所有 Mod、地图、DXVK 情况及多人场景均已充分实测。client.dll / engine.dll 仍限已验证版本，Studio 两种已验证配置继续保留。
 
 邦友的酒和自定义喷漆继续保留。喷漆图片目录为 bin/neko/plugins/L4D2Visual/images；联机及自动匹配分别手动开启。P2P 默认关闭，默认关闭不等于 VAC 安全保证。
+
+## Tank 石头预测
+
+本分支整合石头飞行轨迹与静态地图落点标记，总开关默认关闭。入口在“Tank 行为预测”旁的“Tank 石头预测[关]”；开启后使用，显示外观可调。无有效地图交点时只显示轨迹，不把未来轨迹终点标成落点。
+
+固定重力模型为 320 units/s²，地图扫掠使用半尺寸 16 的假定轴对齐箱；不代表真实碰撞体，不检测玩家/移动物体碰撞。不能据此判断可以刀石。未包含刀石提示、数据采集或诊断开关；不生成 tank-rock.jsonl，旧文件不会自动删除。详情见源码中的 docs/design/tank-rock-prediction.md。
+
+此次仅整理并提交源码，尚未编译或进行整合版实机验证；请合并另一测试分支后统一验证。

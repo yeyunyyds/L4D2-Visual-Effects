@@ -1,4 +1,4 @@
-"""Build an install-only archive: bin/ and README.md at the archive root."""
+"""Build an installer with runtime files in bin/ and documentation beside it."""
 from pathlib import Path
 import zipfile
 
@@ -11,17 +11,17 @@ files = {
     'bin/neko/plugins/L4D2Visual/hud.json': root / 'defaults/hud.default.json',
     'bin/neko/plugins/L4D2Visual.dll': binary,
     'README.md': root / 'docs/INSTALL.md',
-    'bin/neko/plugins/L4D2Visual/images/README.txt': root / 'docs/wall-pictures-folder.txt',
+    'docs/images-README.txt': root / 'docs/wall-pictures-folder.txt',
 }
 for name in ('LICENSE', 'NOTICE.md'):
-    files['bin/neko/plugins/L4D2Visual/licenses/' + name] = root / name
+    files['licenses/' + name] = root / name
 for path in sorted((root / 'vendor').rglob('*')):
     if path.is_file() and ('license' in path.name.lower() or 'copying' in path.name.lower()):
-        files['bin/neko/plugins/L4D2Visual/licenses/vendor/' + path.relative_to(root / 'vendor').as_posix()] = path
+        files['licenses/vendor/' + path.relative_to(root / 'vendor').as_posix()] = path
 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
     for target, source in files.items():
         archive.write(source, target)
 with zipfile.ZipFile(output) as archive:
-    assert {name.split('/')[0] for name in archive.namelist()} == {'bin', 'README.md'}
+    assert {name.split('/')[0] for name in archive.namelist()} == {'bin', 'README.md', 'licenses', 'docs'}
     assert archive.testzip() is None
 print(output)

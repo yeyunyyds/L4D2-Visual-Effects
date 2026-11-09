@@ -114,6 +114,12 @@ inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint
   if(r.simulationTime&&(!std::isfinite(*r.simulationTime)||*r.simulationTime<0||*r.simulationTime>=10000000))r.simulationTime.reset();
   r.nextPrimaryAttack=field<float>(base,info,"m_flNextPrimaryAttack",1);r.nextAttack=field<float>(base,info,"m_flNextAttack",1);
  }
+ // Rock reads do not enable the full combat sampler or accept integer simulation proxies.
+ if(r.className=="CTankRock"||r.className=="TankRock"||r.className=="CBaseCSGrenadeProjectile"){
+  r.velocity=vectorField(base,info,"m_vecVelocity[0]");if(!r.velocity)r.velocity=vectorField(base,info,"m_vecVelocity");
+  r.simulationTime.reset(); // Rock prediction uses observation arrival time, not unverified proxies.
+  r.thrower=field<uint32_t>(base,info,"m_hThrower",0);
+ }
  r.parent=field<uint32_t>(base,info,"moveparent",0);r.parentAttachment=field<uint8_t>(base,info,"m_iParentAttachment",0);r.owner=field<uint32_t>(base,info,"m_hOwnerEntity",0);r.weaponOwner=field<uint32_t>(base,info,"m_hOwner",0);r.activeWeapon=field<uint32_t>(base,info,"m_hActiveWeapon",0);r.viewModel=field<uint32_t>(base,info,"m_hViewModel[0]",0);
  }return r;
 }

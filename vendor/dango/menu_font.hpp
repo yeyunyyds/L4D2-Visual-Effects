@@ -19,6 +19,7 @@ inline void menuFontRanges(ImFontAtlas& atlas,ImVector<ImWchar>& ranges){
  builder.AddText(u8"总开关显示内容当前状态高级攻击计时条箭头目标连线位置前瞻摇普通间隔诊断仅用于反馈须启实体相对位置远近透视缩放左右跟随朝向上下固定世界高度");
  builder.AddText(u8"进度条大小与粗细攻击范围线宽倍率整体精调选中参数减少增加每次仅调整显示不改变距离百分比长度厚度恢复默认");
  builder.AddText(u8"按游戏参数估算不代表实际命中或安全窗口");
+ builder.AddText(u8"石头预测飞行轨迹落点标记长度显示外观恢复本功能默认设置保存颜色绿色橙色蓝色不透明度线宽圆大小当前接口不可用请关闭后重试");
  builder.BuildRanges(&ranges);
 }
 }

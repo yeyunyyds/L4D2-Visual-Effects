@@ -2,9 +2,11 @@
 #include "module_verification.hpp"
 #include "dango/source_trace_contract.hpp"
 namespace visual::picturetrace {
-inline void* object=nullptr;inline bool faulted=false;
-inline void reset(){object=nullptr;faulted=false;}
-inline bool connect(){
+struct Binding {void* object=nullptr;bool faulted=false;void reset(){object=nullptr;faulted=false;}};
+inline Binding shared;inline void*& object=shared.object;inline bool& faulted=shared.faulted;
+inline void reset(){shared.reset();}
+inline bool connectBinding(Binding& binding){
+ auto& object=binding.object;
  using namespace source_camera;auto module=engineModule;
  if(!hooked||!module||!matchesImage(module,EngineTimestamp,EngineImageSize,"picture trace engine"))return false;
  if(!verifiedModuleFile(module,"8a6d468059394bf4cfce32f11dcba12ef45de88da1373084d5a2916d0bf7ba86"))return false;
@@ -22,12 +24,17 @@ inline bool __fastcall reject(void*,void*,void*,int){return false;}
 inline int __fastcall worldOnly(void*,void*){return 1;}
 inline void* methods[]={reinterpret_cast<void*>(&reject),reinterpret_cast<void*>(&worldOnly)};
 struct Filter {void** table=methods;};
-inline bool cast(dango::Vec3 start,dango::Vec3 end,dango::trace::Result& output){
- if(faulted||!object||!dango::wall::finite(start)||!dango::wall::finite(end))return false;
- auto ray=dango::trace::ray(start,end);dango::trace::GuardedResult guarded;Filter filter;
+inline bool castShapeBinding(Binding& binding,dango::Vec3 start,dango::Vec3 end,dango::Vec3 half,dango::trace::Result& output){
+ auto& object=binding.object;auto& faulted=binding.faulted;
+ if(faulted||!object||!dango::wall::finite(start)||!dango::wall::finite(end)||!dango::trace::validExtents(half))return false;
+ auto ray=dango::trace::boxRay(start,end,half);dango::trace::GuardedResult guarded;Filter filter;
  using Call=void(__thiscall*)(void*,const dango::trace::Ray&,unsigned,void*,dango::trace::Result*);
- auto table=*reinterpret_cast<void***>(object);reinterpret_cast<Call>(table[5])(object,ray,0x400b,&filter,&guarded.result);
- if(!guarded.intact()||!dango::trace::valid(guarded.result,start,end)){faulted=true;return false;}
+ if(!source_camera::readable(object,4)){faulted=true;return false;}auto table=*reinterpret_cast<void***>(object);auto moduleBase=reinterpret_cast<uintptr_t>(source_camera::engineModule);if(!source_camera::readable(table,24)||table[5]!=reinterpret_cast<void*>(moduleBase+0x179760)||!source_camera::executable(table[5])){faulted=true;return false;}reinterpret_cast<Call>(table[5])(object,ray,0x400b,&filter,&guarded.result);
+ if(!guarded.intact()||!dango::trace::validSweep(guarded.result,start,end,half)){faulted=true;return false;}
  output=guarded.result;return true;
 }
+inline bool castBinding(Binding& binding,dango::Vec3 start,dango::Vec3 end,dango::trace::Result& output){return castShapeBinding(binding,start,end,{},output);}
+inline bool castBoxBinding(Binding& binding,dango::Vec3 start,dango::Vec3 end,float halfSize,dango::trace::Result& output){if(!std::isfinite(halfSize)||halfSize<4||halfSize>64)return false;return castShapeBinding(binding,start,end,{halfSize,halfSize,halfSize},output);}
+inline bool connect(){return connectBinding(shared);}
+inline bool cast(dango::Vec3 start,dango::Vec3 end,dango::trace::Result& output){return castBinding(shared,start,end,output);}
 } // namespace visual::picturetrace
