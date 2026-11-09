@@ -1,3 +1,7 @@
+> 未发布修改：已修复共用准星识别与菜单开关一致性，并调整范围提醒入口/默认值。说明见 [未发布修复](docs/UNRELEASED-AIM-FIX.md)。已有 preview2/3 下载包未更新。
+
+> 当前分支：0.8.0-transform-preview3。新增 Tank 范围内提醒（红色计时条、范围红线/填充、实验性原生描边，分别默认关闭），见[提醒说明](docs/TANK-WARNINGS.md)；保留准星手动识别、类别开关与参数调整；基于Skeeto路径的实体缩放与XYZ拉伸，扩展角色/道具/手持模型及动态Class ID，默认关闭。见[使用和验证说明](docs/ENTITY-TRANSFORM.md)。正式版仍为0.7.4，尚需游戏内验证新路径。
+
 # L4D2 Visual Effects
 
 求生之路 2 客户端视觉效果插件，基于 **Windows x86 / L4N v2**。项目标识及 DLL 名称为 `L4D2Visual`。

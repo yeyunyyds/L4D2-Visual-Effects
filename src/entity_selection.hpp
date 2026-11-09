@@ -2,6 +2,7 @@
 #include "entity_categories.hpp"
 #include "survivors.hpp"
 #include "special_infected.hpp"
+#include "aim_selection.hpp"
 #include <charconv>
 #include <map>
 #include <string>
@@ -44,6 +45,14 @@ struct EntitySelection {
    return selectedSurvivor(role);
   }
   return selected(r.classId,r.className);
+ }
+ bool selectedAim(const AimSelection& aim)const {auto r=aimRecord(aim);return aim.classId>=0&&actorIdentityKnown(r)&&selectedRecord(r);}
+ bool setAim(const AimSelection& aim,bool value){
+  auto r=aimRecord(aim);if(aim.classId<0||!actorIdentityKnown(r))return false;
+  names[r.classId]=r.className;int special=specialCharacter(r),role=survivorCharacter(r);
+  if(special>=0)specials[special]=value;else if(role>=0)survivors[role]=value;
+  else if(builtinClassIndex(r.className)>=0)setType(r.className,value);else setClass(r.classId,r.className,value);
+  return true;
  }
  bool selectedType(std::string_view name)const {
   auto type=types.find(std::string(name));if(type!=types.end())return type->second;

@@ -50,7 +50,7 @@ inline std::optional<BarPlacement> placeBar(const dango::GameCameraFrame& camera
  return BarPlacement{x,y,scale,anchor};
 }
 // Both the in-game bar and the menu preview use this exact geometry.
-inline void barGeometry(std::vector<Segment>& out,Point center,VisualSettings s,float scale,std::optional<float> fraction){normalizeVisual(s);scale*=s.barSize;auto p=palette(s.preset);float w=(s.vertical?s.thickness:s.length)*scale,h=(s.vertical?s.length:s.thickness)*scale;float x=center.x-w*.5f,y=center.y-h*.5f;
+inline void barGeometry(std::vector<Segment>& out,Point center,VisualSettings s,float scale,std::optional<float> fraction,bool danger=false){normalizeVisual(s);scale*=s.barSize;auto p=palette(s.preset);if(danger){p.progress=0xffff6868;p.frame=0xffff3030;p.background=0xff601515;}float w=(s.vertical?s.thickness:s.length)*scale,h=(s.vertical?s.length:s.thickness)*scale;float x=center.x-w*.5f,y=center.y-h*.5f;
  float padding=2*scale;filled(out,x-padding,y-padding,w+padding*2,h+padding*2,p.background);rectangle(out,x-padding,y-padding,w+padding*2,h+padding*2,p.frame);
  if(fraction){float f=std::clamp(*fraction,0.f,1.f);if(s.vertical)filled(out,x,y+h*(1-f),w,h*f,p.progress);else filled(out,x,y,w*f,h,p.progress);}
  if(p.ticks)for(unsigned i=1;i<4;++i){float f=i*.25f;if(s.vertical)stroke(out,{x+w-3*scale,y+h*f},{x+w,y+h*f},p.background);else stroke(out,{x+w*f,y+h-3*scale},{x+w*f,y+h},p.background);}

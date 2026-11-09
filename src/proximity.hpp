@@ -57,8 +57,8 @@ inline ProximityResult evaluateProximity(const dango::inventory::Frame& frame,co
  if(!settings.enabled||!camera.active||frame.epoch!=camera.epoch||!frame.tick||tick<frame.tick||tick-frame.tick>250)return result;
  std::vector<dango::Vec3> centers;
  for(const auto& r:frame.records){
-  int role=specialIndex(settings.triggerName);
-  bool matches=settings.triggerClassId>=0?r.classId==settings.triggerClassId:role>=0?specialCharacter(r)==role:r.className==settings.triggerName;
+  int role=specialIndex(settings.triggerName),survivor=survivorIndex(settings.triggerName);
+  bool matches=settings.triggerClassId>=0?r.classId==settings.triggerClassId:role>=0?specialCharacter(r)==role:survivor>=0?survivorCharacter(r)==survivor:r.className==settings.triggerName;
   if(!matches)continue;
   auto group=groupForName(r.className);bool actor=group==EntityGroup::Special||group==EntityGroup::Survivors||r.className=="Infected";
   if(actor&&((r.health&&*r.health<=0)||(r.lifeState&&*r.lifeState!=0)))continue;

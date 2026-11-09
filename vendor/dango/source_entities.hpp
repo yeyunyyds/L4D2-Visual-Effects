@@ -102,10 +102,10 @@ inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint
  if(!base){++frame.unknownBase;getterHint(frame,"data_base",dataGetter);}else if(!info.schema)++frame.unknownTables;else{
  r.networkOrigin=vectorField(base,info,"m_vecOrigin");r.networkAngles=vectorField(base,info,"m_angRotation");r.team=field<int>(base,info,"m_iTeamNum",0);r.character=field<int>(base,info,"m_survivorCharacter",0);r.zombieClass=field<int>(base,info,"m_zombieClass",0);r.effects=field<int>(base,info,"m_fEffects",0);r.health=field<int>(base,info,"m_iHealth",0);r.lifeState=field<uint8_t>(base,info,"m_lifeState",0);
  auto index=field<int16_t>(base,info,"m_nModelIndex",0);if(index){r.modelIndex=int(*index);r.modelName=modelName(*index);}
+  r.collisionMins=vectorField(base,info,"m_Collision.m_vecMins");r.collisionMaxs=vectorField(base,info,"m_Collision.m_vecMaxs");
  if(combatRequested){
   r.eyeAngles=vectorField(base,info,"m_angEyeAngles");if(!r.eyeAngles){auto pitch=field<float>(base,info,"m_angEyeAngles[0]",1),yaw=field<float>(base,info,"m_angEyeAngles[1]",1);if(pitch&&yaw&&std::isfinite(*pitch)&&std::isfinite(*yaw)&&std::abs(*pitch)<=360&&std::abs(*yaw)<=36000)r.eyeAngles=Vec3{*pitch,*yaw,0};}
   r.velocity=vectorField(base,info,"m_vecVelocity[0]");if(!r.velocity)r.velocity=vectorField(base,info,"m_vecVelocity");
-  r.collisionMins=vectorField(base,info,"m_Collision.m_vecMins");r.collisionMaxs=vectorField(base,info,"m_Collision.m_vecMaxs");
   r.lookAtHandle=field<uint32_t>(base,info,"m_lookatPlayer",0);r.enemyHandle=field<uint32_t>(base,info,"m_hEnemy",0);if(!r.enemyHandle)r.enemyHandle=field<uint32_t>(base,info,"m_hAttackTarget",0);
   if(r.className=="Tank"||(r.zombieClass&&*r.zombieClass==8))r.animationLayers=dango::animation::animationLayers(reader,base,info.layers,r.animationLayerReason);
   r.sequence=field<int>(base,info,"m_nSequence",0);r.animationCycle=field<float>(base,info,"m_flCycle",1);if(r.animationCycle&&(!std::isfinite(*r.animationCycle)||*r.animationCycle<0||*r.animationCycle>1))r.animationCycle.reset();r.simulationTime=field<float>(base,info,"m_flSimulationTime",1);
@@ -114,7 +114,7 @@ inline std::optional<Record> readRecord(unsigned i,const wire::Entry& entry,uint
   if(r.simulationTime&&(!std::isfinite(*r.simulationTime)||*r.simulationTime<0||*r.simulationTime>=10000000))r.simulationTime.reset();
   r.nextPrimaryAttack=field<float>(base,info,"m_flNextPrimaryAttack",1);r.nextAttack=field<float>(base,info,"m_flNextAttack",1);
  }
- r.parent=field<uint32_t>(base,info,"moveparent",0);r.parentAttachment=field<uint8_t>(base,info,"m_iParentAttachment",0);r.owner=field<uint32_t>(base,info,"m_hOwnerEntity",0);r.weaponOwner=field<uint32_t>(base,info,"m_hOwner",0);r.activeWeapon=field<uint32_t>(base,info,"m_hActiveWeapon",0);r.viewModel=field<uint32_t>(base,info,"m_hViewModel[0]",0);
+ r.parent=field<uint32_t>(base,info,"moveparent",0);r.parentAttachment=field<uint8_t>(base,info,"m_iParentAttachment",0);r.owner=field<uint32_t>(base,info,"m_hOwnerEntity",0);r.weaponOwner=field<uint32_t>(base,info,"m_hOwner",0);r.activeWeapon=field<uint32_t>(base,info,"m_hActiveWeapon",0);r.viewModel=field<uint32_t>(base,info,"m_hViewModel[0]",0);r.weaponParent=field<uint32_t>(base,info,"m_hCombatWeaponParent",0);if(!r.weaponParent&&(r.className.find("ViewModel")!=std::string::npos||r.className.find("Viewmodel")!=std::string::npos))r.weaponParent=field<uint32_t>(base,info,"m_hWeapon",0);
  }return r;
 }
 inline bool prepare(const GameCameraFrame& camera,Frame& frame){
