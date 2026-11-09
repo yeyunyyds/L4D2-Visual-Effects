@@ -7,7 +7,7 @@ root = Path(__file__).resolve().parents[1]
 binary = root / 'build/L4D2Visual.dll'
 if not binary.is_file():
     raise SystemExit('Build the DLL first')
-output = root / 'build/L4D2Visual-0.8.0-main-test1.zip'
+output = root / 'build/L4D2Visual-0.8.0.zip'
 files = {
     'bin/neko/plugins/L4D2Visual/hud.json': root / 'defaults/hud.default.json',
     'bin/neko/plugins/L4D2Visual.dll': binary,

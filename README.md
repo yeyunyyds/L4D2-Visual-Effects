@@ -2,7 +2,9 @@
 
 求生之路 2 的客户端视觉效果插件，基于 **Windows x86 / L4N v2**。项目及 DLL 标识为 `L4D2Visual`。
 
-当前为 **0.8.0-main-test1 本地主线整合测试**，合并了实体形变、识别修复、Tank 范围提醒和 `feature/tank-rock-prediction`。尚未推送远端 main，也未发布正式版本；现有正式下载仍是 [0.7.4](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.7.4)。
+当前正式版为 **0.8.0**，基于已通过用户验收的整合测试版发布，包含实体形变、共用准星识别修复、Tank 范围提醒和石头预测。
+
+[下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) · [安装说明](docs/INSTALL.md) · [更新说明](docs/releases/v0.8.0.md) · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip)
 
 ## 功能与入口
 
@@ -24,12 +26,12 @@ P2P 联机喷漆及自动搜寻默认关闭。**联机功能未经测试，不�
 
 ## 安装与测试
 
-参见 [安装说明](docs/INSTALL.md) 与 [本次整合及验收项目](docs/MAIN-INTEGRATION.md)。测试包根目录仅 `bin/` 和 `README.md`，许可证位于 bin 内；配套源码单独提供，不放入安装包。更新前完全退出游戏，备份已有 DLL 和 `hud.json`，保留图片目录。
+参见 [安装说明](docs/INSTALL.md) 与 [本次整合及验收项目](docs/MAIN-INTEGRATION.md)。安装包根目录仅 `bin/` 和 `README.md`，许可证位于 bin 内；配套源码单独提供，也可从 v0.8.0 标签获取。更新前完全退出游戏，备份已有 DLL 和 `hud.json`，保留图片目录。
 
 只需替换插件，不能替换游戏自带 `studiorender.dll`。原版与此前验证版本的 Studio 接入继续共用。首次启用原生形变、描边或场景射线后 DLL 可能固定到游戏进程结束，更新需要彻底退出游戏。
 
 - [实体缩放与拉伸](docs/ENTITY-TRANSFORM.md)
-- [共用准星识别修复](docs/UNRELEASED-AIM-FIX.md)
+- [共用准星识别修复](docs/AIM-IDENTIFICATION.md)
 - [Tank 范围提醒](docs/TANK-WARNINGS.md)
 - [Tank 石头预测设计及整合说明](docs/design/tank-rock-prediction.md)
 
@@ -37,13 +39,15 @@ P2P 联机喷漆及自动搜寻默认关闭。**联机功能未经测试，不�
 
 ## 构建
 
+正式版由 GitHub Actions 在 v0.8.0 标签触发后运行测试、构建 x86 DLL、打包、更新 zip 分支并发布 Release。下面命令用于开发环境；正式发布不依赖本地二进制。
+
 ```sh
 ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
 CXX_X86=i686-w64-mingw32-g++ bash scripts/build-mingw.sh
 python3 scripts/package.py
 ```
 
-测试使用原生 C++17 编译器和 ASan/UBSan；DLL 使用 Windows x86 MinGW，安装包需要已构建的 DLL。main 保留源码与文档，安装 ZIP 仅在构建目录生成；实测通过后再推送和安排正式版本。
+测试使用原生 C++17 编译器和 ASan/UBSan；DLL 使用 Windows x86 MinGW，安装包需要已构建的 DLL。main 保留源码与文档；安装包和校验文件通过 zip 分支与 Release 提供，不放入 main。
 
 ## 许可
 
