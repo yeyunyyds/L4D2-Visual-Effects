@@ -1,5 +1,7 @@
 # L4D2 Visual Effects 下载
 
+修复测试版：[0.8.1-fix-test1 安装包](L4D2Visual-0.8.1-fix-test1.zip) · [对应源码](L4D2Visual-0.8.1-fix-test1-source.zip) · [安装包校验](L4D2Visual-0.8.1-fix-test1.zip.sha256) · [源码校验](L4D2Visual-0.8.1-fix-test1-source.zip.sha256)。修复准星识别类别应用、Gnome/求生者/道具统一缩放、原生路径回退和形变菜单自动开启逻辑。用于实机验收，尚未替代 0.8.0 正式版；更新前请完全退出游戏并备份 DLL 与 hud.json。
+
 正式版：[0.8.0 安装包](L4D2Visual-0.8.0.zip) · [配套完整源码](L4D2Visual-0.8.0-source.zip) · [安装包校验](L4D2Visual-0.8.0.zip.sha256)。基于用户验收通过的整合版，由 GitHub CI 构建与发布。所有功能总开关默认关闭；新配置范围红线提醒默认开，其余提醒默认关。请完全退出游戏并备份 DLL、hud.json 后更新。
 
 已验收测试留档：[0.8.0-main-test1](L4D2Visual-0.8.0-main-test1.zip) · [对应源码](L4D2Visual-0.8.0-main-test1-source.zip)。正式版本请使用上方0.8.0下载。
