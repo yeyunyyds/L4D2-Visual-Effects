@@ -1,0 +1,53 @@
+name: First-person body ABI probe (diagnostic only)
+on:
+  push:
+    branches:
+      - experimental/first-person-body-abi-probe
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Windows x86 compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: Run original regression suite and new config test
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: bash scripts/test.sh
+      - name: Build Windows x86 DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: bash scripts/build-mingw.sh
+      - name: Create experimental installation and matching complete source ZIP
+        run: python3 scripts/package-first-person-body.py
+      - name: Verify integrity
+        run: |
+          sha256sum build/L4D2Visual-FirstPersonBody-Experimental*.zip
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          b=Path('build')
+          install=b/'L4D2Visual-FirstPersonBody-Experimental.zip'
+          source=b/'L4D2Visual-FirstPersonBody-Experimental-source.zip'
+          with zipfile.ZipFile(install) as z:
+              assert set(x.split('/')[0] for x in z.namelist()) == {'bin','README.md'}
+              assert z.testzip() is None
+          with zipfile.ZipFile(source) as z:
+              assert z.testzip() is None
+              assert {'src/plugin.cpp','src/first_person_body.hpp',
+                      'docs/FIRST-PERSON-BODY-ABI-BLOCKER.md'} <= set(z.namelist())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-FirstPersonBody-DIAGNOSTIC-ONLY
+          path: |
+            build/L4D2Visual-FirstPersonBody-Experimental.zip
+            build/L4D2Visual-FirstPersonBody-Experimental-source.zip
+          if-no-files-found: error

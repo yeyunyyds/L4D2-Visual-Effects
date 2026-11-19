@@ -1,29 +1,29 @@
 {
   "preset": 0,
-  "font": 22.0,
+  "font": 22,
   "opacity": 0.47999998927116394,
-  "x": 8.0,
-  "y": 14.0,
+  "x": 8,
+  "y": 14,
   "centerY": true,
   "step": 8,
   "f10": false,
   "tankVisual": {
-    "arrowSize": 1.0,
-    "arrowWidth": 3.0,
+    "arrowSize": 1,
+    "arrowWidth": 3,
     "barSize": 0.55,
     "coordinateSpace": "tank-world",
-    "length": 88.0,
+    "length": 88,
     "preset": 2,
-    "rangeWidth": 3.0,
+    "rangeWidth": 3,
     "showBar": true,
     "showDirection": true,
     "showRange": true,
     "showTarget": true,
     "step": 4,
-    "thickness": 8.0,
+    "thickness": 8,
     "vertical": true,
-    "x": -32.0,
-    "y": -24.0
+    "x": -32,
+    "y": -24
   },
   "tankPrediction": {
     "enabled": false,
@@ -83,5 +83,8 @@
     "lineWidth": 2,
     "landingRadius": 32,
     "landingOpacity": 0.5
+  },
+  "firstPersonBody": {
+    "enabled": false
   }
 }
