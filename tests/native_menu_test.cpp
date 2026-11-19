@@ -10,11 +10,34 @@ int main(){
  check(opensChild(820)&&opensChild(860)&&opensChild(862)&&opensChild(863)&&opensChild(864)&&!opensChild(861));
  check(!opensChild(884)&&!opensChild(885)&&opensChild(865));
  check(!opensChild(896)); // Periodic DEBUG toggle is an action, not a child menu.
+ check(opensChild(9001)&&opensChild(300)&&!opensChild(9000)); // Menu page, nested stretch page, native appearance action.
  for(uintptr_t id=887;id<=895;++id)check(!opensChild(id));
  for(uintptr_t id=870;id<=885;++id)check(!opensChild(id));
- auto mainMenu=document(R"kv("L4D2Visual" {"实体缩放与拉伸" {"user_data" "0x320"} "第一人称身体 [关] · 设置" {"user_data" "0x35c"}})kv");
- check(mainMenu.rows.size()==2&&mainMenu.rows[1].action==860);
- check(opensChild(mainMenu.rows[1].action));
+ auto mainMenu=document(R"kv("L4D2Visual" {
+  "实体缩放与拉伸" {"user_data" "0x320"}
+  "第一人称身体 [开] · 设置" {"user_data" "0x35c"}
+  "自定义喷漆" {"user_data" "0x96"}
+  "Tank 行为预测" {"user_data" "0x140"}
+  "Tank 石头预测" {"user_data" "0x2bc"}
+  "菜单" {"user_data" "0x2329"}
+  "保存设置" {"user_data" "0x65"}
+})kv");
+ check(mainMenu.rows.size()==7&&mainMenu.rows[0].action==800);
+ check(mainMenu.rows[1].action==860&&mainMenu.rows[2].action==150);
+ check(mainMenu.rows[5].action==9001&&!opensChild(mainMenu.rows[6].action));
+ check(opensChild(mainMenu.rows[0].action)&&opensChild(mainMenu.rows[1].action));
+ auto settingMenu=document(R"kv("菜单" {
+  "外观设置" {"user_data" "0x2328"}
+  "日志级别：Info" {"user_data" "0x380"}
+  "保存设置" {"user_data" "0x65"}
+ })kv");
+ check(settingMenu.rows.size()==3);
+ check(!opensChild(settingMenu.rows[0].action)&&!opensChild(settingMenu.rows[1].action));
+ check(!opensChild(settingMenu.rows[2].action));
+ auto stretchMenu=document(R"kv("实体缩放与拉伸" {
+  "邦友的酒：[关] · 设置" {"user_data" "0x12c"}
+ })kv");
+ check(stretchMenu.rows.size()==1&&stretchMenu.rows[0].action==300&&opensChild(300));
  check(opensChild(700)&&opensChild(701));for(uintptr_t id=750;id<=759;++id)check(!opensChild(id));
  check(opensChild(325)&&opensChild(326)&&opensChild(327));for(uintptr_t id=380;id<=388;++id)check(!opensChild(id));
  check(opensChild(321)&&opensChild(322)&&opensChild(323)&&opensChild(324));for(uintptr_t id=370;id<=373;++id)check(!opensChild(id));for(uintptr_t id=360;id<=366;++id)check(!opensChild(id));

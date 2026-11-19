@@ -17,7 +17,9 @@ summary at Info level. This also removes the string-building overhead.
 
 ## Debug (opt-in)
 
-Use **邦友的酒 → 接口与日志诊断 → 日志级别** to switch to **Debug**.
+Use **菜单 → 日志级别** to switch to **Debug**.
+The old **实体缩放与拉伸 → 邦友的酒 → 接口与运行诊断** page
+continues to display runtime status but no longer contains a log-level switch.
 Detailed periodic snapshots preserve the previous format and nominal
 two-second interval. Turning Debug off stops further periodic snapshots.
 Normal Info events remain enabled in either mode.

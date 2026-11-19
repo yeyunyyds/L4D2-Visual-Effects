@@ -13,9 +13,9 @@ inline std::string percent(float f){return std::to_string(int(std::round(f*100))
 inline bool editPage(std::uintptr_t page){return page==820||page==0x700004||page==0x700006||(page>=0x710000&&page<0x720000);}
 inline bool isPage(std::uintptr_t page){return page==800||editPage(page)||page==822||page==0x700005||(page>=810&&page<815);}
 inline Rule selectedAimRule(const Settings& s){return aimed.rule(s);}
-inline std::string page(std::uintptr_t id){auto cfg=std::atomic_load(&options);auto frame=std::atomic_load(&source_entities::snapshot);static std::uint32_t catalogEpoch=0;if(catalogEpoch!=frame->epoch){known.clear();catalogEpoch=frame->epoch;}for(const auto& c:frame->classCatalog)known[c.first]=c.second;for(const auto& r:frame->records)known[r.classId]=r.className;
+inline std::string page(std::uintptr_t id,bool stretchRequested=false){auto cfg=std::atomic_load(&options);auto frame=std::atomic_load(&source_entities::snapshot);static std::uint32_t catalogEpoch=0;if(catalogEpoch!=frame->epoch){known.clear();catalogEpoch=frame->epoch;}for(const auto& c:frame->classCatalog)known[c.first]=c.second;for(const auto& r:frame->records)known[r.classId]=r.className;
  aimruntime::poll(aimSession,frame->epoch);aimed.clear();if(aimSession.aimed.classId>=0)aimed.remember(aimRecord(aimSession.aimed),frame->epoch);
- if(id==800){std::string rows=menuItem(cfg->enabled?u8"实体形变总开关：开":u8"实体形变总开关：关（默认）",0x700001)+menuItem(cfg->studioOnly?u8"处理路径：Studio兼容":u8"处理路径：自动（构建优先）",0x700002);
+ if(id==800){std::string rows=menuItem(stretchRequested?u8"邦友的酒：[开] · 设置":u8"邦友的酒：[关] · 设置",300)+menuItem(cfg->enabled?u8"实体形变总开关：开":u8"实体形变总开关：关（默认）",0x700001)+menuItem(cfg->studioOnly?u8"处理路径：Studio兼容":u8"处理路径：自动（构建优先）",0x700002);
  rows+=menuItem(u8"骨骼上限："+std::to_string(boneLimit.load())+u8"（切换128/256）",118)+menuItem(u8"准星识别与调整",0x700005);
  for(unsigned g=0;g<EntityGroupCount;++g)rows+=menuItem(groupName(EntityGroup(g)),810+g);
  return menuPage(u8"实体缩放与拉伸",rows+menuItem(u8"调整所有实体默认值",0x700004)+menuItem(u8"一键关闭所有类别",0x700003)+menuItem(u8"运行状态",822)+menuItem(u8"保存设置",101));}

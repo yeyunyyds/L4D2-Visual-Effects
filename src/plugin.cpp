@@ -137,7 +137,7 @@ bool entityAction(uintptr_t id){
  saveMessage=u8"实体类别设置未保存";return true;
 }
 std::string buildMenu(uintptr_t id){
- if(visual::deform::isPage(id))return visual::deform::page(id);
+ if(visual::deform::isPage(id))return visual::deform::page(id,requested.load());
  auto parameters=std::atomic_load(&visual::render::animation);
  auto f=std::atomic_load(&source_entities::snapshot);
  auto selection=std::atomic_load(&visual::render::selection);entityMenus.observe(*f,*selection);visual::aimruntime::poll(entityMenus,f->epoch);
@@ -217,14 +217,17 @@ std::string buildMenu(uintptr_t id){
  item(u8"最小比例 -0.1："+decimal(parameters->minTenths),112)+item(u8"最小比例 +0.1",113)+
  item(u8"最大比例 -0.1："+decimal(parameters->maxTenths),114)+item(u8"最大比例 +0.1",115)+
  item(u8"恢复动画默认：0.5秒 / 0.5～1.1",117)+item(u8"保存设置",101)+"}";}
- if(id==24){std::string body=item(visual::logging::periodicDebugEnabled()?u8"日志级别：Debug（周期详细诊断开启）":u8"日志级别：Info（周期详细诊断关闭）",896);body+=row(visual::render::status.load());body+=row(std::string(u8"Studio配置：")+visual::render::studioProfile.load());body+=row("Camera: "+std::string(source_camera::status()));body+=row("Entities: "+f->status);body+=row("Identify: "+std::string(visual::render::identifyReason.load()));body+=row("Pose: "+std::string(visual::render::poseReason.load()));body+=row("Engine/Studio: "+std::to_string(visual::render::engineCalls.load())+" / "+std::to_string(visual::render::studioCalls.load()));body+=row("Matched/Drawn: "+std::to_string(visual::render::identified.load())+" / "+std::to_string(visual::render::drawn.load()));body+=row(visual::diagnostics::writable?u8"日志已写入 L4D2Visual/L4D2Visual.log":u8"日志写入失败，请检查目录权限");body+=item(u8"保存设置",101);return "\"L4D2Visual · 诊断\" {"+body+"}";}
+ if(id==24){std::string body=row(visual::render::status.load());body+=row(std::string(u8"Studio配置：")+visual::render::studioProfile.load());body+=row("Camera: "+std::string(source_camera::status()));body+=row("Entities: "+f->status);body+=row("Identify: "+std::string(visual::render::identifyReason.load()));body+=row("Pose: "+std::string(visual::render::poseReason.load()));body+=row("Engine/Studio: "+std::to_string(visual::render::engineCalls.load())+" / "+std::to_string(visual::render::studioCalls.load()));body+=row("Matched/Drawn: "+std::to_string(visual::render::identified.load())+" / "+std::to_string(visual::render::drawn.load()));body+=row(visual::diagnostics::writable?u8"日志已写入 L4D2Visual/L4D2Visual.log":u8"日志写入失败，请检查目录权限");body+=item(u8"保存设置",101);return "\"L4D2Visual · 诊断\" {"+body+"}";}
  auto proximity=std::atomic_load(&visual::render::proximity);
  std::string experimental=!proximity->enabled?u8"范围实验：关":visual::render::proximityActive.load()?u8"范围实验：已触发":u8"范围实验：待机";
+ if(id==9001)return "\"菜单\" {"+
+  item(u8"外观设置",9000)+
+  item(visual::logging::periodicDebugEnabled()?u8"日志级别：Debug（周期详细诊断开启）":u8"日志级别：Info（周期详细诊断关闭）",896)+
+  item(u8"保存设置",101)+"}";
  if(id==300)return "\"邦友的酒\" {"+item(requested?u8"邦友的酒：开":u8"邦友的酒：关",100)+
  item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
- item(experimental,108)+item(u8"接口与日志诊断",24)+item(u8"保存设置",101)+"}";
- return "\"L4D2Visual 0.8.0-fpb-user-preset-experimental\" {"+item(requested?u8"邦友的酒[开]":u8"邦友的酒[关]",300)+
- item(u8"实体缩放与拉伸",800)+item(std::atomic_load(&visual::firstperson::options)->enabled?u8"第一人称身体 [开] · 设置":u8"第一人称身体 [关] · 设置",860)+item(u8"自定义喷漆",150)+item(u8"Tank 行为预测",320)+item(visual::rockui::title(),700)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+"}";
+ item(experimental,108)+item(u8"接口与运行诊断",24)+item(u8"保存设置",101)+"}";
+ return "\"L4D2Visual 0.8.0-fpb-user-preset-experimental\" {"+item(u8"实体缩放与拉伸",800)+item(std::atomic_load(&visual::firstperson::options)->enabled?u8"第一人称身体 [开] · 设置":u8"第一人称身体 [关] · 设置",860)+item(u8"自定义喷漆",150)+item(u8"Tank 行为预测",320)+item(visual::rockui::title(),700)+item(u8"菜单",9001)+item(u8"保存设置",101)+"}";
 }
 void action(uintptr_t id){
  if(id==896){
