@@ -1,3 +1,5 @@
+> **实验分支说明：** 本分支在无喷漆模块化结构上增加独立实现的 Evo 风格第一人称身体和 Info / Debug 日志设置。安装前备份原 `L4D2Visual.dll` 与 `hud.json`；实验默认身体偏移为 -13/-1/-1，旧 GPU 裁剪关闭。与 v0.8.0 正式版不同，仍需实机验证不同 MOD/动画的兼容性。保存现有 `hud.json` 时不会被出厂默认值覆盖。
+
 # L4D2Visual 0.8.0 正式版
 
 本版基于通过用户验收的整合测试版，由 GitHub CI 构建与发布。正式源码标签为 v0.8.0：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0 。另提供 `L4D2Visual-0.8.0-source.zip`；源码提交号附在本 README 末尾。

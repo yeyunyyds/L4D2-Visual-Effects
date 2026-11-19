@@ -5,6 +5,20 @@
 using namespace dango::hud;
 void check(bool v){if(!v)throw std::runtime_error("Native menu regression");}
 int main(){
+ check(opensChild(9001)&&opensChild(860)&&opensChild(865)&&opensChild(862)&&opensChild(863)&&opensChild(864));
+ check(!opensChild(896)&&!opensChild(9000)&&opensChild(300));
+ for(uintptr_t id=887;id<=895;++id)check(!opensChild(id));
+ auto root=document(R"kv("L4D2Visual" {
+  "实体缩放与拉伸" {"user_data" "0x320"}
+  "第一人称身体" {"user_data" "0x35c"}
+  "Tank 行为预测" {"user_data" "0x140"}
+  "Tank 石头预测" {"user_data" "0x2bc"}
+  "菜单" {"user_data" "0x2329"}
+  "保存设置" {"user_data" "0x65"}
+ })kv");
+ check(root.rows.size()==6&&root.rows[0].action==800&&root.rows[1].action==860);
+ check(root.rows[4].action==9001&&opensChild(root.rows[4].action));
+
  check(opensChild(700)&&opensChild(701));for(uintptr_t id=750;id<=759;++id)check(!opensChild(id));
  check(opensChild(325)&&opensChild(326)&&opensChild(327));for(uintptr_t id=380;id<=388;++id)check(!opensChild(id));
  check(opensChild(321)&&opensChild(322)&&opensChild(323)&&opensChild(324));for(uintptr_t id=370;id<=373;++id)check(!opensChild(id));for(uintptr_t id=360;id<=366;++id)check(!opensChild(id));

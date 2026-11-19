@@ -38,5 +38,17 @@ int main(){
  std::weak_ptr<int> weak;
  {Host lifetime;Module owned;owned.id="owned";auto state=std::make_shared<int>(12);weak=state;owned.stateOwner=state;owned.action=[pointer=state.get()](auto id){return id==unsigned(*pointer);};lifetime.add(std::move(owned));lifetime.freeze();state.reset();check(!weak.expired()&&lifetime.action(12));}
  check(weak.expired());
+ Host decorators;int calls=0;Matrix3x4 pose{};dango::Vec3 origin{1,2,3};
+ auto once=+[](void* data,Matrix3x4* bones,const dango::Vec3& value){
+  auto* count=static_cast<int*>(data);++*count;
+  if(!bones||value.x!=1)throw std::runtime_error("Studio original input changed");
+ };
+ Module stage;stage.id="studio";
+ stage.studioDraw=[](const void*,Matrix3x4* b,const dango::Vec3& o,void* data,StudioNext next){next(data,b,o);};
+ stage.deviceCreated=[&](IDirect3DDevice9*){++calls;};
+ decorators.add(stage);decorators.freeze();decorators.deviceCreated(nullptr);check(calls==1);
+ decorators.decorateStudio(nullptr,&pose,origin,&calls,once);check(calls==2);
+ decorators.quiesce();decorators.decorateStudio(nullptr,&pose,origin,&calls,once);check(calls==3);
+ decorators.deviceCreated(nullptr);check(calls==3);decorators.stop();
  std::cout<<"PASS: module registration, demand aggregation, ordered lifecycle/restore drain, independent config/menu dispatch, observer broadcast, pose ownership, overlay failure isolation and module omission\n";
 }

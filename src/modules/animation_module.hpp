@@ -109,7 +109,7 @@ inline std::optional<std::string> page(uintptr_t id){
  std::string experimental=!proximity->enabled?u8"范围实验：关":visual::render::proximityActive.load()?u8"范围实验：已触发":u8"范围实验：待机";
  if(id==300)return "\"邦友的酒\" {"+item(requested?u8"邦友的酒：开":u8"邦友的酒：关",100)+
  item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
- item(experimental,108)+item(u8"接口与日志诊断",24)+item(u8"保存设置",101)+"}";
+ item(experimental,108)+item(u8"接口与运行诊断",24)+item(u8"保存设置",101)+"}";
  return {};
 }
 inline bool action(uintptr_t id){if(entityAction(id))return true;if(id==100)toggle();if(id>=110&&id<=117){auto a=*std::atomic_load(&visual::render::animation);a=visual::adjustAnimation(a,unsigned(id));std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(a));visual::render::startedAt=GetTickCount64();saveMessage=u8"动画设置未保存";}if(id==119){visual::render::compatibility=!visual::render::compatibility.load();saveMessage=u8"渲染模式未保存";}if(id==118){visual::render::boneLimit=visual::nextBoneLimit(visual::render::boneLimit.load());saveMessage=u8"骨骼上限未保存";}return id==100||(id>=110&&id<=119);}
@@ -138,7 +138,7 @@ inline void onFrame(const dango::GameCameraFrame& frame){
 public:
 inline modules::Module bindings(){
  modules::Module m;m.id="animation";m.menuOrder=0;
- m.rootItem=[this] {return item(requested?u8"邦友的酒[开]":u8"邦友的酒[关]",300);};
+ // Menu parent lives in entity scaling; this remains a separate module.
  m.page=[this](std::uintptr_t id){return page(id);};m.action=[this](std::uintptr_t id){return action(id);};m.frame=[this](const dango::GameCameraFrame& frame){onFrame(frame);};
  m.needsEntities=[this] {auto selection=std::atomic_load(&render::selection);auto proximity=std::atomic_load(&render::proximity);return requested&&(selection->anyEnabled()||proximity->enabled);};
  m.diagnostics=[this]{return "requested="+std::to_string(requested.load())+" proximity="+std::to_string(render::proximityActive.load())+" proximityCount="+std::to_string(render::proximityCount.load())+" proximitySources="+std::to_string(render::proximitySources.load());};

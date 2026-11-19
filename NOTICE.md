@@ -105,3 +105,10 @@ existing glows and restores only values still owned by this feature.
 The experimental custom-spray/image and Steam P2P modules have been removed.
 Their earlier attribution above is retained as historical provenance; the shared
 trace implementation now lives in src/source_trace.hpp for aim and rock queries.
+
+## Experimental first-person body visual style
+
+This independently implemented first-person body display uses the visual
+presentation associated with Evo as a design reference. No Evo source code,
+binary code, or proprietary assets are copied, extracted, ported, or included.
+Evo is mentioned solely as a style reference, not an affiliation or endorsement.

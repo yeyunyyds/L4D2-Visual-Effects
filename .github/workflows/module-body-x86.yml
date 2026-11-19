@@ -1,0 +1,73 @@
+name: Module-host first-person Windows x86 integration
+on:
+  push:
+    branches:
+      - experimental/module-host-first-person-body
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mingw-x86:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: Run full module and feature regression suite
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: bash scripts/test.sh
+      - name: Build Windows x86 DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: bash scripts/build-mingw.sh
+      - name: Package installer and source
+        run: |
+          python3 scripts/package.py
+          mv build/L4D2Visual-0.8.0.zip build/L4D2Visual-ModuleBody-Install.zip
+          git archive --format=zip --output=build/L4D2Visual-ModuleBody-Source.zip HEAD
+          python3 scripts/verify-module-body-archive.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-ModuleBody-MinGW-x86
+          path: |
+            build/L4D2Visual-ModuleBody-Install.zip
+            build/L4D2Visual-ModuleBody-Source.zip
+          if-no-files-found: error
+  msvc-x86:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check first-person, log, module host and menu unit tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
+          if not exist build mkdir build
+          for %%T in (log_settings first_person_body_patch first_person_body_math first_person_body_parts first_person_dynamic_alignment first_person_body_config module_host native_menu) do (
+            cl /nologo /utf-8 /std:c++17 /EHsc /MT /I src /I vendor tests\%%T_test.cpp /Fe:build\%%T_test.exe
+            if errorlevel 1 exit /b 1
+            build\%%T_test.exe
+            if errorlevel 1 exit /b 1
+          )
+      - name: Build Windows x86 DLL with MSVC
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
+          cl /nologo /utf-8 /std:c++17 /EHsc /O2 /MT /DNOMINMAX /DWIN32_LEAN_AND_MEAN /LD /I src /I vendor /I vendor\imgui src\plugin.cpp vendor\imgui\imgui.cpp vendor\imgui\imgui_draw.cpp vendor\imgui\imgui_tables.cpp vendor\imgui\imgui_widgets.cpp vendor\imgui\backends\imgui_impl_dx9.cpp /link /OUT:build\L4D2Visual.dll /DEF:src\L4D2Visual.def user32.lib d3d9.lib comctl32.lib gdi32.lib uuid.lib advapi32.lib ole32.lib windowscodecs.lib
+          if errorlevel 1 exit /b 1
+      - name: Package installation and exact source snapshot
+        shell: pwsh
+        run: |
+          python scripts/package.py
+          Rename-Item build/L4D2Visual-0.8.0.zip L4D2Visual-ModuleBody-Install.zip
+          git archive --format=zip --output=build/L4D2Visual-ModuleBody-Source.zip HEAD
+          python scripts/verify-module-body-archive.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-ModuleBody-MSVC-x86
+          path: |
+            build/L4D2Visual-ModuleBody-Install.zip
+            build/L4D2Visual-ModuleBody-Source.zip
+          if-no-files-found: error

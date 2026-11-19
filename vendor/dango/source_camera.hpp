@@ -38,6 +38,29 @@ inline void capture(bool active){
  captureState=state;unsigned bit=1u<<state;if(!(seenCaptureStates.fetch_or(bit)&bit))log(std::string("Source capture: ")+captureStatus(state));
  std::atomic_store(&snapshot,std::make_shared<const GameCameraFrame>(f));if(auto listener=frameListener.load(std::memory_order_acquire))listener(f);
 }
+inline bool executable(const void* address); // Defined below; checked before live calls.
+// Called from the current Studio draw stage rather than after View_Render.
+// Never publishes a frame or invokes frameListener: diagnostic/camera users
+// continue to receive the existing post-render snapshot.
+inline bool sampleDuringDraw(GameCameraFrame& f){
+ if(!hooked||!engine||!engineModule||GetModuleHandleW(L"engine.dll")!=engineModule)return false;
+ if(!readable(engine,sizeof(void*)))return false;
+ auto vt=*reinterpret_cast<void***>(engine);
+ if(!readable(vt,(WorldViewSlot+1)*sizeof(void*))||
+    !executable(vt[WorldClipSlot])||!executable(vt[WorldViewSlot])||
+    !executable(vt[InGameSlot])||!executable(vt[LoadingSlot]))return false;
+ using Matrix=const Matrix4&(__thiscall*)(void*);
+ using Bool=bool(__thiscall*)(void*);
+ if(!reinterpret_cast<Bool>(vt[InGameSlot])(engine)||
+     reinterpret_cast<Bool>(vt[LoadingSlot])(engine))return false;
+ const auto& clip=reinterpret_cast<Matrix>(vt[WorldClipSlot])(engine);
+ const auto& view=reinterpret_cast<Matrix>(vt[WorldViewSlot])(engine);
+ if(!readable(&clip,sizeof(Matrix4))||!readable(&view,sizeof(Matrix4)))return false;
+ f=GameCameraFrame{};f.active=1;f.epoch=epoch;f.tick=GetTickCount64();
+ std::memcpy(f.worldToClip.data(),&clip,64);
+ std::memcpy(f.worldToView.data(),&view,64);
+ CameraPose pose;return cameraPose(f,pose);
+}
 inline void __fastcall renderHook(void* self,void*,void* rect){static thread_local int depth=0;++depth;originalRender(self,rect);if(depth==1)capture(true);--depth;}
 inline void __fastcall shutdownHook(void* self,void*){++epoch;capture(false);originalShutdown(self);}
 inline void __fastcall levelHook(void* self,void*){++epoch;capture(false);originalLevelShutdown(self);}

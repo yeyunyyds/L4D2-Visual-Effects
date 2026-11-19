@@ -2,7 +2,7 @@
 from pathlib import Path
 import re
 root = Path(__file__).resolve().parents[1]
-for name in ('module_host.hpp', 'hud_runtime.hpp', 'plugin.cpp'):
+for name in ('module_host.hpp', 'hud_runtime.hpp', 'plugin.cpp', 'source_render.hpp'):
     text = (root / 'src' / name).read_text()
     for feature in ('tank::', 'rockui::', 'rockruntime::', 'deform::', 'animationfeature::'):
         assert feature not in text, f'{name} directly depends on {feature}'
@@ -18,3 +18,7 @@ for path in (root / 'src').glob('rock_*.hpp'):
 for pattern in ('tank_*.hpp', 'entity_transform_*.hpp'):
     for path in (root / 'src').glob(pattern):
         assert '#include "entity_menu.hpp"' not in path.read_text(), f'{path.name} imports animation entity menu'
+
+# Studio host remains implementation-neutral: no direct first-person dependency.
+assert 'first_person_body' not in (root / 'src/source_render.hpp').read_text()
+assert 'first_person_body' not in (root / 'src/plugin.cpp').read_text()

@@ -51,6 +51,11 @@ inline std::atomic<const char*> identifyReason{"No target draw yet"},poseReason{
 inline std::atomic<const char*> status{"Waiting for game modules"};
 using PoseModifier=bool(*)(std::uint32_t,std::uint32_t,const Matrix3x4*,const Vec3&,Matrix3x4*,unsigned,unsigned&);
 inline std::atomic<PoseModifier> poseModifier{nullptr};
+// Studio draw decoration follows all existing pose modifiers, and never changes
+// the shared render implementation's dependency on feature modules.
+using StudioNext=void(*)(void*,Matrix3x4*,const Vec3&);
+using StudioDecorator=void(*)(const void*,Matrix3x4*,const Vec3&,void*,StudioNext);
+inline std::atomic<StudioDecorator> studioDecorator{nullptr};
 inline HMODULE studioModule=nullptr;
 inline std::atomic<const char*> studioProfile{u8"尚未匹配"};
 struct Context {bool valid=false;DrawIdentity identity{};std::uint32_t header{},renderable{};std::uint64_t age{};int classId=-1;};
@@ -203,6 +208,20 @@ inline std::string targetSummary() {
     }
     return out;
 }
+struct StudioPassContext {
+ void* self;void* results;const void* info;float* flex;float* delayed;int flags;
+};
+inline void studioPass(void* self,void* results,const void* info,Matrix3x4* bones,
+                       float* flex,float* delayed,const Vec3& origin,int flags){
+ StudioPassContext context{self,results,info,flex,delayed,flags};
+ auto continuation=+[](void* data,Matrix3x4* nextBones,const Vec3& nextOrigin){
+  auto& c=*static_cast<StudioPassContext*>(data);
+  studioOriginal(c.self,c.results,c.info,nextBones,c.flex,c.delayed,nextOrigin,c.flags);
+ };
+ if(auto decorate=studioDecorator.load(std::memory_order_acquire))
+  decorate(info,bones,origin,&context,continuation);
+ else continuation(&context,bones,origin);
+}
 inline void __fastcall engineHook(void* self,void*,const DrawState& state,const ModelInfo& info,Matrix3x4* bones) {
     engineCalls.fetch_add(1,std::memory_order_relaxed);
     if(auto observe=modelObserver.load(std::memory_order_acquire))try{observe(state.header,info.index,info.origin);}catch(...){}
@@ -248,7 +267,7 @@ template<std::size_t Capacity> __declspec(noinline) void studioTargetDraw(
     if(enabled.load() && target && target->valid)targetResult(*target,changed,direct,studio?studio->name:emptyModel);
     // The verified studio implementation copies non-render-arena matrices for
     // queued draws (66e50). Our local copy survives until that copy completes.
-    studioOriginal(self,results,info,changed?copy.bones.data():bones,flex,delayed,origin,flags);
+    studioPass(self,results,info,changed?copy.bones.data():bones,flex,delayed,origin,flags);
     if(changed) {
         if(drawn.fetch_add(1,std::memory_order_relaxed)==0)source_camera::log("First visual stretch submitted; original entity and bone cache untouched");
         status="Stretch draws submitted; inspect feet and animation in game";
@@ -262,7 +281,7 @@ inline void studioCore(void* self,void*,void* results,const void* info,Matrix3x4
         if(source_entities::wire::load(source_entities::reader,address,header)&&source_entities::wire::load(source_entities::reader,address+24,renderable))observe(header,renderable,origin);
     }catch(...){}
 
-    if(!enabled.load()){studioOriginal(self,results,info,bones,flex,delayed,origin,flags);return;}
+    if(!enabled.load()){studioPass(self,results,info,bones,flex,delayed,origin,flags);return;}
     Context fallback;Context* target=context;bool direct=false;
     std::uint32_t header{},renderable{};
     auto ptr=std::uint32_t(reinterpret_cast<std::uintptr_t>(info));
@@ -275,7 +294,7 @@ inline void studioCore(void* self,void*,void* results,const void* info,Matrix3x4
         }
     }catch(...){rejected.fetch_add(1,std::memory_order_relaxed);target=nullptr;}
     // Ordinary props/non-target draws must not zero two 12KB pose buffers.
-    if(!target || !target->valid){studioOriginal(self,results,info,bones,flex,delayed,origin,flags);return;}
+    if(!target || !target->valid){studioPass(self,results,info,bones,flex,delayed,origin,flags);return;}
     if(boneLimit.load(std::memory_order_relaxed)==256)
         studioTargetDraw<256>(self,results,info,bones,flex,delayed,origin,flags,target,direct);
     else studioTargetDraw<128>(self,results,info,bones,flex,delayed,origin,flags,target,direct);

@@ -12,6 +12,7 @@
 #include "stretch.hpp"
 struct IDirect3DDevice9;
 namespace visual::modules {
+using StudioNext=void(*)(void*,Matrix3x4*,const dango::Vec3&);
 struct Module {
  std::string id;
  std::shared_ptr<void> stateOwner;
@@ -36,6 +37,9 @@ struct Module {
  std::function<void(IDirect3DDevice9*,float,float)> drawOverlay;
  std::function<void(float,float)> drawNativeOverlay;
  std::function<void(const char*)> unavailable;
+ std::function<void(IDirect3DDevice9*)> deviceCreated;
+ // Optional post-pose, draw-only wrapper; continuations must run exactly once.
+ std::function<void(const void*,Matrix3x4*,const dango::Vec3&,void*,StudioNext)> studioDraw;
  std::function<bool(std::uintptr_t)> previewKeys;
  std::function<void(std::uintptr_t,float,float,bool)> preview;
 };
@@ -66,6 +70,11 @@ public:
  void drawOverlay(IDirect3DDevice9* d,float w,float h){if(quiet)return;for(auto& e:entries)if(e.drawOverlay)try{e.drawOverlay(d,w,h);}catch(...){if(e.unavailable)e.unavailable("overlay exception");}}
  void drawNativeOverlay(float w,float h){if(quiet)return;for(auto& e:entries)if(e.drawNativeOverlay)e.drawNativeOverlay(w,h);}
  void unavailable(const char* reason){for(auto& e:entries)if(e.unavailable)e.unavailable(reason);}
+ void deviceCreated(IDirect3DDevice9* d){if(!quiet)for(auto& e:entries)if(e.deviceCreated)e.deviceCreated(d);}
+ void decorateStudio(const void* info,Matrix3x4* bones,const dango::Vec3& origin,void* data,StudioNext next){
+  if(!quiet)for(auto& e:entries)if(e.studioDraw){e.studioDraw(info,bones,origin,data,next);return;}
+  next(data,bones,origin);
+ }
  bool previewKeys(std::uintptr_t page)const{if(quiet)return false;for(auto& e:entries)if(e.previewKeys&&e.previewKeys(page))return true;return false;}
  void preview(std::uintptr_t page,float w,float h,bool focused){if(quiet)return;for(auto& e:entries)if(e.preview&&e.previewKeys&&e.previewKeys(page)){e.preview(page,w,h,focused);return;}}
  bool observing()const{if(quiet)return false;for(auto& e:entries)if(e.observing&&e.observing())return true;return false;}
