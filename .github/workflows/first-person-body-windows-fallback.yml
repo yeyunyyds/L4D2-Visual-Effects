@@ -1,0 +1,70 @@
+name: First-person body native gate MSVC x86 fallback
+on:
+  push:
+    branches:
+      - experimental/first-person-body-abi-probe
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  msvc-x86:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check native-gate pure C++ unit tests (x86)
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
+          if not exist build mkdir build
+          cl /nologo /utf-8 /std:c++17 /EHsc /MT /I src /I vendor tests\first_person_body_patch_test.cpp /Fe:build\first_person_body_patch_test.exe
+          if errorlevel 1 exit /b 1
+          build\first_person_body_patch_test.exe
+          if errorlevel 1 exit /b 1
+          cl /nologo /utf-8 /std:c++17 /EHsc /MT /I src /I vendor tests\first_person_body_config_test.cpp /Fe:build\first_person_body_config_test.exe
+          if errorlevel 1 exit /b 1
+          build\first_person_body_config_test.exe
+          if errorlevel 1 exit /b 1
+      - name: Compile experimental Windows x86 L4D2Visual DLL (MSVC)
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
+          cl /nologo /utf-8 /std:c++17 /EHsc /O2 /MT /LD /I src /I vendor /I vendor\imgui src\plugin.cpp vendor\imgui\imgui.cpp vendor\imgui\imgui_draw.cpp vendor\imgui\imgui_tables.cpp vendor\imgui\imgui_widgets.cpp vendor\imgui\backends\imgui_impl_dx9.cpp /link /OUT:build\L4D2Visual.dll /DEF:src\L4D2Visual.def user32.lib d3d9.lib comctl32.lib gdi32.lib uuid.lib advapi32.lib ole32.lib windowscodecs.lib
+          if errorlevel 1 exit /b 1
+      - name: Package installation and exact source snapshot
+        shell: pwsh
+        run: python scripts/package-first-person-body.py
+      - name: Verify installer/source ZIP and x86 architecture
+        shell: pwsh
+        run: |
+          @'
+          import zipfile, json, struct
+          from pathlib import Path
+          base=Path('build')
+          install=base/'L4D2Visual-FirstPersonBody-Experimental.zip'
+          source=base/'L4D2Visual-FirstPersonBody-Experimental-source.zip'
+          with zipfile.ZipFile(install) as z:
+              assert z.testzip() is None
+              assert {i.split('/')[0] for i in z.namelist()}=={'bin','README.md'}
+              dll=z.read('bin/neko/plugins/L4D2Visual.dll')
+              off=struct.unpack_from('<I',dll,0x3c)[0]
+              assert dll[off:off+4]==b'PE\x00\x00'
+              assert struct.unpack_from('<H',dll,off+4)[0]==0x14c
+              assert b'0.8.0-fpb-native-gate-experimental' in dll
+              j=json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
+              assert j['firstPersonBody']['enabled'] is False
+              assert 'bin/neko/plugins/L4D2Visual/licenses/LICENSE' in z.namelist()
+          with zipfile.ZipFile(source) as z:
+              assert z.testzip() is None
+              for path in ('src/first_person_native_gate.hpp','src/first_person_body_patch.hpp','tests/first_person_body_patch_test.cpp','docs/research/first-person-body-native-gate.md'):
+                  assert path in z.namelist()
+          print('MSVC x86 and archive checks passed')
+          '@ | python
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-FirstPersonBody-NativeGate-MSVC-x86
+          path: |
+            build/L4D2Visual-FirstPersonBody-Experimental.zip
+            build/L4D2Visual-FirstPersonBody-Experimental-source.zip
+          if-no-files-found: error
