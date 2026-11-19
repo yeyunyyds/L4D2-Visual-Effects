@@ -138,7 +138,7 @@ std::string buildMenu(uintptr_t id){
  auto parameters=std::atomic_load(&visual::render::animation);
  auto f=std::atomic_load(&source_entities::snapshot);
  auto selection=std::atomic_load(&visual::render::selection);entityMenus.observe(*f,*selection);visual::aimruntime::poll(entityMenus,f->epoch);
- if(id==820){auto s=std::atomic_load(&visual::firstperson::options);return "\"第一人称身体渲染（ABI 诊断）\" {"+item(s->enabled?u8"第一人称身体渲染 [开]":u8"第一人称身体渲染 [关]",821)+row(visual::firstperson::status.load())+row(u8"功能尚未激活：缺少经过验证的原生可见性 Hook")+item(u8"保存设置",101)+"}";}
+ if(id==820){auto s=std::atomic_load(&visual::firstperson::options);return "\"第一人称身体渲染（ABI 诊断）\" {"+item(s->enabled?u8"第一人称身体渲染 [开]":u8"第一人称身体渲染 [关]",821)+row(visual::firstperson::status.load())+row("ShouldDraw local/true/false: "+std::to_string(visual::firstperson::localCalls.load())+"/"+std::to_string(visual::firstperson::nativeTrue.load())+"/"+std::to_string(visual::firstperson::nativeFalse.load()))+row(u8"仅观察；原生可见性保持不变")+item(u8"保存设置",101)+"}";}
  if(id==700||id==701)return visual::rockui::menu(id);
  if(id==328)return visual::tank::menu(id,visual::tank::outline::status.load());
  if(id==320||id==322||id==323||id==324)return visual::tank::menu(id);
@@ -168,7 +168,7 @@ std::string buildMenu(uintptr_t id){
  item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
  item(experimental,108)+item(u8"接口与日志诊断",24)+item(u8"保存设置",101)+"}";
  return "\"L4D2Visual 0.8.0-fpb-abi-probe\" {"+item(requested?u8"邦友的酒[开]":u8"邦友的酒[关]",300)+
- item(u8"实体缩放与拉伸",800)+item(std::atomic_load(&visual::firstperson::options)->enabled?u8"第一人称身体渲染 [开]（未就绪）":u8"第一人称身体渲染 [关]",820)+item(u8"自定义喷漆",150)+item(u8"Tank 行为预测",320)+item(visual::rockui::title(),700)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+"}";
+ item(u8"实体缩放与拉伸",800)+item(std::atomic_load(&visual::firstperson::options)->enabled?u8"第一人称身体渲染 [开]（仅诊断）":u8"第一人称身体渲染 [关]",820)+item(u8"自定义喷漆",150)+item(u8"Tank 行为预测",320)+item(visual::rockui::title(),700)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+"}";
 }
 void action(uintptr_t id){if(id==821){auto s=*std::atomic_load(&visual::firstperson::options);s.enabled=!s.enabled;std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(s));saveMessage=u8"设置未保存；可见性 ABI 未验证，不会实际渲染";return;}if(visual::rockui::action(id)){saveMessage=u8"石头预测设置未保存";return;}if(visual::deform::action(id)){saveMessage=visual::deform::notice;return;}if(visual::tank::visualAction(id)){saveMessage=u8"Tank 样式未保存";return;}if(visual::tank::action(id)){saveMessage=u8"Tank预测设置未保存";return;}if(visual::picturemenu::action(id)){saveMessage=visual::picturemenu::notice.load();return;}if(entityAction(id))return;if(id==100)toggle();if(id>=110&&id<=117){auto a=*std::atomic_load(&visual::render::animation);a=visual::adjustAnimation(a,unsigned(id));std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(a));visual::render::startedAt=GetTickCount64();saveMessage=u8"动画设置未保存";}if(id==119){visual::render::compatibility=!visual::render::compatibility.load();saveMessage=u8"渲染模式未保存";}if(id==118){visual::render::boneLimit=visual::nextBoneLimit(visual::render::boneLimit.load());saveMessage=u8"骨骼上限未保存";}if(id==101){saveRequested=true;saveMessage=u8"已提交保存";}}
 void closed(){}
