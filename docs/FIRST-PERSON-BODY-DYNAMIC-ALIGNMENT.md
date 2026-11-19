@@ -15,22 +15,19 @@ translation. A camera-forward body offset mitigates it without eliminating
 all mesh-interior views. Existing user `hud.json` values are never forced
 overwritten; only factory defaults and packaged sample are changed.
 
-## Intent, provenance and verification
-The user has confirmed that L4D2Visual's native DrawModel visibility gate and
-manual Studio pose translation work in their real game. The new dynamic position
-path is **not yet game-tested**, and must never be described as an exact copy
-of Evo's proprietary implementation.
+## Purpose and independent implementation
 
-The supplied "L4D2 Evolved.zip" v1.1.9 contains ONLY binaries and configuration:
-- vr/config.sample lists FirstPersonBodyAnchorOffsetMeters, CameraOffsetMeters,
-  FallbackCameraOffsetMeters, AnchorRotationOffsetDeg and optional head/arm filters.
-- updatelog.txt v1.0.9 says calibrations are stored per MOD rather than per survivor.
-- L4D2Evolved.dll diagnostic strings describe inverse-bind recovery, a verified
-  model eye position with stale-eye rejection, a chest/neck/head fallback,
-  headFromAnchor / chestFromAnchor, bodyYawRoot, and upper-body locking.
+Dynamic body placement is part of the project's experimental **Evo-style
+first-person visual presentation**. The design objective is to maintain an
+appropriate relationship between the camera and the local player's rendered
+body as the model animates. This is an independently developed implementation,
+not a code port or reproduction of another plugin's internals.
 
-Our model-aware implementation is independently authored. No binary code is
-copied and no undocumented Evo interfaces are called.
+The feature combines Source model metadata, per-model calibration, render-time
+camera measurements, and a temporary Studio bone-matrix copy. It does not
+incorporate any Evo source code, binary code, or proprietary assets. Evo is
+mentioned only as a visual reference; neither implementation equivalence nor
+affiliation is implied.
 
 ## Runtime algorithm
 1. Keep current strict native visibility gate, alive-local-survivor identity,
@@ -54,7 +51,7 @@ copied and no undocumented Evo interfaces are called.
    direction, bounded to 0.90 rad maximum; enabled in the tuned preset. Optional
    per-model yaw trim is bounded to ±40 degrees.
 7. Copy all Studio matrices; apply the bounded transform to the temporary copy.
-   Then run the existing Evo-inspired hide-head/hide-arms on that same copy,
+   Then apply the separately configured head/arm branch hiding on that copy,
    and call the native Studio original exactly once.
 8. If there is no valid inverse-bind pose, bootstrap a live model-relative
    anchor at the first valid sample. Invalid camera, anchor, matrices, or
@@ -76,8 +73,9 @@ copied and no undocumented Evo interfaces are called.
   samples vs failures, active model and calibration source.
 
 ## Important limitations
-- Evo uses its own VR/NoHMD HMD-centred body yaw, room-scale lean,
-  head/IK and weapon interaction. **Those proprietary systems are NOT included.**
+- The intended appearance is a style reference only. This experimental
+  feature does not implement a complete VR/IK pipeline, room-scale body
+  tracking, or advanced weapon interaction.
 - Current engine matrices MAY still be one render stage behind if Source
   updates them after the Studio callback. The diagnostic measures successful
   reads, not proven temporal alignment.

@@ -1,6 +1,6 @@
 #pragma once
 // Independent model-aware first-person body placement for native Studio draws.
-// No Evo binary code or engine-memory writes. Inputs are validated draw copies.
+// Independently developed: validated camera/model data and per-draw bone copies.
 #include "first_person_body_config.hpp"
 #include "first_person_body_parts.hpp"
 #include "dango/world_camera.hpp"

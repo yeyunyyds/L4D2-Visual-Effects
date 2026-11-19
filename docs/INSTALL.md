@@ -2,6 +2,8 @@
 
 本版基于通过用户验收的整合测试版，由 GitHub CI 构建与发布。正式源码标签为 v0.8.0：https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0 。另提供 `L4D2Visual-0.8.0-source.zip`；源码提交号附在本 README 末尾。
 
+> **版本范围：** 本文针对 `v0.8.0` 正式版。`experimental/first-person-body-abi-probe` 实验分支另行提供参考 Evo 视觉风格、由本项目独立实现的第一人称身体呈现功能；它不属于 v0.8.0 正式版。相关说明见[第一人称身体呈现](FIRST-PERSON-BODY-ANATOMY.md)。
+
 ## 安装
 
 1. 完全退出游戏，备份当前 `L4D2Visual.dll` 与 `hud.json`。

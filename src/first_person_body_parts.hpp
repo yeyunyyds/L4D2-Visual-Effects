@@ -1,5 +1,5 @@
 #pragma once
-// Evo-inspired anatomy treatment, independently implemented from MDL bones.
+// Original render-only bone-branch handling for Evo-style first-person presentation.
 // Operates ONLY on caller-owned per-draw Studio matrix copies.
 #include "studio_pose.hpp"
 #include <array>

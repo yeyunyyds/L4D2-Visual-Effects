@@ -140,10 +140,10 @@ std::string buildMenu(uintptr_t id){
  auto parameters=std::atomic_load(&visual::render::animation);
  auto f=std::atomic_load(&source_entities::snapshot);
  auto selection=std::atomic_load(&visual::render::selection);entityMenus.observe(*f,*selection);visual::aimruntime::poll(entityMenus,f->epoch);
- if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第一人称身体 · 设置\" {"+
+ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"Evo 风格 · 第一人称身体设置\" {"+
   item(s->enabled?u8"身体渲染：[开]":u8"身体渲染：[关]",861)+
-  item(s->hideHead?u8"Evo式隐藏头部：[开]":u8"Evo式隐藏头部：[关]",884)+
-  item(s->hideArms?u8"Evo式隐藏第三人称手臂：[开]":u8"Evo式隐藏第三人称手臂：[关]",885)+
+  item(s->hideHead?u8"头部骨骼隐藏：[开]":u8"头部骨骼隐藏：[关]",884)+
+  item(s->hideArms?u8"第三人称手臂隐藏：[开]":u8"第三人称手臂隐藏：[关]",885)+
   item(s->dynamicAnchor?u8"动态身体定位 [开] · 校准":u8"动态身体定位 [关] · 校准",865)+
   item(s->clipEnabled?u8"旧GPU高度裁剪：[开]（实验）":u8"旧GPU高度裁剪：[关]（实验）",862)+
   item(u8"模型位置 · 前后/左右/高度",863)+
@@ -184,8 +184,8 @@ std::string buildMenu(uintptr_t id){
   row(visual::firstperson::status.load())+
   row("Native gate active/enables/restores/failures: "+std::to_string(visual::firstperson::native::active.load())+"/"+std::to_string(visual::firstperson::native::enables.load())+"/"+std::to_string(visual::firstperson::native::restores.load())+"/"+std::to_string(visual::firstperson::native::failures.load()))+
   row("Body Studio matches/shifts/rejects: "+std::to_string(visual::firstperson::effects::matched.load())+"/"+std::to_string(visual::firstperson::effects::shifted.load())+"/"+std::to_string(visual::firstperson::effects::shiftRejected.load()))+
-  row("Evo head done/rejected: "+std::to_string(visual::firstperson::effects::headHidden.load())+"/"+std::to_string(visual::firstperson::effects::headRejected.load()))+
-  row("Evo arm done/rejected: "+std::to_string(visual::firstperson::effects::armsHidden.load())+"/"+std::to_string(visual::firstperson::effects::armsRejected.load()))+
+  row("Head branch applied/rejected: "+std::to_string(visual::firstperson::effects::headHidden.load())+"/"+std::to_string(visual::firstperson::effects::headRejected.load()))+
+  row("Arm branch applied/rejected: "+std::to_string(visual::firstperson::effects::armsHidden.load())+"/"+std::to_string(visual::firstperson::effects::armsRejected.load()))+
   row("Dynamic applied/rejected: "+std::to_string(visual::firstperson::effects::dynamicApplied.load())+"/"+std::to_string(visual::firstperson::effects::dynamicRejected.load()))+
   row("Live camera success/failure: "+std::to_string(visual::firstperson::effects::sameFrameCamera.load())+"/"+std::to_string(visual::firstperson::effects::liveCameraRejected.load()))+
   row(visual::firstperson::effects::dynamicStatus.load())+row(visual::firstperson::effects::dynamicSource.load())+

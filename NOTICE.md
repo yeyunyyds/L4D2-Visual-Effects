@@ -101,3 +101,15 @@ CampaignOutline* glow ownership and native color-proxy route from the same
 Skeeto commit above (Copyright (C) 2026 regoists), under GPL-3.0. It validates
 the exact client image/native entry points and embedded glow layout, preserves
 existing glows and restores only values still owned by this feature.
+
+## First-person body presentation — visual style reference
+
+The experimental first-person body feature takes inspiration from the visual
+presentation associated with Evo. Its implementation is independently developed
+within L4D2 Visual Effects using the project's own rendering and model-handling
+code. It does not contain, copy, extract, port, or reuse Evo source code, binary
+code, or proprietary assets.
+
+Evo is referenced solely to describe a visual design direction. This project
+is not affiliated with or endorsed by Evo or its developers. The reference does
+not imply that the projects share code or that their features are equivalent.
