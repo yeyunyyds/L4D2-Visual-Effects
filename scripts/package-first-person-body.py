@@ -33,6 +33,12 @@ readme+='Possible head/hair clipping, arms/weapons overlap and animation anomali
 readme+='Back up plugin DLL and hud.json, exit game, extract to game directory.\n'
 readme+='Switch off to restore original logic; to roll back restore saved plugin.\n'
 readme+='See docs/research/first-person-body-native-gate.md in the source ZIP.\n'
+readme+='New: first-person clip plane at adjustable model-relative height; optional\n'
+readme+='three-axis display-only body translation via Studio bone copies.\n'
+readme+='Main menu [3] toggles body; menu [9] opens advanced cut/position pages.\n'
+readme+='New settings default OFF or ZERO; save in existing hud.json.\n'
+readme+='The body was confirmed visible by user before these effects. New clipping\n'
+readme+='and offset handling remain game-untested, including shader/deferred passes.\n'
 readme+='NOT A STABLE RELEASE. Do not assume VAC safety.\n'
 readme+='\nSource commit: '+revision+'\n'
 with zipfile.ZipFile(build/filename,'w',zipfile.ZIP_DEFLATED) as z:
@@ -52,7 +58,7 @@ with zipfile.ZipFile(build/filename) as z:
     pe=int.from_bytes(data[0x3c:0x40],'little')
     assert data[pe:pe+4]==b'PE\x00\x00'
     assert int.from_bytes(data[pe+4:pe+6],'little')==0x14c
-    assert b'0.8.0-fpb-native-gate-experimental' in data
+    assert b'0.8.0-fpb-clip-offset-experimental' in data
     config=json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
     assert config['firstPersonBody']['enabled'] is False
 print(build/filename)

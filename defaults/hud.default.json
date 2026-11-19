@@ -85,6 +85,12 @@
     "landingOpacity": 0.5
   },
   "firstPersonBody": {
-    "enabled": false
+    "enabled": false,
+    "clipEnabled": false,
+    "clipHeight": 65,
+    "forward": 0,
+    "right": 0,
+    "up": 0,
+    "step": 1
   }
 }
