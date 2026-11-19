@@ -28,3 +28,21 @@ Not verified by automation: actual L4D2 animation/physics/render behavior,
 camera/Studio callback timing under load, exotic third-party skeletons,
 game online/anti-cheat compatibility. Back up the original DLL and hud.json.
 Test in offline environments before wider use.
+
+## TLTPV first-/third-person mode gate (opt-in)
+
+`firstPersonBody.tltpvCompatibility` defaults to `false`, including old
+configurations. It does not parse the complete TLTPV CFG state machine.
+The module reads the SHA-256-verified client.dll ConVar object at RVA
+`0x7589c8` for `c_thirdpersonshoulder` (read-only name/parent checks),
+then compares the current camera eye to the local networked player origin.
+
+Third and Unknown modes restore the native DrawModel gate on the next game
+frame and skip the Studio draw decoration; a second camera probe occurs at
+draw time. Changing camera modes invalidates the dynamic alignment tracking
+state. When compatibility is disabled, the original body rendering path remains.
+
+Test TLTPV's ordinary `firstperson` and `thirdpersonshoulder` transitions
+in game. Shoulder camera collision and network interpolation can produce an
+Unknown result. This is an experimental spatial heuristic, not a verified
+engine camera-mode accessor.

@@ -11,7 +11,11 @@ inline modules::Module create(){modules::Module m;m.id="deformation";m.menuOrder
   if(id==800){
    // Navigation only; no dependency on another feature's implementation.
    auto last=content.rfind('}');
-   if(last!=std::string::npos)content.insert(last,ui::item(u8"邦友的酒 · 设置",300));
+   if(last!=std::string::npos){
+    // Parent item must be FIRST on the FIRST page, not appended.
+    auto first=content.find('{');
+    if(first!=std::string::npos)content.insert(first+1,ui::item(u8"邦友的酒 · 设置",300));
+   }
   }
   return content;
  }return std::nullopt;};

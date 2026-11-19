@@ -19,6 +19,7 @@ int main(){
  assert(expected.followCameraYaw==factory.followCameraYaw&&expected.clipHeight==factory.clipHeight);
 
  assert(readSettings(empty).enabled&&!readSettings(empty).clipEnabled);
+ assert(!readSettings(empty).tltpvCompatibility);
  assert(readSettings(empty).clipHeight==81.f && readSettings(empty).forward==-13.f);
  assert(readSettings(empty).right==-1.f && readSettings(empty).up==-1.f);
  assert(readSettings(empty).hideHead && readSettings(empty).hideArms);
@@ -29,6 +30,7 @@ int main(){
  auto cfg=readSettings(saved);assert(cfg.enabled&&cfg.clipEnabled&&cfg.clipHeight==71.f);
  assert(cfg.forward==3.f&&cfg.right==-2.f&&cfg.up==6.f);
  assert(adjust(cfg,870)&&!cfg.clipEnabled);
+ assert(adjust(cfg,886)&&cfg.tltpvCompatibility);
  assert(adjust(cfg,876)&&cfg.forward==4.f);
  assert(adjust(cfg,883)&&cfg.forward==0&&cfg.right==0&&cfg.up==0);
  assert(adjust(cfg,882)&&cfg.step==5.f);
@@ -43,6 +45,8 @@ int main(){
  writeSettings(saved,cfg);
  assert(saved.at("tankPrediction").at("enabled")==false);
  assert(readSettings(saved).clipHeight==66.f);
+ assert(readSettings(saved).tltpvCompatibility);
  writeSettings(saved,Settings{});
  assert(readSettings(saved).enabled&&!readSettings(saved).clipEnabled);
+ assert(!readSettings(saved).tltpvCompatibility);
 }

@@ -15,6 +15,7 @@ inline bool validModelKey(const std::string& name){
 }
 struct Settings {
  bool enabled=true,clipEnabled=false,hideHead=true,hideArms=true;
+ bool tltpvCompatibility=false; // Explicit opt-in; old configurations retain behavior.
  // User-tested visual baseline (experimental, not a universal per-MOD calibration).
  bool dynamicAnchor=true,followCameraYaw=true;
  float clipHeight=81.f,forward=-13.f,right=-1.f,up=-1.f,step=1;
@@ -72,6 +73,7 @@ template<class Json> Settings readSettings(const Json& root){
  auto readBool=[&](const char* key,bool& value){auto v=it->find(key);if(v!=it->end()&&v->is_boolean())value=v->template get<bool>();};
  auto readFloat=[&](const char* key,float& value){auto v=it->find(key);if(v!=it->end()&&v->is_number())value=v->template get<float>();};
  readBool("enabled",s.enabled);readBool("clipEnabled",s.clipEnabled);
+ readBool("tltpvCompatibility",s.tltpvCompatibility);
  readBool("hideHead",s.hideHead);readBool("hideArms",s.hideArms);
  readBool("dynamicAnchor",s.dynamicAnchor);readBool("followCameraYaw",s.followCameraYaw);
  readFloat("clipHeight",s.clipHeight);readFloat("forward",s.forward);
@@ -99,6 +101,7 @@ template<class Json> void writeSettings(Json& root,const Settings& settings){
   array.push_back(Json{{"model",p.model},{"checksum",p.checksum},{"forward",p.forward},
    {"right",p.right},{"up",p.up},{"yaw",p.yaw}});
  root["firstPersonBody"]=Json{{"enabled",s.enabled},{"clipEnabled",s.clipEnabled},
+  {"tltpvCompatibility",s.tltpvCompatibility},
   {"hideHead",s.hideHead},{"hideArms",s.hideArms},
   {"dynamicAnchor",s.dynamicAnchor},{"followCameraYaw",s.followCameraYaw},
   {"clipHeight",s.clipHeight},{"forward",s.forward},{"right",s.right},
@@ -117,6 +120,7 @@ inline bool adjust(Settings& s,std::uintptr_t id){
  case 882:s.step=s.step==.5f?1.f:s.step==1.f?5.f:.5f;break;
  case 883:s.forward=s.right=s.up=0;break;
  case 884:s.hideHead=!s.hideHead;break;case 885:s.hideArms=!s.hideArms;break;
+ case 886:s.tltpvCompatibility=!s.tltpvCompatibility;break;
  case 887:s.dynamicAnchor=!s.dynamicAnchor;break;
  case 888:s.followCameraYaw=!s.followCameraYaw;break;
  case 889:s.fallbackEyeHeight+=1;break;case 890:s.fallbackEyeHeight-=1;break;

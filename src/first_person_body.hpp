@@ -6,6 +6,7 @@
 #include <cstring>
 #include "first_person_body_config.hpp"
 #include "first_person_native_gate.hpp"
+#include "tltpv_runtime.hpp"
 #include "local_player.hpp"
 #include "survivors.hpp"
 namespace visual::firstperson {
@@ -145,6 +146,26 @@ inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
     !entry.entity||entry.serial!=(handle>>12)){
   clear();detach();status=u8"实体 handle/serial 未通过";return;
  }
+ // Compatibility is opt-in. Do not force native local DrawModel in a
+ // confirmed third-person view or when the current mode is unverified.
+ const auto cfg=std::atomic_load(&options);
+ if(cfg->tltpvCompatibility){
+  const auto viewed=tltpv::detect(camera,actor->networkOrigin);
+  const auto before=tltpv::mode.load(std::memory_order_acquire);
+  tltpv::observe(viewed);
+  if(before!=viewed)source_camera::log(std::string("FPB TLTPV view: ")+tltpv::label(viewed));
+  tltpv::status=viewed==tltpv::Mode::First?"TLTPV: first-person body enabled":
+      viewed==tltpv::Mode::Third?"TLTPV: third-person, native body restored":
+      "TLTPV: unknown camera mode, native body restored";
+  if(viewed!=tltpv::Mode::First){
+   clear();detach();
+   status=viewed==tltpv::Mode::Third?u8"TLTPV 第三人称：恢复原生模型":
+      u8"TLTPV 视角未验证：保持原生模型";
+   return; // RestoreOnFailure invokes native::disable().
+  }
+ }else if(tltpv::mode.load(std::memory_order_acquire)!=tltpv::Mode::Unknown){
+  tltpv::reset();tltpv::status="TLTPV compatibility disabled";
+ }
  if(!install(entry.entity)){clear();return;}
  currentHandle=handle;currentEpoch=camera.epoch;localBase=entry.entity;localTick=camera.tick;
  validatedLocal=true;
@@ -153,7 +174,7 @@ inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
  status=u8"本机原生 DrawModel 分支已放行（游戏内未验证）";
 }
 inline void stop() noexcept {
- native::disable();clear();detach();status=u8"插件退出；原生可见性未修改";
+ native::disable();clear();detach();tltpv::reset();status=u8"插件退出；原生可见性未修改";
 }
 inline bool isDrawing() noexcept {return false;}
 }

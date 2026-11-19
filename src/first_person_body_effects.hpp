@@ -68,6 +68,8 @@ inline bool select(std::uint32_t renderable,Context& ctx) noexcept {
  if(!base||renderable!=base+4)return false;
  ctx.options=std::atomic_load(&options);
  if(!ctx.options->enabled)return false;
+ if(ctx.options->tltpvCompatibility&&
+    tltpv::mode.load(std::memory_order_acquire)!=tltpv::Mode::First)return false;
  if(!ctx.options->clipEnabled&&!ctx.options->hideHead&&!ctx.options->hideArms&&
     ctx.options->forward==0&&ctx.options->right==0&&ctx.options->up==0&&!ctx.options->dynamicAnchor)return false;
  ctx.camera=std::atomic_load(&source_camera::snapshot);
@@ -141,6 +143,27 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  }
  Context ctx;
  if(!select(renderable,ctx)) {original(bones,origin);return;}
+ if(ctx.options->tltpvCompatibility){
+  // TLTPV can switch cameras after the previous game-frame snapshot.
+  // Validate the current Studio-draw camera before changing any matrix.
+  const auto frame=std::atomic_load(&source_entities::snapshot);
+  std::optional<dango::Vec3> playerOrigin;
+  if(frame&&frame->epoch==ctx.camera->epoch)
+   for(const auto& actor:frame->records)if(actor.handle==ctx.handle){
+    playerOrigin=actor.networkOrigin;break;
+   }
+  dango::GameCameraFrame live{};
+  auto viewed=tltpv::Mode::Unknown;
+  if(source_camera::sampleDuringDraw(live)&&live.epoch==ctx.camera->epoch)
+   viewed=tltpv::detect(live,playerOrigin);
+  tltpv::observe(viewed);
+  if(viewed!=tltpv::Mode::First){
+   tltpv::status=viewed==tltpv::Mode::Third?
+     "TLTPV: draw-time third-person camera, body bypassed":
+     "TLTPV: draw-time camera uncertain, body bypassed";
+   original(bones,origin);return;
+  }
+ }
  ++matched;
  dango::Vec3 shift{};bool moved=false,partChanged=false,dynamicMoved=false;
  visual::Matrix3x4 temporary[256];
@@ -164,6 +187,9 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  }
  if(wantDynamic){
   static thread_local dynamic::Track tracking;
+  static thread_local unsigned lastModeGeneration=0;
+  const unsigned now=tltpv::generation.load(std::memory_order_acquire);
+  if(now!=lastModeGeneration){tracking=dynamic::Track{};lastModeGeneration=now;}
   dango::GameCameraFrame live{};
   dango::CameraPose pose{};
   if(ready&&source_camera::sampleDuringDraw(live)&&

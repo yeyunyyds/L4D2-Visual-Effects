@@ -18,6 +18,7 @@ inline std::optional<std::string> page(std::uintptr_t id){
  if(id!=860&&id!=862&&id!=863&&id!=864&&id!=865)return std::nullopt;
 if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"Evo 风格 · 第一人称身体设置\" {"+
   item(s->enabled?u8"身体渲染：[开]":u8"身体渲染：[关]",861)+
+  item(s->tltpvCompatibility?u8"TLTPV 第三人称兼容：[开]":u8"TLTPV 第三人称兼容：[关]（默认）",886)+
   item(s->hideHead?u8"头部骨骼隐藏：[开]":u8"头部骨骼隐藏：[关]",884)+
   item(s->hideArms?u8"第三人称手臂隐藏：[开]":u8"第三人称手臂隐藏：[关]",885)+
   item(s->dynamicAnchor?u8"动态身体定位 [开] · 校准":u8"动态身体定位 [关] · 校准",865)+
@@ -58,6 +59,8 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"Evo
  if(id==864){auto s=std::atomic_load(&visual::firstperson::options);
   return "\"第一人称身体 · 运行诊断\" {"+
   row(visual::firstperson::status.load())+
+  row(std::string("TLTPV: ")+visual::tltpv::status.load()+
+      " c_thirdpersonshoulder="+std::to_string(visual::tltpv::shoulderValue.load()))+
   row("Native gate active/enables/restores/failures: "+std::to_string(visual::firstperson::native::active.load())+"/"+std::to_string(visual::firstperson::native::enables.load())+"/"+std::to_string(visual::firstperson::native::restores.load())+"/"+std::to_string(visual::firstperson::native::failures.load()))+
   row("Body Studio matches/shifts/rejects: "+std::to_string(visual::firstperson::effects::matched.load())+"/"+std::to_string(visual::firstperson::effects::shifted.load())+"/"+std::to_string(visual::firstperson::effects::shiftRejected.load()))+
   row("Head branch applied/rejected: "+std::to_string(visual::firstperson::effects::headHidden.load())+"/"+std::to_string(visual::firstperson::effects::headRejected.load()))+
@@ -88,7 +91,7 @@ inline bool action(std::uintptr_t id){
   }else saveMessage=u8"没有可更新的当前MOD校准";
   return true;
  }
- if((id>=870&&id<=885)||(id>=887&&id<=893)){
+ if((id>=870&&id<=893)){
   auto s=*std::atomic_load(&visual::firstperson::options);
   if(visual::firstperson::adjust(s,id)){
    std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(s));
@@ -126,6 +129,7 @@ inline modules::Module create(){
   });
  };
  m.diagnostics=[] {return "body="+std::to_string(std::atomic_load(&firstperson::options)->enabled)+
+  " TLTPV="+std::string(tltpv::label(tltpv::mode.load()))+
   " native="+std::to_string(firstperson::native::active.load())+
   " aligned="+std::to_string(firstperson::effects::dynamicApplied.load())+
   " rejected="+std::to_string(firstperson::effects::dynamicRejected.load());};

@@ -80,7 +80,8 @@
     "right": -1,
     "step": 1,
     "up": -1,
-    "yawTrim": 0
+    "yawTrim": 0,
+    "tltpvCompatibility": false
   },
   "logging": {
     "level": "info"

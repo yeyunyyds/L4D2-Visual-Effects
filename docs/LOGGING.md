@@ -43,3 +43,11 @@ rendering, and first-person body settings.
 This change only gates the previously high-volume *periodic* diagnostic
 writer. It does **not** suppress logs emitted elsewhere, prevent individual
 components from writing event messages, or change file rotation.
+
+## TLTPV mode-gate diagnostics
+
+When the optional compatibility mode is enabled, the first-person-body
+runtime diagnostics show the camera classification and read-only
+`c_thirdpersonshoulder` cached value (`-1` means unavailable).
+Changes in camera classification emit Info-level event logs.
+Unknown mode deliberately retains native rendering.

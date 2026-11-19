@@ -21,6 +21,7 @@ with zipfile.ZipFile(install) as archive:
     body = config["firstPersonBody"]
     assert body["enabled"] and body["dynamicAnchor"] and body["followCameraYaw"]
     assert body["hideHead"] and body["hideArms"] and not body["clipEnabled"]
+    assert body["tltpvCompatibility"] is False
     assert (body["forward"], body["right"], body["up"]) == (-13, -1, -1)
     assert "wallPictures" not in config and "sprayP2P" not in config
     assert not any("/images/" in p or "spray-cache" in p for p in names)
@@ -36,6 +37,9 @@ with zipfile.ZipFile(source) as archive:
         "src/first_person_body_effects.hpp",
         "src/first_person_dynamic_alignment.hpp",
         "src/log_settings.hpp",
+        "src/tltpv_camera_compat.hpp",
+        "src/tltpv_runtime.hpp",
+        "tests/tltpv_camera_compat_test.cpp",
         "tests/module_host_test.cpp",
         "tests/first_person_dynamic_alignment_test.cpp",
     }
