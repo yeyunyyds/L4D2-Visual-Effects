@@ -75,6 +75,11 @@ with zipfile.ZipFile(build/filename) as z:
     assert int.from_bytes(data[pe+4:pe+6],'little')==0x14c
     assert b'0.8.0-fpb-user-preset-experimental' in data
     config=json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
-    assert config['firstPersonBody']['enabled'] is True\n    assert config['firstPersonBody']['dynamicAnchor'] is True\n    assert config['firstPersonBody']['followCameraYaw'] is True\n    assert config['firstPersonBody']['forward'] == -13\n    assert config['firstPersonBody']['hideHead'] and config['firstPersonBody']['hideArms']\n    assert config['firstPersonBody']['clipEnabled'] is False
+    assert config['firstPersonBody']['enabled'] is True
+    assert config['firstPersonBody']['dynamicAnchor'] is True
+    assert config['firstPersonBody']['followCameraYaw'] is True
+    assert config['firstPersonBody']['forward'] == -13
+    assert config['firstPersonBody']['hideHead'] and config['firstPersonBody']['hideArms']
+    assert config['firstPersonBody']['clipEnabled'] is False
 print(build/filename)
 print(build/source_name)

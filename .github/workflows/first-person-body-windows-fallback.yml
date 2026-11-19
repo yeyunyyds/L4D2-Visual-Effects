@@ -65,7 +65,13 @@ jobs:
               assert struct.unpack_from('<H',dll,off+4)[0]==0x14c
               assert b'0.8.0-fpb-user-preset-experimental' in dll
               j=json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
-              assert j['firstPersonBody']['enabled'] is True\n              assert j['firstPersonBody']['dynamicAnchor'] is True\n              assert j['firstPersonBody']['forward']==-13\n              assert j['firstPersonBody']['right']==-1\n              assert j['firstPersonBody']['up']==-1\n              assert j['firstPersonBody']['hideArms'] is True\n              assert j['firstPersonBody']['clipEnabled'] is False
+              assert j['firstPersonBody']['enabled'] is True
+              assert j['firstPersonBody']['dynamicAnchor'] is True
+              assert j['firstPersonBody']['forward']==-13
+              assert j['firstPersonBody']['right']==-1
+              assert j['firstPersonBody']['up']==-1
+              assert j['firstPersonBody']['hideArms'] is True
+              assert j['firstPersonBody']['clipEnabled'] is False
               assert 'bin/neko/plugins/L4D2Visual/licenses/LICENSE' in z.namelist()
           with zipfile.ZipFile(source) as z:
               assert z.testzip() is None
