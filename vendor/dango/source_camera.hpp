@@ -38,6 +38,7 @@ inline void capture(bool active){
  captureState=state;unsigned bit=1u<<state;if(!(seenCaptureStates.fetch_or(bit)&bit))log(std::string("Source capture: ")+captureStatus(state));
  std::atomic_store(&snapshot,std::make_shared<const GameCameraFrame>(f));if(auto listener=frameListener.load(std::memory_order_acquire))listener(f);
 }
+inline bool executable(const void* address); // Defined below; checked before live calls.
 // Called from the current Studio draw stage rather than after View_Render.
 // Never publishes a frame or invokes frameListener: diagnostic/camera users
 // continue to receive the existing post-render snapshot.
