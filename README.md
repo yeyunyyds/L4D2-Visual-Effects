@@ -34,6 +34,10 @@ P2P 联机喷漆及自动搜寻默认关闭。**联机功能未经测试，不�
 
 **此功能仅在 `experimental/first-person-body-abi-probe` 实验分支提供，不属于当前 `v0.8.0` 正式版。** 使用前请备份插件和 `hud.json`；已有配置优先于实验默认值。详见[第一人称身体呈现与骨骼处理](docs/FIRST-PERSON-BODY-ANATOMY.md)及[动态身体定位](docs/FIRST-PERSON-BODY-DYNAMIC-ALIGNMENT.md)。
 
+## 日志与诊断
+
+默认使用 **Info** 日志：保留启动、模块加载、状态切换、配置保存及故障信息，不再自动写入周期性实体与绘制统计。需要排查问题时，可在「邦友的酒 → 接口与日志诊断」切换到 **Debug**，恢复原有每约两秒一次的详细状态、实体绑定、类别清单和绘制统计；设置保存在 `hud.json` 的 `logging.level`。详见[日志级别与周期诊断](docs/LOGGING.md)。
+
 ## 安装与测试
 
 参见 [安装说明](docs/INSTALL.md) 与 [本次整合及验收项目](docs/MAIN-INTEGRATION.md)。安装包根目录仅 `bin/` 和 `README.md`，许可证位于 bin 内；配套源码单独提供，也可从 v0.8.0 标签获取。更新前完全退出游戏，备份已有 DLL 和 `hud.json`，保留图片目录。

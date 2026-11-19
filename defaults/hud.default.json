@@ -84,6 +84,9 @@
     "landingRadius": 32,
     "landingOpacity": 0.5
   },
+  "logging": {
+    "level": "info"
+  },
   "firstPersonBody": {
     "clipEnabled": false,
     "clipHeight": 81,

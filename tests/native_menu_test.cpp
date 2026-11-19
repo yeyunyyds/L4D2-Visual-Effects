@@ -9,6 +9,7 @@ int main(){
  // Main menu opens ONE first-person body submenu (860); toggles are actions.
  check(opensChild(820)&&opensChild(860)&&opensChild(862)&&opensChild(863)&&opensChild(864)&&!opensChild(861));
  check(!opensChild(884)&&!opensChild(885)&&opensChild(865));
+ check(!opensChild(896)); // Periodic DEBUG toggle is an action, not a child menu.
  for(uintptr_t id=887;id<=895;++id)check(!opensChild(id));
  for(uintptr_t id=870;id<=885;++id)check(!opensChild(id));
  auto mainMenu=document(R"kv("L4D2Visual" {"实体缩放与拉伸" {"user_data" "0x320"} "第一人称身体 [关] · 设置" {"user_data" "0x35c"}})kv");
