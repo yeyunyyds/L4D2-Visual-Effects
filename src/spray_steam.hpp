@@ -12,7 +12,7 @@ inline uint64_t nonce(){std::random_device random;uint64_t n=(uint64_t(random())
 // Minimal interoperability declarations, not a replacement Steam SDK.
 // Windows x86 MSVC CSteamID class return uses caller-provided return storage.
 inline Peer legacyUserId(void* user){
- if(!readable(user,sizeof(void*)))throw std::runtime_error("Steam user object unavailable");auto table=*reinterpret_cast<void***>(user);if(!readable(table,3*sizeof(void*))||!executable(table[2]))throw std::runtime_error("Steam GetSteamID unavailable");void* method=table[2];uint64_t result=UINT64_MAX;uint32_t low=0,high=0;
+ if(!readable(user,sizeof(void*)))throw std::runtime_error("Steam user object unavailable");auto table=*reinterpret_cast<void***>(user);if(!readable(table,3*sizeof(void*))||!executable(table[2]))throw std::runtime_error("Steam GetSteamID unavailable");void* method=table[2];uint64_t result=UINT64_MAX;uint32_t lowPart=0,highPart=0;
  // Explicitly restore the stack: supported clients may return the 8-byte ID in
  // EDX:EAX or via MSVC's hidden class-return pointer. Never assume GCC's class ABI.
 #ifdef _MSC_VER
@@ -22,12 +22,12 @@ inline Peer legacyUserId(void* user){
          mov ecx, user
          call method
          mov esp, ebx
-         mov low, eax
-         mov high, edx }
+         mov lowPart, eax
+         mov highPart, edx }
 #else
- __asm__ volatile("movl %%esp, %%ebx\n\tpushl %[storage]\n\tmovl %[object], %%ecx\n\tcall *%[method]\n\tmovl %%ebx, %%esp" : "=a"(low),"=d"(high) : [storage]"r"(&result),[object]"r"(user),[method]"r"(method) : "ebx","ecx","memory","cc");
+ __asm__ volatile("movl %%esp, %%ebx\n\tpushl %[storage]\n\tmovl %[object], %%ecx\n\tcall *%[method]\n\tmovl %%ebx, %%esp" : "=a"(lowPart),"=d"(highPart) : [storage]"r"(&result),[object]"r"(user),[method]"r"(method) : "ebx","ecx","memory","cc");
 #endif
- if(result!=UINT64_MAX)return result;return (uint64_t(high)<<32)|low;
+ if(result!=UINT64_MAX)return result;return (uint64_t(highPart)<<32)|lowPart;
 }
 inline Peer userId(HMODULE api,void* user){using Flat=uint64_t(__cdecl*)(void*);auto flat=reinterpret_cast<Flat>(GetProcAddress(api,"SteamAPI_ISteamUser_GetSteamID"));return flat?flat(user):legacyUserId(user);}
 class Transport final:public spraysync::Transport {
