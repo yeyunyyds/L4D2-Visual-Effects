@@ -24,14 +24,16 @@ for path in sorted((root/'vendor').rglob('*')):
     if path.is_file() and ('license' in path.name.lower() or 'copying' in path.name.lower()):
         install['bin/neko/plugins/L4D2Visual/licenses/vendor/'+path.relative_to(root/'vendor').as_posix()]=path
 readme=(root/'docs/INSTALL.md').read_text(encoding='utf-8')
-readme+='\n\n# First-person body experiment -- NOT WORKING YET\n\n'
-readme+='This is a diagnostic-only ABI probe. The first-person body menu and preference\n'
-readme+='are present, but the native ShouldDraw entry has NOT been verified. Enabling\n'
-readme+='the menu option does NOT make the survivor visible. No visibility hook is\n'
-readme+='installed. This is not a production release. Game-side testing is NOT done.\n'
-readme+='See docs/FIRST-PERSON-BODY-ABI-BLOCKER.md in the source ZIP for details.\n'
-readme+='Install only with the game closed; back up your DLL and hud.json first.\n'
-readme+='To roll back, restore the backed-up DLL/hud.json and restart the game.\n'
+readme+='\n\n# First-person body: native drawing gate EXPERIMENT\n\n'
+readme+='Verified exact client.dll and engine.dll builds are required. Default OFF.\n'
+readme+='One native local-player DrawModel conditional skip is bypassed in memory.\n'
+readme+='No model is cloned, no extra draw call or HUD substitute is used.\n'
+readme+='The game has NOT been run with this build; visible-body success is UNKNOWN.\n'
+readme+='Possible head/hair clipping, arms/weapons overlap and animation anomalies.\n'
+readme+='Back up plugin DLL and hud.json, exit game, extract to game directory.\n'
+readme+='Switch off to restore original logic; to roll back restore saved plugin.\n'
+readme+='See docs/research/first-person-body-native-gate.md in the source ZIP.\n'
+readme+='NOT A STABLE RELEASE. Do not assume VAC safety.\n'
 readme+='\nSource commit: '+revision+'\n'
 with zipfile.ZipFile(build/filename,'w',zipfile.ZIP_DEFLATED) as z:
     for target, source in install.items():
@@ -50,7 +52,7 @@ with zipfile.ZipFile(build/filename) as z:
     pe=int.from_bytes(data[0x3c:0x40],'little')
     assert data[pe:pe+4]==b'PE\x00\x00'
     assert int.from_bytes(data[pe+4:pe+6],'little')==0x14c
-    assert b'0.8.0-fpb-abi-probe' in data
+    assert b'0.8.0-fpb-native-gate-experimental' in data
     config=json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
     assert config['firstPersonBody']['enabled'] is False
 print(build/filename)

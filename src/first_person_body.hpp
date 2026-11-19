@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include "first_person_body_config.hpp"
+#include "first_person_native_gate.hpp"
 #include "local_player.hpp"
 #include "survivors.hpp"
 namespace visual::firstperson {
@@ -112,6 +113,7 @@ inline bool install(std::uint32_t base) {
  return true;
 }
 inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
+ struct RestoreOnFailure {bool succeeded=false;~RestoreOnFailure(){if(!succeeded)native::disable();}} gate;
  if(!std::atomic_load(&options)->enabled){
   clear();detach();status=u8"关闭：原生可见性保持不变";return;
  }
@@ -146,10 +148,12 @@ inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
  if(!install(entry.entity)){clear();return;}
  currentHandle=handle;currentEpoch=camera.epoch;localBase=entry.entity;localTick=camera.tick;
  validatedLocal=true;
- status=u8"ShouldDraw 原生返回值采集中；不会更改可见性";
+ if(!native::enable(entry.entity)){status=native::state.load();return;}
+ gate.succeeded=true;
+ status=u8"本机原生 DrawModel 分支已放行（游戏内未验证）";
 }
 inline void stop() noexcept {
- clear();detach();status=u8"插件退出；原生可见性未修改";
+ native::disable();clear();detach();status=u8"插件退出；原生可见性未修改";
 }
 inline bool isDrawing() noexcept {return false;}
 }
