@@ -5,6 +5,12 @@
 using namespace dango::hud;
 void check(bool v){if(!v)throw std::runtime_error("Native menu regression");}
 int main(){
+ // Regression: 820 belongs to entity-transform editing, never first-person body.
+ // First-person body must be a direct toggle (861), with an optional status page (860).
+ check(opensChild(820)&&opensChild(860)&&!opensChild(861));
+ auto mainMenu=document(R"kv("L4D2Visual" {"实体缩放与拉伸" {"user_data" "0x320"} "第一人称身体渲染 [关]" {"user_data" "0x35d"} "第一人称身体 · 诊断信息" {"user_data" "0x35c"}})kv");
+ check(mainMenu.rows.size()==3&&mainMenu.rows[1].action==861&&mainMenu.rows[2].action==860);
+ check(!opensChild(mainMenu.rows[1].action)&&opensChild(mainMenu.rows[2].action));
  check(opensChild(700)&&opensChild(701));for(uintptr_t id=750;id<=759;++id)check(!opensChild(id));
  check(opensChild(325)&&opensChild(326)&&opensChild(327));for(uintptr_t id=380;id<=388;++id)check(!opensChild(id));
  check(opensChild(321)&&opensChild(322)&&opensChild(323)&&opensChild(324));for(uintptr_t id=370;id<=373;++id)check(!opensChild(id));for(uintptr_t id=360;id<=366;++id)check(!opensChild(id));
