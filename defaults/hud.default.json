@@ -93,6 +93,11 @@
     "up": 0,
     "step": 1,
     "hideHead": true,
-    "hideArms": false
+    "hideArms": false,
+    "dynamicAnchor": false,
+    "followCameraYaw": false,
+    "fallbackEyeHeight": 5,
+    "yawTrim": 0,
+    "modelProfiles": []
   }
 }

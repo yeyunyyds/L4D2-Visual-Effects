@@ -1,6 +1,10 @@
 #pragma once
 #include "stretch.hpp"
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <string>
 #include <vector>
@@ -14,7 +18,30 @@ struct StudioPose {
     // Validated MDL hierarchy for render-only first-person part hiding.
     std::vector<int> parents;
     std::vector<std::string> boneNames;
+    // mstudiohdr_t checksum/eye and inverse-bind bone positions (model local).
+    std::uint32_t checksum=0;
+    std::array<float,3> eyeLocal{};
+    bool eyeValid=false;
+    std::vector<std::array<float,3>> bindLocal;
+    std::vector<unsigned char> bindValid;
 };
+// Read the inverse bind transform at mstudiobone_t::poseToBone (+96).
+// The inverse matrix maps the model origin of this bone back to model space.
+inline bool inverseBindPosition(const float m[12],std::array<float,3>& p){
+ for(unsigned k=0;k<12;++k)if(!std::isfinite(m[k]))return false;
+ const double a=m[0],b=m[1],c=m[2],d=m[4],e=m[5],f=m[6],g=m[8],h=m[9],i=m[10];
+ const double A=e*i-f*h,B=c*h-b*i,C=b*f-c*e;
+ const double D=f*g-d*i,E=a*i-c*g,F=c*d-a*f;
+ const double G=d*h-e*g,H=b*g-a*h,I=a*e-b*d;
+ const double det=a*A+b*D+c*G;
+ if(!std::isfinite(det)||std::abs(det)<.1||std::abs(det)>10)return false;
+ const double tx=m[3],ty=m[7],tz=m[11];
+ const double x=-(A*tx+B*ty+C*tz)/det;
+ const double y=-(D*tx+E*ty+F*tz)/det;
+ const double z=-(G*tx+H*ty+I*tz)/det;
+ if(!std::isfinite(x)||!std::isfinite(y)||!std::isfinite(z)||std::abs(x)>4096||std::abs(y)>4096||std::abs(z)>4096)return false;
+ p={float(x),float(y),float(z)};return true;
+}
 template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, StudioPose& out,const char** reason=nullptr) {
     auto fail=[&](const char* why){if(reason)*reason=why;return false;};
     std::array<std::uint32_t,42> words{};
@@ -24,7 +51,12 @@ template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, Stu
     if (length<sizeof(words) || length>16*1024*1024 || !count || count>MaxBones ||
         offset<sizeof(words) || std::uint64_t(offset)+count*216>length ||
         std::uint64_t(header)+length>UINT32_MAX) return fail("studio bounds/count rejected");
-    StudioPose result; result.count=count;
+    StudioPose result; result.count=count;result.checksum=words[2];
+    std::memcpy(result.eyeLocal.data(),words.data()+20,12);
+    result.eyeValid=std::all_of(result.eyeLocal.begin(),result.eyeLocal.end(),[](float value){
+      return std::isfinite(value)&&std::abs(value)<=256.f;
+    });
+    result.bindLocal.resize(count);result.bindValid.assign(count,0);
     const char* name=reinterpret_cast<const char*>(words.data())+12;
     const auto end=std::find(name,name+64,'\0');
     if(end==name+64 || end==name)return fail("studio model name invalid");
@@ -48,6 +80,10 @@ template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, Stu
             boneName+=ch>='A'&&ch<='Z'?char(ch-'A'+'a'):ch;
         }
         boneNames[i]=boneName;
+        std::array<float,12> poseToBone{};
+        if(reader.read(bone+96,poseToBone.data(),48) &&
+           inverseBindPosition(poseToBone.data(),result.bindLocal[i]))
+           result.bindValid[i]=1;
         // Names, not fixed bone indices; work across infected model skeletons.
         if(boneName.find("foot")!=std::string::npos &&
            boneName.find("attach")==std::string::npos)result.feet.push_back(i);

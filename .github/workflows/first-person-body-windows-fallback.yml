@@ -30,6 +30,10 @@ jobs:
           if errorlevel 1 exit /b 1
           build\first_person_body_parts_test.exe
           if errorlevel 1 exit /b 1
+          cl /nologo /utf-8 /std:c++17 /EHsc /MT /I src /I vendor tests\first_person_dynamic_alignment_test.cpp /Fe:build\first_person_dynamic_alignment_test.exe
+          if errorlevel 1 exit /b 1
+          build\first_person_dynamic_alignment_test.exe
+          if errorlevel 1 exit /b 1
           cl /nologo /utf-8 /std:c++17 /EHsc /MT /I src /I vendor tests\first_person_body_config_test.cpp /Fe:build\first_person_body_config_test.exe
           if errorlevel 1 exit /b 1
           build\first_person_body_config_test.exe
@@ -59,13 +63,13 @@ jobs:
               off=struct.unpack_from('<I',dll,0x3c)[0]
               assert dll[off:off+4]==b'PE\x00\x00'
               assert struct.unpack_from('<H',dll,off+4)[0]==0x14c
-              assert b'0.8.0-fpb-evo-parts-experimental' in dll
+              assert b'0.8.0-fpb-dynamic-anchor-experimental' in dll
               j=json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
               assert j['firstPersonBody']['enabled'] is False
               assert 'bin/neko/plugins/L4D2Visual/licenses/LICENSE' in z.namelist()
           with zipfile.ZipFile(source) as z:
               assert z.testzip() is None
-              for path in ('src/first_person_native_gate.hpp','src/first_person_body_patch.hpp','src/first_person_body_parts.hpp','tests/first_person_body_patch_test.cpp','docs/research/first-person-body-native-gate.md'):
+              for path in ('src/first_person_native_gate.hpp','src/first_person_body_patch.hpp','src/first_person_body_parts.hpp','src/first_person_dynamic_alignment.hpp','tests/first_person_dynamic_alignment_test.cpp','tests/first_person_body_patch_test.cpp','docs/research/first-person-body-native-gate.md'):
                   assert path in z.namelist()
           print('MSVC x86 and archive checks passed')
           '@ | python

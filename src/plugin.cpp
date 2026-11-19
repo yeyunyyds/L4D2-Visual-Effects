@@ -144,9 +144,27 @@ std::string buildMenu(uintptr_t id){
   item(s->enabled?u8"身体渲染：[开]":u8"身体渲染：[关]",861)+
   item(s->hideHead?u8"Evo式隐藏头部：[开]":u8"Evo式隐藏头部：[关]",884)+
   item(s->hideArms?u8"Evo式隐藏第三人称手臂：[开]":u8"Evo式隐藏第三人称手臂：[关]",885)+
+  item(s->dynamicAnchor?u8"动态身体定位 [开] · 校准":u8"动态身体定位 [关] · 校准",865)+
   item(s->clipEnabled?u8"旧GPU高度裁剪：[开]（实验）":u8"旧GPU高度裁剪：[关]（实验）",862)+
   item(u8"模型位置 · 前后/左右/高度",863)+
   item(u8"运行状态与诊断",864)+item(u8"保存设置",101)+"}";}
+ if(id==865){auto s=std::atomic_load(&visual::firstperson::options);
+  auto model=visual::firstperson::effects::activeModel();
+  std::string modelName=model?model->name:std::string(u8"尚未识别本机MOD");
+  if(modelName.size()>54)modelName=modelName.substr(modelName.size()-54);
+  auto p=model?visual::firstperson::profile(*s,model->name,model->checksum):nullptr;
+  std::string saved=p?u8"本MOD校准已保存":u8"本MOD没有单独校准";
+  return "\"第一人称身体 · 动态锚点\" {"+
+   item(s->dynamicAnchor?u8"动态身体定位：[开]":u8"动态身体定位：[关]",887)+
+   item(s->followCameraYaw?u8"胸肩朝向跟随视角：[开]（实验）":u8"胸肩朝向跟随视角：[关]",888)+
+   row(u8"本机 MOD："+modelName)+row(saved)+
+   row(u8"眼位失效回退高度："+fpbValue(s->fallbackEyeHeight))+
+   item(u8"回退高度 +1",889)+item(u8"回退高度 -1",890)+
+   row(u8"手动朝向补偿："+fpbValue(s->yawTrim)+u8" 度")+
+   item(u8"朝向 +5 度",891)+item(u8"朝向 -5 度",892)+
+   item(u8"绑定当前XYZ和朝向到本MOD",894)+
+   item(u8"重置当前MOD独立校准",895)+item(u8"保存设置",101)+"}";
+ }
  if(id==862){auto s=std::atomic_load(&visual::firstperson::options);
   return "\"第一人称身体 · 高度裁剪\" {"+
   item(s->clipEnabled?u8"高度裁剪：[开]":u8"高度裁剪：[关]",870)+
@@ -168,6 +186,9 @@ std::string buildMenu(uintptr_t id){
   row("Body Studio matches/shifts/rejects: "+std::to_string(visual::firstperson::effects::matched.load())+"/"+std::to_string(visual::firstperson::effects::shifted.load())+"/"+std::to_string(visual::firstperson::effects::shiftRejected.load()))+
   row("Evo head done/rejected: "+std::to_string(visual::firstperson::effects::headHidden.load())+"/"+std::to_string(visual::firstperson::effects::headRejected.load()))+
   row("Evo arm done/rejected: "+std::to_string(visual::firstperson::effects::armsHidden.load())+"/"+std::to_string(visual::firstperson::effects::armsRejected.load()))+
+  row("Dynamic applied/rejected: "+std::to_string(visual::firstperson::effects::dynamicApplied.load())+"/"+std::to_string(visual::firstperson::effects::dynamicRejected.load()))+
+  row("Live camera success/failure: "+std::to_string(visual::firstperson::effects::sameFrameCamera.load())+"/"+std::to_string(visual::firstperson::effects::liveCameraRejected.load()))+
+  row(visual::firstperson::effects::dynamicStatus.load())+row(visual::firstperson::effects::dynamicSource.load())+
   row(visual::firstperson::effects::headStatus.load())+row(visual::firstperson::effects::armStatus.load())+
   row("Legacy GPU clip set/rejected: "+std::to_string(visual::firstperson::effects::clipSet.load())+"/"+std::to_string(visual::firstperson::effects::clipRejected.load()))+
   row(visual::firstperson::effects::clipStatus.load())+row(visual::firstperson::effects::offsetStatus.load())+
@@ -201,11 +222,26 @@ std::string buildMenu(uintptr_t id){
  if(id==300)return "\"邦友的酒\" {"+item(requested?u8"邦友的酒：开":u8"邦友的酒：关",100)+
  item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
  item(experimental,108)+item(u8"接口与日志诊断",24)+item(u8"保存设置",101)+"}";
- return "\"L4D2Visual 0.8.0-fpb-evo-parts-experimental\" {"+item(requested?u8"邦友的酒[开]":u8"邦友的酒[关]",300)+
+ return "\"L4D2Visual 0.8.0-fpb-dynamic-anchor-experimental\" {"+item(requested?u8"邦友的酒[开]":u8"邦友的酒[关]",300)+
  item(u8"实体缩放与拉伸",800)+item(std::atomic_load(&visual::firstperson::options)->enabled?u8"第一人称身体 [开] · 设置":u8"第一人称身体 [关] · 设置",860)+item(u8"自定义喷漆",150)+item(u8"Tank 行为预测",320)+item(visual::rockui::title(),700)+item(u8"菜单外观",9000)+item(u8"保存设置",101)+"}";
 }
 void action(uintptr_t id){
- if(id>=870&&id<=885){auto s=*std::atomic_load(&visual::firstperson::options);
+ if(id==894||id==895){
+  auto model=visual::firstperson::effects::activeModel();
+  if(!model){saveMessage=u8"未识别到当前本机MOD；先进入游戏";return;}
+  auto s=*std::atomic_load(&visual::firstperson::options);
+  bool ok=id==894?visual::firstperson::storeForModel(s,model->name,model->checksum):
+                 visual::firstperson::eraseForModel(s,model->name,model->checksum);
+  if(ok){
+   std::atomic_store(&visual::firstperson::options,
+     std::make_shared<const visual::firstperson::Settings>(std::move(s)));
+   saveMessage=id==894?u8"当前XYZ与朝向校准已绑定到本MOD；请再点保存设置":
+                       u8"已重置当前MOD的独立校准；请再点保存设置";
+  }else saveMessage=u8"没有可更新的当前MOD校准";
+  return;
+ }
+ if((id>=870&&id<=885)||(id>=887&&id<=893)){
+  auto s=*std::atomic_load(&visual::firstperson::options);
   if(visual::firstperson::adjust(s,id)){
    std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(s));
    saveMessage=u8"第一人称身体隐藏/裁剪/位置已更新，设置未保存";
@@ -237,16 +273,16 @@ class Plugin final:public IL4NPlugin {
   }
  }
 public:
- Plugin(){note("=== L4D2Visual 0.8.0-fpb-evo-parts-experimental startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);visual::hudruntime::hud.configureOverlay(visual::rockui::needed,visual::rockui::draw);visual::hudruntime::hud.configureAddon(visual::tank::visualPreview,visual::tank::visualPreviewKeys);visual::hudruntime::hud.configureAdjustment([](uintptr_t page,int delta){return visual::deform::adjust(page,delta)||visual::tank::visualAdjust(page,delta);});
+ Plugin(){note("=== L4D2Visual 0.8.0-fpb-dynamic-anchor-experimental startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);visual::hudruntime::hud.configureOverlay(visual::rockui::needed,visual::rockui::draw);visual::hudruntime::hud.configureAddon(visual::tank::visualPreview,visual::tank::visualPreviewKeys);visual::hudruntime::hud.configureAdjustment([](uintptr_t page,int delta){return visual::deform::adjust(page,delta)||visual::tank::visualAdjust(page,delta);});
   try{std::ifstream file(visual::diagnostics::path.parent_path()/L"hud.json");if(file){nlohmann::json j;file>>j;visual::rockui::readSettings(j);std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(visual::firstperson::readSettings(j)));std::atomic_store(&visual::tank::options,std::make_shared<const visual::tank::Settings>(visual::tank::readSettings(j)));std::atomic_store(&visual::deform::options,std::make_shared<const visual::deform::Settings>(visual::deform::readSettings(j)));std::atomic_store(&visual::tank::visualSettings,std::make_shared<const visual::tank::VisualSettings>(visual::tank::readVisual(j)));std::atomic_store(&visual::spraysync::options,std::make_shared<const visual::spraysync::Settings>(visual::spraysync::readSettings(j)));std::atomic_store(&visual::pictures::options,std::make_shared<const visual::pictures::Settings>(visual::pictures::readSettings(j)));std::atomic_store(&visual::render::proximity,std::make_shared<const visual::ProximitySettings>(visual::readProximity(j)));visual::render::compatibility=visual::readRenderCompatibility(j);std::atomic_store(&visual::render::selection,std::make_shared<const visual::EntitySelection>(visual::readEntitySelection(j)));visual::render::boneLimit=visual::readBoneLimit(j);std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(visual::readAnimationSettings(j)));appearance.preset=std::min(3u,j.value("preset",0u));appearance.step=std::clamp(j.value("step",8u),1u,64u);appearance.opacity=std::clamp(j.value("opacity",.48f),.05f,1.f);appearance.font=std::clamp(j.value("font",22.f),12.f,48.f);appearance.x=j.value("x",8.f);appearance.y=j.value("y",14.f);appearance.f10=j.value("f10",false);appearance.centerY=j.value("centerY",true);visual::hudruntime::hud.loadAppearance(appearance);}}catch(const std::exception& e){note(std::string("HUD settings load failed: ")+e.what());}
   visual::pictures::folder=visual::diagnostics::path.parent_path()/L"images";
   worker=std::thread([this]{diagnostics();});}
  const char* GetName()override{return "L4D2Visual";}
- const char* GetVersion()override{return "0.8.0-fpb-evo-parts-experimental";}
+ const char* GetVersion()override{return "0.8.0-fpb-dynamic-anchor-experimental";}
  void OnModuleLoaded(const char* name,uintptr_t handle)override{if(!name)return;std::string n(name);if(n=="client"||n=="client.dll")source_camera::clientModule=reinterpret_cast<HMODULE>(handle);if(n=="engine"||n=="engine.dll")source_camera::engineModule=reinterpret_cast<HMODULE>(handle);note("Module loaded: "+n);connect();}
  void OnGameLaunch()override{note("OnGameLaunch");connect();}
  void OnD3DDeviceCreated(void* d,bool dxvk)override{note(std::string("OnD3DDeviceCreated dxvk=")+(dxvk?"yes":"no"));visual::hudruntime::created(static_cast<IDirect3DDevice9*>(d));visual::firstperson::effects::setDevice(static_cast<IDirect3DDevice9*>(d));}
- const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.8.0-fpb-evo-parts-experimental";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开视觉效果菜单\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
+ const char* RequestHudMenu(bool title)override{if(title)return "L4D2Visual 0.8.0-fpb-dynamic-anchor-experimental";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开视觉效果菜单\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
  void stop(){visual::firstperson::stop();visual::firstperson::effects::stop();visual::aimruntime::stop();visual::tank::outline::stop();visual::deform::stop();visual::render::poseModifier=nullptr;stopping=true;if(worker.joinable())worker.join();visual::spraysync::network.stop();requested=false;visual::render::modelObserver=nullptr;visual::render::studioObserver=nullptr;source_entities::combatRequested=false;visual::modelpath::apply(false);visual::hudruntime::stop();visual::render::stop();source_entities::browseRequested=false;source_camera::frameListener=nullptr;source_camera::stop();}
  ~Plugin()override{stop();}
 };

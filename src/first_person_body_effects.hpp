@@ -4,6 +4,7 @@
 #include "first_person_body_math.hpp"
 #include "studio_cache.hpp"
 #include "first_person_body_parts.hpp"
+#include "first_person_dynamic_alignment.hpp"
 #include <d3d9.h>
 #include <array>
 #include <atomic>
@@ -19,6 +20,28 @@ inline std::atomic<const char*> clipStatus{u8"高度裁剪未启用"};
 inline std::atomic<const char*> offsetStatus{u8"位置偏移为零"};
 inline std::atomic<const char*> headStatus{u8"头部分支隐藏关闭"},armStatus{u8"双臂分支隐藏关闭"};
 inline std::atomic<unsigned long> headHidden{0},headRejected{0},armsHidden{0},armsRejected{0};
+inline std::atomic<unsigned long> dynamicApplied{0},dynamicRejected{0},sameFrameCamera{0},liveCameraRejected{0};
+inline std::atomic<const char*> dynamicStatus{u8"动态定位关闭"},dynamicSource{"unavailable"};
+struct ModelIdentity{std::string name;std::uint32_t checksum=0,epoch=0;};
+inline std::shared_ptr<const ModelIdentity> modelIdentity=std::make_shared<ModelIdentity>();
+inline std::atomic<std::uint64_t> modelSeenAt{0};
+inline std::shared_ptr<const ModelIdentity> activeModel() {
+ auto current=std::atomic_load(&modelIdentity);
+ auto tick=GetTickCount64(),sample=modelSeenAt.load();
+ if(!current||current->name.empty()||!visual::firstperson::validatedLocal.load()||
+    current->epoch!=visual::firstperson::currentEpoch.load()||
+    tick<sample||tick-sample>2000)return nullptr;
+ return current;
+}
+inline void observeModel(const visual::StudioPose& studio,std::uint32_t epoch){
+ auto name=visual::canonicalModel(studio.name);
+ auto current=std::atomic_load(&modelIdentity);
+ if(!current||current->name!=name||current->checksum!=studio.checksum||current->epoch!=epoch){
+  std::atomic_store(&modelIdentity,
+   std::shared_ptr<const ModelIdentity>(std::make_shared<ModelIdentity>(ModelIdentity{name,studio.checksum,epoch})));
+ }
+ modelSeenAt=GetTickCount64();
+}
 inline void setDevice(IDirect3DDevice9* next) noexcept {
  std::lock_guard<std::mutex> lock(deviceMutex);
  if(next==renderDevice)return;
@@ -46,7 +69,7 @@ inline bool select(std::uint32_t renderable,Context& ctx) noexcept {
  ctx.options=std::atomic_load(&options);
  if(!ctx.options->enabled)return false;
  if(!ctx.options->clipEnabled&&!ctx.options->hideHead&&!ctx.options->hideArms&&
-    ctx.options->forward==0&&ctx.options->right==0&&ctx.options->up==0)return false;
+    ctx.options->forward==0&&ctx.options->right==0&&ctx.options->up==0&&!ctx.options->dynamicAnchor)return false;
  ctx.camera=std::atomic_load(&source_camera::snapshot);
  if(!ctx.camera->active||ctx.camera->epoch!=currentEpoch.load(std::memory_order_acquire))return false;
  auto tick=GetTickCount64(),sample=localTick.load(std::memory_order_acquire);
@@ -119,14 +142,15 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  Context ctx;
  if(!select(renderable,ctx)) {original(bones,origin);return;}
  ++matched;
- dango::Vec3 shift{};bool moved=false,partChanged=false;
+ dango::Vec3 shift{};bool moved=false,partChanged=false,dynamicMoved=false;
  visual::Matrix3x4 temporary[256];
  auto settings=ctx.options;
  const bool wantOffset=settings->forward!=0||settings->right!=0||settings->up!=0;
  const bool wantParts=settings->hideHead||settings->hideArms;
+ const bool wantDynamic=settings->dynamicAnchor;
  const visual::StudioPose* studio=nullptr;
  bool ready=false;
- if(bones&&(wantOffset||wantParts)){
+ if(bones&&(wantOffset||wantParts||wantDynamic)){
   static thread_local visual::StudioCache cache;
   const char* reason=nullptr;
   studio=cache.find(source_entities::reader,header,ctx.camera->epoch,&reason);
@@ -135,26 +159,60 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
    ready=true;
    for(unsigned i=0;i<studio->count;++i)
     if(!parts::matrixValid(temporary[i])){ready=false;break;}
+   if(ready)observeModel(*studio,ctx.camera->epoch);
   }
  }
- if(wantOffset){
-  if(ready&&math::offset(*ctx.camera,settings->forward,settings->right,settings->up,shift)){
+ if(wantDynamic){
+  static thread_local dynamic::Track tracking;
+  dango::GameCameraFrame live{};
+  dango::CameraPose pose{};
+  if(ready&&source_camera::sampleDuringDraw(live)&&
+     live.epoch==ctx.camera->epoch&&dango::cameraPose(live,pose)){
+   ++sameFrameCamera;
+   auto rig=dynamic::discover(*studio,settings->fallbackEyeHeight);
+   auto id=visual::canonicalModel(studio->name);
+   auto prof=visual::firstperson::profile(*settings,id,studio->checksum);
+   const auto resolved=dynamic::compute(*studio,rig,temporary,pose,*settings,prof,
+                                       ctx.camera->epoch,ctx.handle,live.tick,tracking);
+   if(resolved.ok&&rig.anchor>=0&&unsigned(rig.anchor)<studio->count){
+    auto pivot=dynamic::location(temporary[unsigned(rig.anchor)]);
+    if(dynamic::transform(temporary,studio->count,pivot,
+                          resolved.translation,resolved.yawRadians)){
+     shift=resolved.translation;dynamicMoved=moved=true;
+     ++dynamicApplied;dynamicStatus=u8"动态身体已对齐本帧相机与胸部锚点";
+     dynamicSource=resolved.usedBootstrap?"live-pose-bootstrap":resolved.source;
+    }
+   }
+  }else{
+   ++liveCameraRejected;
+   dynamicStatus=u8"同帧相机矩阵不可用：动态定位跳过";
+  }
+  if(!dynamicMoved){
+   ++dynamicRejected;
+   if(ready)dynamicStatus=u8"当前MOD锚点/姿态无法安全校准，保留原版位置";
+  }
+ }else dynamicStatus=u8"动态定位关闭";
+ if(!dynamicMoved&&wantOffset){
+  dango::Vec3 manual{};
+  if(ready&&math::offset(*ctx.camera,settings->forward,settings->right,settings->up,manual)){
    bool finite=true;
    for(unsigned i=0;i<studio->count&&finite;++i)
     for(unsigned row=0;row<3;++row)
-     finite=std::isfinite(temporary[i].m[row][3]+(row==0?shift.x:row==1?shift.y:shift.z));
+     finite=std::isfinite(temporary[i].m[row][3]+
+         (row==0?manual.x:row==1?manual.y:manual.z));
    if(finite){
     for(unsigned i=0;i<studio->count;++i){
-     temporary[i].m[0][3]+=shift.x;
-     temporary[i].m[1][3]+=shift.y;
-     temporary[i].m[2][3]+=shift.z;
+     temporary[i].m[0][3]+=manual.x;
+     temporary[i].m[1][3]+=manual.y;
+     temporary[i].m[2][3]+=manual.z;
     }
-    moved=true;
+    shift=manual;moved=true;
    }
   }
-  if(moved){++shifted;offsetStatus=u8"已将偏移应用于 Studio 骨骼副本";}
-  else{++shiftRejected;offsetStatus=u8"骨骼或相机校验失败，位置偏移跳过";shift={};}
- }else offsetStatus=u8"位置偏移为零";
+  if(moved){++shifted;offsetStatus=u8"手动位置偏移已应用于骨骼副本";}
+  else{++shiftRejected;offsetStatus=u8"骨骼或相机校验失败，位置偏移跳过";}
+ }else if(dynamicMoved)offsetStatus=u8"手动位置微调已并入动态锚点";
+ else offsetStatus=u8"位置偏移为零";
  if(wantParts){
   if(ready){
    // Use actual model bone hierarchy; never guess head from vertex height.

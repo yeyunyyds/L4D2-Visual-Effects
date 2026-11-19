@@ -6,6 +6,7 @@ int main(){
  const json empty=json::object();
  assert(!readSettings(empty).enabled&&!readSettings(empty).clipEnabled);
  assert(readSettings(empty).hideHead && !readSettings(empty).hideArms);
+ assert(!readSettings(empty).dynamicAnchor && !readSettings(empty).followCameraYaw);
  const json invalid={{"firstPersonBody",{{"enabled","true"},{"forward",99999},{"clipHeight",-99}}}};
  auto bad=readSettings(invalid);assert(!bad.enabled&&bad.forward==64.f&&bad.clipHeight==0.f);
  auto saved=json{{"firstPersonBody",{{"enabled",true},{"clipEnabled",true},{"clipHeight",71.f},{"forward",3.f},{"right",-2.f},{"up",6.f}}},{"tankPrediction",{{"enabled",false}}}};
@@ -18,6 +19,10 @@ int main(){
  assert(adjust(cfg,873)&&cfg.clipHeight==66.f);
  assert(adjust(cfg,884)&&!cfg.hideHead);
  assert(adjust(cfg,885)&&cfg.hideArms);
+ assert(adjust(cfg,887)&&cfg.dynamicAnchor);
+ assert(adjust(cfg,888)&&cfg.followCameraYaw);
+ assert(adjust(cfg,889)&&cfg.fallbackEyeHeight==6);
+ assert(adjust(cfg,891)&&cfg.yawTrim==5);
  assert(!adjust(cfg,860));
  writeSettings(saved,cfg);
  assert(saved.at("tankPrediction").at("enabled")==false);
