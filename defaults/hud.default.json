@@ -85,19 +85,19 @@
     "landingOpacity": 0.5
   },
   "firstPersonBody": {
-    "enabled": false,
     "clipEnabled": false,
-    "clipHeight": 65,
-    "forward": 0,
-    "right": 0,
-    "up": 0,
-    "step": 1,
-    "hideHead": true,
-    "hideArms": false,
-    "dynamicAnchor": false,
-    "followCameraYaw": false,
+    "clipHeight": 81,
+    "dynamicAnchor": true,
+    "enabled": true,
     "fallbackEyeHeight": 5,
-    "yawTrim": 0,
-    "modelProfiles": []
+    "followCameraYaw": true,
+    "forward": -13,
+    "hideArms": true,
+    "hideHead": true,
+    "modelProfiles": [],
+    "right": -1,
+    "step": 1,
+    "up": -1,
+    "yawTrim": 0
   }
 }

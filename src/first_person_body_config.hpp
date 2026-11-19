@@ -14,10 +14,10 @@ inline bool validModelKey(const std::string& name){
  return !name.empty()&&name.size()<=180&&std::all_of(name.begin(),name.end(),[](unsigned char c){return c>=32 && c!=127;});
 }
 struct Settings {
- bool enabled=false,clipEnabled=false,hideHead=true,hideArms=false;
- // Deliberately OFF until tested in-game; no change to the proven body gate.
- bool dynamicAnchor=false,followCameraYaw=false;
- float clipHeight=65.f,forward=0,right=0,up=0,step=1;
+ bool enabled=true,clipEnabled=false,hideHead=true,hideArms=true;
+ // User-tested visual baseline (experimental, not a universal per-MOD calibration).
+ bool dynamicAnchor=true,followCameraYaw=true;
+ float clipHeight=81.f,forward=-13.f,right=-1.f,up=-1.f,step=1;
  float fallbackEyeHeight=5.f,yawTrim=0.f;
  std::vector<ModelProfile> modelProfiles;
 };

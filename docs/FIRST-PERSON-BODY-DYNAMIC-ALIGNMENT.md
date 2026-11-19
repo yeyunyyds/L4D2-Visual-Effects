@@ -1,5 +1,20 @@
 # Experimental model-aware dynamic first-person body placement
 
+## Current baseline (19 November 2026 user-tested camera framing)
+
+The factory `firstPersonBody` preset now matches the user's uploaded `hud.json`:
+render ON, dynamic anchor ON, camera yaw follow ON, hide head/arms ON,
+manual forward=-13, right=-1, up=-1, GPU clipping OFF. The historical
+clipHeight=81 is retained while clipping remains disabled. These are
+an empirical visibility compromise, **not** a physically exact camera-eye
+alignment and not guaranteed across animations or unrelated player MODs.
+
+The open-neck seam when jumping/leaning arises from animated upper-body
+pose and first-person camera placement, not necessarily failed rigid
+translation. A camera-forward body offset mitigates it without eliminating
+all mesh-interior views. Existing user `hud.json` values are never forced
+overwritten; only factory defaults and packaged sample are changed.
+
 ## Intent, provenance and verification
 The user has confirmed that L4D2Visual's native DrawModel visibility gate and
 manual Studio pose translation work in their real game. The new dynamic position
@@ -36,7 +51,7 @@ copied and no undocumented Evo interfaces are called.
    is deliberately immediate to handle jump/landing; lateral correction uses
    a short 18ms filter. Reset on model, handle, epoch, elapsed-time or teleport.
 6. Optional yaw alignment from left/right clavicles to horizontal camera
-   direction, bounded to 0.90 rad maximum; disabled by default. Optional
+   direction, bounded to 0.90 rad maximum; enabled in the tuned preset. Optional
    per-model yaw trim is bounded to ±40 degrees.
 7. Copy all Studio matrices; apply the bounded transform to the temporary copy.
    Then run the existing Evo-inspired hide-head/hide-arms on that same copy,
@@ -52,8 +67,8 @@ copied and no undocumented Evo interfaces are called.
 
 ## Controls and diagnostics
 - Main menu -> First-person Body (existing single submenu) -> Dynamic Anchor
-- Toggle dynamic mode ON (default OFF, to preserve proven original behavior).
-- Toggle follow camera yaw separately (experimental; default OFF).
+- Dynamic mode defaults ON for this user-tested camera-framing preset.
+- Camera-yaw following defaults ON for this experimental preset.
 - Adjust fallback eye offset (+/-1 Source unit) and global yaw trim (+/-5 degrees).
 - Position submenu retains manual XYZ and step increments.
 - Bind trims to current MOD, reset this MOD, then Save Settings to persist.
