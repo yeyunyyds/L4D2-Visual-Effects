@@ -10,3 +10,5 @@ inline bool opensChild(uintptr_t id){
 }
 inline const char* callbackResult(uintptr_t id,const char* page){return opensChild(id)?page:nullptr;}
 }
+
+// 884/885 intentionally absent: action-only bone-hide toggles.

@@ -4,7 +4,7 @@
 #include <cstdint>
 namespace visual::firstperson {
 struct Settings {
- bool enabled=false,clipEnabled=false;
+ bool enabled=false,clipEnabled=false,hideHead=true,hideArms=false;
  float clipHeight=65.f;
  float forward=0.f,right=0.f,up=0.f,step=1.f;
 };
@@ -22,6 +22,7 @@ template<class Json> Settings readSettings(const Json& root) {
  auto readBool=[&](const char* key,bool& value){auto v=it->find(key);if(v!=it->end()&&v->is_boolean())value=v->template get<bool>();};
  auto readFloat=[&](const char* key,float& value){auto v=it->find(key);if(v!=it->end()&&v->is_number())value=v->template get<float>();};
  readBool("enabled",s.enabled);readBool("clipEnabled",s.clipEnabled);
+ readBool("hideHead",s.hideHead);readBool("hideArms",s.hideArms);
  readFloat("clipHeight",s.clipHeight);readFloat("forward",s.forward);
  readFloat("right",s.right);readFloat("up",s.up);readFloat("step",s.step);
  normalize(s);return s;
@@ -29,6 +30,7 @@ template<class Json> Settings readSettings(const Json& root) {
 template<class Json> void writeSettings(Json& root,const Settings& settings) {
  Settings s=settings;normalize(s);
  root["firstPersonBody"]=Json{{"enabled",s.enabled},{"clipEnabled",s.clipEnabled},
+ {"hideHead",s.hideHead},{"hideArms",s.hideArms},
  {"clipHeight",s.clipHeight},{"forward",s.forward},{"right",s.right},{"up",s.up},{"step",s.step}};
 }
 inline bool adjust(Settings& s,std::uintptr_t id) {
@@ -47,6 +49,8 @@ inline bool adjust(Settings& s,std::uintptr_t id) {
  case 881:s.up-=s.step;break;
  case 882:s.step=s.step==.5f?1.f:s.step==1.f?5.f:.5f;break;
  case 883:s.forward=s.right=s.up=0;break;
+ case 884:s.hideHead=!s.hideHead;break;
+ case 885:s.hideArms=!s.hideArms;break;
  default:return false;
  }
  normalize(s);return true;

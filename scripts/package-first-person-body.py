@@ -37,6 +37,12 @@ readme+='New: first-person clip plane at adjustable model-relative height; optio
 readme+='three-axis display-only body translation via Studio bone copies.\n'
 readme+='Main menu [3] toggles body; menu [9] opens advanced cut/position pages.\n'
 readme+='New settings default OFF or ZERO; save in existing hud.json.\n'
+readme+='Evo-inspired render-only head->neck and upper-arm->clavicle branch collapse.\n'
+readme+='Main menu now has ONE first-person body submenu with enable/hide settings.\n'
+readme+='Head hiding defaults ON if body is enabled; world-arm hiding defaults OFF.\n'
+readme+='Existing body position offsets remain. Legacy GPU clip is optional.\n'
+readme+='This is independent algorithm based on Evo behavior descriptions, not Evo code.\n'
+readme+='New bone hiding has NOT been verified in game; MODs may not be supported.\n'
 readme+='The body was confirmed visible by user before these effects. New clipping\n'
 readme+='and offset handling remain game-untested, including shader/deferred passes.\n'
 readme+='NOT A STABLE RELEASE. Do not assume VAC safety.\n'
@@ -58,7 +64,7 @@ with zipfile.ZipFile(build/filename) as z:
     pe=int.from_bytes(data[0x3c:0x40],'little')
     assert data[pe:pe+4]==b'PE\x00\x00'
     assert int.from_bytes(data[pe+4:pe+6],'little')==0x14c
-    assert b'0.8.0-fpb-clip-offset-experimental' in data
+    assert b'0.8.0-fpb-evo-parts-experimental' in data
     config=json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
     assert config['firstPersonBody']['enabled'] is False
 print(build/filename)

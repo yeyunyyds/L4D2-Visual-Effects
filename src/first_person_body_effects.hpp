@@ -3,6 +3,7 @@
 #include "first_person_body.hpp"
 #include "first_person_body_math.hpp"
 #include "studio_cache.hpp"
+#include "first_person_body_parts.hpp"
 #include <d3d9.h>
 #include <array>
 #include <atomic>
@@ -16,6 +17,8 @@ inline IDirect3DDevice9* renderDevice=nullptr;
 inline std::atomic<unsigned long> matched{0},shifted{0},shiftRejected{0},clipSet{0},clipRejected{0};
 inline std::atomic<const char*> clipStatus{u8"高度裁剪未启用"};
 inline std::atomic<const char*> offsetStatus{u8"位置偏移为零"};
+inline std::atomic<const char*> headStatus{u8"头部分支隐藏关闭"},armStatus{u8"双臂分支隐藏关闭"};
+inline std::atomic<unsigned long> headHidden{0},headRejected{0},armsHidden{0},armsRejected{0};
 inline void setDevice(IDirect3DDevice9* next) noexcept {
  std::lock_guard<std::mutex> lock(deviceMutex);
  if(next==renderDevice)return;
@@ -42,7 +45,8 @@ inline bool select(std::uint32_t renderable,Context& ctx) noexcept {
  if(!base||renderable!=base+4)return false;
  ctx.options=std::atomic_load(&options);
  if(!ctx.options->enabled)return false;
- if(!ctx.options->clipEnabled&&ctx.options->forward==0&&ctx.options->right==0&&ctx.options->up==0)return false;
+ if(!ctx.options->clipEnabled&&!ctx.options->hideHead&&!ctx.options->hideArms&&
+    ctx.options->forward==0&&ctx.options->right==0&&ctx.options->up==0)return false;
  ctx.camera=std::atomic_load(&source_camera::snapshot);
  if(!ctx.camera->active||ctx.camera->epoch!=currentEpoch.load(std::memory_order_acquire))return false;
  auto tick=GetTickCount64(),sample=localTick.load(std::memory_order_acquire);
@@ -115,36 +119,69 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  Context ctx;
  if(!select(renderable,ctx)) {original(bones,origin);return;}
  ++matched;
- dango::Vec3 shift{};bool moved=false;
+ dango::Vec3 shift{};bool moved=false,partChanged=false;
  visual::Matrix3x4 temporary[256];
  auto settings=ctx.options;
- if(settings->forward!=0||settings->right!=0||settings->up!=0){
-  if(math::offset(*ctx.camera,settings->forward,settings->right,settings->up,shift)&&bones){
-   static thread_local visual::StudioCache cache;
-   const char* reason=nullptr;
-   auto pose=cache.find(source_entities::reader,header,ctx.camera->epoch,&reason);
-   if(pose&&pose->count>0&&pose->count<=256&&
-      source_entities::reader.read(std::uint32_t(std::uintptr_t(bones)),temporary,pose->count*sizeof(visual::Matrix3x4))){
-     moved=true;
-     for(unsigned i=0;i<pose->count;++i)for(unsigned row=0;row<3;++row)for(unsigned col=0;col<4;++col)
-      if(!std::isfinite(temporary[i].m[row][col]))moved=false;
-     if(moved){for(unsigned i=0;i<pose->count;++i){
-       temporary[i].m[0][3]+=shift.x;
-       temporary[i].m[1][3]+=shift.y;
-       temporary[i].m[2][3]+=shift.z;
-     }}
+ const bool wantOffset=settings->forward!=0||settings->right!=0||settings->up!=0;
+ const bool wantParts=settings->hideHead||settings->hideArms;
+ const visual::StudioPose* studio=nullptr;
+ bool ready=false;
+ if(bones&&(wantOffset||wantParts)){
+  static thread_local visual::StudioCache cache;
+  const char* reason=nullptr;
+  studio=cache.find(source_entities::reader,header,ctx.camera->epoch,&reason);
+  if(studio&&studio->count>0&&studio->count<=256&&
+     source_entities::reader.read(std::uint32_t(std::uintptr_t(bones)),temporary,studio->count*sizeof(visual::Matrix3x4))){
+   ready=true;
+   for(unsigned i=0;i<studio->count;++i)
+    if(!parts::matrixValid(temporary[i])){ready=false;break;}
+  }
+ }
+ if(wantOffset){
+  if(ready&&math::offset(*ctx.camera,settings->forward,settings->right,settings->up,shift)){
+   bool finite=true;
+   for(unsigned i=0;i<studio->count&&finite;++i)
+    for(unsigned row=0;row<3;++row)
+     finite=std::isfinite(temporary[i].m[row][3]+(row==0?shift.x:row==1?shift.y:shift.z));
+   if(finite){
+    for(unsigned i=0;i<studio->count;++i){
+     temporary[i].m[0][3]+=shift.x;
+     temporary[i].m[1][3]+=shift.y;
+     temporary[i].m[2][3]+=shift.z;
+    }
+    moved=true;
    }
   }
   if(moved){++shifted;offsetStatus=u8"已将偏移应用于 Studio 骨骼副本";}
   else{++shiftRejected;offsetStatus=u8"骨骼或相机校验失败，位置偏移跳过";shift={};}
  }else offsetStatus=u8"位置偏移为零";
+ if(wantParts){
+  if(ready){
+   // Use actual model bone hierarchy; never guess head from vertex height.
+   // Only this draw's temporary bone matrices are modified.
+   const auto plan=parts::discover(*studio);
+   const auto result=parts::apply(*studio,plan,temporary,settings->hideHead,settings->hideArms);
+   partChanged=result.modified!=0;
+   if(settings->hideHead){
+    if(result.head){++headHidden;headStatus=u8"已收缩头部及后代骨骼至颈部";}
+    else{++headRejected;headStatus=u8"此 MOD 缺少可验证的头部/颈部骨骼分支";}
+   }else headStatus=u8"头部分支隐藏关闭";
+   if(settings->hideArms){
+    if(result.left||result.right){++armsHidden;armStatus=(result.left&&result.right)?u8"已收缩双臂分支":u8"仅找到单侧手臂分支";}
+    else{++armsRejected;armStatus=u8"此 MOD 未找到可验证的左右上臂骨骼";}
+   }else armStatus=u8"双臂分支隐藏关闭";
+  }else{
+   if(settings->hideHead){++headRejected;headStatus=u8"Studio 骨骼校验失败，未隐藏头部";}
+   if(settings->hideArms){++armsRejected;armStatus=u8"Studio 骨骼校验失败，未隐藏手臂";}
+  }
+ }else{headStatus=u8"头部分支隐藏关闭";armStatus=u8"双臂分支隐藏关闭";}
  dango::Vec3 shiftedOrigin=origin+shift;
  if(settings->clipEnabled){
    ClipScope clip(*ctx.camera,shiftedOrigin.z+settings->clipHeight);
-   original(moved?temporary:bones,shiftedOrigin);
+   original((moved||partChanged)?temporary:bones,shiftedOrigin);
  }else{
    clipStatus=u8"高度裁剪未启用";
-   original(moved?temporary:bones,shiftedOrigin);
+   original((moved||partChanged)?temporary:bones,shiftedOrigin);
  }
 }
 }

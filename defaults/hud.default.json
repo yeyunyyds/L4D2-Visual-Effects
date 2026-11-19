@@ -91,6 +91,8 @@
     "forward": 0,
     "right": 0,
     "up": 0,
-    "step": 1
+    "step": 1,
+    "hideHead": true,
+    "hideArms": false
   }
 }

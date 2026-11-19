@@ -11,6 +11,9 @@ struct StudioPose {
     std::string name;
     std::vector<unsigned> feet;
     std::vector<unsigned> fixed;
+    // Validated MDL hierarchy for render-only first-person part hiding.
+    std::vector<int> parents;
+    std::vector<std::string> boneNames;
 };
 template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, StudioPose& out,const char** reason=nullptr) {
     auto fail=[&](const char* why){if(reason)*reason=why;return false;};
@@ -27,6 +30,7 @@ template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, Stu
     if(end==name+64 || end==name)return fail("studio model name invalid");
     result.name.assign(name,end);out.name=result.name;out.count=count;
     std::vector<int> parents(count);
+    std::vector<std::string> boneNames(count);
     for(unsigned i=0;i<count;++i) {
         const auto bone=header+offset+i*216;
         std::int32_t displacement{};
@@ -43,6 +47,7 @@ template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, Stu
             if(j==127)return fail("bone name too long");
             boneName+=ch>='A'&&ch<='Z'?char(ch-'A'+'a'):ch;
         }
+        boneNames[i]=boneName;
         // Names, not fixed bone indices; work across infected model skeletons.
         if(boneName.find("foot")!=std::string::npos &&
            boneName.find("attach")==std::string::npos)result.feet.push_back(i);
@@ -59,6 +64,8 @@ template<class Reader> bool studioPose(Reader& reader, std::uint32_t header, Stu
         if(parent!=-1)return fail("cyclic bone parent hierarchy"); // cyclic hierarchy
         if(fixed)result.fixed.push_back(i);
     }
+    result.parents=std::move(parents);
+    result.boneNames=std::move(boneNames);
     out=std::move(result);return true;
 }
 template<std::size_t Capacity> inline void preserveFeet(const StudioPose& studio,const Matrix3x4* original,BasicPoseCopy<Capacity>& output) {
