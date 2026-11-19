@@ -25,10 +25,12 @@ for path in sorted((root/'vendor').rglob('*')):
         install['bin/neko/plugins/L4D2Visual/licenses/vendor/'+path.relative_to(root/'vendor').as_posix()]=path
 readme=(root/'docs/INSTALL.md').read_text(encoding='utf-8')
 readme+='\n\n# First-person body: native drawing gate EXPERIMENT\n\n'
-readme+='Verified exact client.dll and engine.dll builds are required.\n'\nreadme+='USER-TUNED EXPERIMENTAL DEFAULT: first-person body and dynamic anchor ON.\n'
+readme+='Verified exact client.dll and engine.dll builds are required.\n'
+readme+='USER-TUNED EXPERIMENTAL DEFAULT: first-person body and dynamic anchor ON.\n'
 readme+='One native local-player DrawModel conditional skip is bypassed in memory.\n'
 readme+='No model is cloned, no extra draw call or HUD substitute is used.\n'
-readme+='User confirmed prior native-body, movement, and this tuned camera framing.\n'\nreadme+='New factory preset has not itself been game-regression-tested.\n'
+readme+='User confirmed prior native-body, movement, and this tuned camera framing.\n'
+readme+='New factory preset has not itself been game-regression-tested.\n'
 readme+='Possible head/hair clipping, arms/weapons overlap and animation anomalies.\n'
 readme+='Back up plugin DLL and hud.json, exit game, extract to game directory.\n'
 readme+='Switch off to restore original logic; to roll back restore saved plugin.\n'

@@ -38,6 +38,8 @@ int main(){
  camera.eye={0,0,65};camera.forward={1,0,0};
  camera.right={0,-1,0};camera.up={0,0,1};
  Settings options{};options.dynamicAnchor=true;
+ // The alignment math tests use a neutral calibration, not the live visual preset.
+ options.forward=options.right=options.up=options.yawTrim=0.f;
  Track track;
  auto r=compute(rig,anchor,bones,camera,options,nullptr,1,123,1000,track);
  assert(r.ok&&std::abs(r.translation.z)<.001f);
