@@ -1,7 +1,7 @@
 #pragma once
 #include "aim_selection.hpp"
 #include "local_player.hpp"
-#include "image_trace.hpp"
+#include "source_trace.hpp"
 #include <memory>
 namespace visual::aimruntime {
 struct Request{std::uint64_t id=0,tick=0;std::uint32_t epoch=0;bool hands=false;};
@@ -9,7 +9,7 @@ inline std::shared_ptr<const Request> pending;
 inline std::shared_ptr<const AimResult> completed=std::make_shared<const AimResult>();
 inline std::atomic<std::uint64_t> sequence{0},failed{0};
 inline std::atomic<bool> stopped{false};
-inline picturetrace::Binding traceBinding;
+inline scenetrace::Binding traceBinding;
 inline bool traceFaulted=false;inline std::uint32_t traceEpoch=0;
 inline bool hasPending(){return bool(std::atomic_load(&pending));}
 inline void cancel(AimSession& session){auto queued=std::atomic_load(&pending);if(queued&&queued->id==session.request)std::atomic_compare_exchange_strong(&pending,&queued,std::shared_ptr<const Request>{});session.clear();}
@@ -47,7 +47,7 @@ inline void onFrame(const dango::GameCameraFrame& camera){
  if(!query.handsOnly){
   if(traceEpoch!=camera.epoch){traceEpoch=camera.epoch;traceFaulted=false;traceBinding.reset();}
   if(traceFaulted||traceBinding.faulted){result.status=u8"射线校验失败，本地图停止场景识别";finish();return;}
-  dango::CameraPose eye;if(!dango::cameraPose(camera,eye)||!picturetrace::connectBinding(traceBinding)){result.status=u8"射线接口未验证，未执行识别";finish();return;}
+  dango::CameraPose eye;if(!dango::cameraPose(camera,eye)||!scenetrace::connectBinding(traceBinding)){result.status=u8"射线接口未验证，未执行识别";finish();return;}
   Filter filter;auto links=aimOwnerLinks(verified);
   for(const auto& r:verified.records)if(r.index<identities.size()&&identities[r.index].serial==r.serial&&(r.handle==query.localHandle||aimActorOwner(verified,r,&links)==query.localHandle))filter.ignored.insert(identities[r.index].entity);
   static bool pinned=false;if(!pinned){HMODULE module=nullptr;pinned=GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN|GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,reinterpret_cast<const wchar_t*>(&pending),&module)!=FALSE;}if(!pinned){result.status=u8"识别模块未就绪";finish();return;}

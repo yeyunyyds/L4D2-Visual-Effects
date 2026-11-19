@@ -1,14 +1,14 @@
 #pragma once
 #include "module_verification.hpp"
 #include "dango/source_trace_contract.hpp"
-namespace visual::picturetrace {
+namespace visual::scenetrace {
 struct Binding {void* object=nullptr;bool faulted=false;void reset(){object=nullptr;faulted=false;}};
 inline Binding shared;inline void*& object=shared.object;inline bool& faulted=shared.faulted;
 inline void reset(){shared.reset();}
 inline bool connectBinding(Binding& binding){
  auto& object=binding.object;
  using namespace source_camera;auto module=engineModule;
- if(!hooked||!module||!matchesImage(module,EngineTimestamp,EngineImageSize,"picture trace engine"))return false;
+ if(!hooked||!module||!matchesImage(module,EngineTimestamp,EngineImageSize,"scene trace engine"))return false;
  if(!verifiedModuleFile(module,"8a6d468059394bf4cfce32f11dcba12ef45de88da1373084d5a2916d0bf7ba86"))return false;
  using Factory=void*(__cdecl*)(const char*,int*);auto factory=reinterpret_cast<Factory>(GetProcAddress(module,"CreateInterface"));if(!factory)return false;
  auto candidate=factory("EngineTraceClient003",nullptr);auto base=reinterpret_cast<std::uintptr_t>(module);
@@ -37,4 +37,4 @@ inline bool castBinding(Binding& binding,dango::Vec3 start,dango::Vec3 end,dango
 inline bool castBoxBinding(Binding& binding,dango::Vec3 start,dango::Vec3 end,float halfSize,dango::trace::Result& output){if(!std::isfinite(halfSize)||halfSize<4||halfSize>64)return false;return castShapeBinding(binding,start,end,{halfSize,halfSize,halfSize},output);}
 inline bool connect(){return connectBinding(shared);}
 inline bool cast(dango::Vec3 start,dango::Vec3 end,dango::trace::Result& output){return castBinding(shared,start,end,output);}
-} // namespace visual::picturetrace
+} // namespace visual::scenetrace

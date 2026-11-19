@@ -2,7 +2,7 @@
 #include "dango/source_entities.hpp"
 #include "rock_settings.hpp"
 #include "rock_landing.hpp"
-#include "image_trace.hpp"
+#include "source_trace.hpp"
 namespace visual::rockruntime {
 inline std::shared_ptr<const rocks::Settings> options=std::make_shared<const rocks::Settings>();
 inline std::atomic<bool> faulted{false};
@@ -10,7 +10,7 @@ struct Snapshot {uint32_t epoch=0;uint64_t tick=0;std::map<uint32_t,rocks::Track
 inline std::shared_ptr<const Snapshot> emptySnapshot=std::make_shared<const Snapshot>();
 inline std::shared_ptr<const Snapshot> snapshot=emptySnapshot;
 inline rocks::Tracker tracker;
-inline picturetrace::Binding mapTrace;
+inline scenetrace::Binding mapTrace;
 inline std::shared_ptr<const source_entities::Frame> inventory;
 inline std::map<uint32_t,rocks::Landing> landings;
 inline uint32_t epoch=0;inline uint64_t lastTick=0,nextLanding=0;inline size_t cursor=0;inline bool running=false;
@@ -33,10 +33,10 @@ inline void updateLandings(uint64_t now){
  if(now<nextLanding)return;nextLanding=now+50;
  std::vector<const rocks::Track*> flying;for(const auto& item:tracker.tracks())if(item.second.motion&&!item.second.trajectory.empty())flying.push_back(&item.second);
  if(flying.empty())return;
- if(!mapTrace.object&&!mapTrace.faulted&&!picturetrace::connectBinding(mapTrace))mapTrace.faulted=true;
+ if(!mapTrace.object&&!mapTrace.faulted&&!scenetrace::connectBinding(mapTrace))mapTrace.faulted=true;
  if(mapTrace.faulted){landings.clear();return;}
  const auto& t=*flying[cursor++%flying.size()];unsigned budget=64;
- auto hit=rocks::predictLanding(*t.motion,rocks::Gravity,now,budget,[](auto a,auto b,auto& out){return picturetrace::castBoxBinding(mapTrace,a,b,rocks::HalfSize,out);},rocks::HalfSize);
+ auto hit=rocks::predictLanding(*t.motion,rocks::Gravity,now,budget,[](auto a,auto b,auto& out){return scenetrace::castBoxBinding(mapTrace,a,b,rocks::HalfSize,out);},rocks::HalfSize);
  if(hit.valid())landings[t.record.handle]=hit;else landings.erase(t.record.handle);
 }
 inline void onFrame(const dango::GameCameraFrame& camera)noexcept{

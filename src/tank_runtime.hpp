@@ -5,7 +5,8 @@
 #include "tank_observed_timer.hpp"
 #include "tank_layer_attack.hpp"
 #include "tank_visual_state.hpp"
-#include "entity_menu.hpp"
+#include "menu_format.hpp"
+#include "class_catalog.hpp"
 #include "tank_local.hpp"
 #include <mutex>
 namespace visual::tank {

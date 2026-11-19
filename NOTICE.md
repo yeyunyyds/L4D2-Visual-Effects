@@ -101,3 +101,7 @@ CampaignOutline* glow ownership and native color-proxy route from the same
 Skeeto commit above (Copyright (C) 2026 regoists), under GPL-3.0. It validates
 the exact client image/native entry points and embedded glow layout, preserves
 existing glows and restores only values still owned by this feature.
+
+The experimental custom-spray/image and Steam P2P modules have been removed.
+Their earlier attribution above is retained as historical provenance; the shared
+trace implementation now lives in src/source_trace.hpp for aim and rock queries.

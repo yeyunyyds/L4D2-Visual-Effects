@@ -1,6 +1,6 @@
 #pragma once
+#include <d3d9.h>
 #include "tank_runtime.hpp"
-#include "spray_display.hpp"
 #include "tank_warning_geometry.hpp"
 namespace visual::tank {
 inline bool needed(){auto s=std::atomic_load(&options);auto f=std::atomic_load(&snapshot);auto c=std::atomic_load(&source_camera::snapshot);auto now=GetTickCount64();auto visual=std::atomic_load(&visualSettings);const char* reason=nullptr;

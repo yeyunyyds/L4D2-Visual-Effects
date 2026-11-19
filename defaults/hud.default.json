@@ -34,24 +34,6 @@
     "warnFill": false,
     "warnOutline": false
   },
-  "sprayP2P": {
-    "enabled": false,
-    "automatic": false,
-    "room": "",
-    "peers": []
-  },
-  "wallPictures": {
-    "enabled": false,
-    "bindT": false,
-    "autoNext": false,
-    "selected": "",
-    "size": 60,
-    "rotation": 0,
-    "opacity": 10,
-    "maximum": 2,
-    "sizes": {},
-    "sizeProfileVersion": 1
-  },
   "proximityStretch": {
     "enabled": false,
     "includeCommon": false

@@ -12,7 +12,6 @@ files = {
     'bin/neko/plugins/L4D2Visual/hud.json': root / 'defaults/hud.default.json',
     'bin/neko/plugins/L4D2Visual.dll': binary,
     'README.md': root / 'docs/INSTALL.md',
-    'bin/neko/plugins/L4D2Visual/images/README.txt': root / 'docs/wall-pictures-folder.txt',
 }
 for name in ('LICENSE', 'NOTICE.md'):
     files['bin/neko/plugins/L4D2Visual/licenses/' + name] = root / name

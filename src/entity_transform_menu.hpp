@@ -1,6 +1,7 @@
 #pragma once
 #include "entity_transform_runtime.hpp"
-#include "entity_menu.hpp"
+#include "menu_format.hpp"
+#include "class_catalog.hpp"
 #include "aim_runtime.hpp"
 namespace visual::deform {
 inline AimTarget aimed;inline AimSession aimSession;

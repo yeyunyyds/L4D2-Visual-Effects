@@ -53,12 +53,13 @@ jobs:
               assert dll[pe:pe+4] == b'PE\x00\x00'
               assert int.from_bytes(dll[pe+4:pe+6], 'little') == 0x14c
               readme = z.read('README.md').decode()
-              assert '联机功能未经测试，不保障 VAC 安全' in readme
+              assert '自定义喷漆实验已移除' in readme
+              assert not any('/images/' in name or 'spray-cache' in name for name in z.namelist())
               assert revision in readme
               config = json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
-              for key in ['entityTransform', 'tankPrediction', 'tankRockPrediction', 'wallPictures', 'sprayP2P']:
+              for key in ['entityTransform', 'tankPrediction', 'tankRockPrediction']:
                   assert config[key]['enabled'] is False
-              assert config['sprayP2P']['automatic'] is False
+              assert 'sprayP2P' not in config and 'wallPictures' not in config
               assert config['tankPrediction']['warnRange'] is True
               for key in ['warnBar', 'warnFill', 'warnOutline']:
                   assert config['tankPrediction'][key] is False

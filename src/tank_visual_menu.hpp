@@ -1,6 +1,7 @@
 #pragma once
 #include "tank_visual_state.hpp"
-#include "entity_menu.hpp"
+#include "menu_format.hpp"
+#include "class_catalog.hpp"
 #include "imgui/imgui.h"
 #include <windows.h>
 namespace visual::tank {

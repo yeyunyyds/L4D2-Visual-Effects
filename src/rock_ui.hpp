@@ -1,10 +1,10 @@
 #pragma once
 #include "rock_runtime.hpp"
-#include "tank_visual.hpp"
+#include "overlay_gate.hpp"
 #include "imgui/imgui.h"
 #include <sstream>
 namespace visual::rockui {
-inline visual::tank::OverlayGate displayGate;inline bool foreground=false;
+inline visual::OverlayGate displayGate;inline bool foreground=false;
 inline void pollDisplay(const dango::GameCameraFrame& camera,bool escape,bool pluginMenu,bool focused){foreground=focused;displayGate.poll(camera,escape,pluginMenu,focused,rockruntime::active());}
 inline void readSettings(const nlohmann::json& j){std::atomic_store(&rockruntime::options,std::make_shared<const rocks::Settings>(rocks::readSettings(j)));}
 inline void writeSettings(nlohmann::json& j){rocks::writeSettings(j,*std::atomic_load(&rockruntime::options));}
