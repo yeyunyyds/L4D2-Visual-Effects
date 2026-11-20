@@ -6,13 +6,13 @@
 #include <optional>
 namespace visual::tank {
 using dango::Vec3;using dango::inventory::Record;using dango::inventory::Frame;
-struct Settings{bool enabled=false,draw=true;unsigned horizonMs=200;bool warnBar=false,warnRange=true,warnFill=false,warnOutline=false;};
+struct Settings{bool enabled=false,draw=true,occludeHud=true;unsigned horizonMs=200;bool warnBar=false,warnRange=true,warnFill=false;};
 template<class Json> Settings readSettings(const Json& j){Settings s;auto p=j.find("tankPrediction");if(p==j.end()||!p->is_object())return s;
- for(auto value:{std::pair<const char*,bool*>{"enabled",&s.enabled},{"draw",&s.draw},{"warnBar",&s.warnBar},{"warnRange",&s.warnRange},{"warnFill",&s.warnFill},{"warnOutline",&s.warnOutline}})if(p->contains(value.first)&&(*p)[value.first].is_boolean())*value.second=(*p)[value.first].template get<bool>();
+ for(auto value:{std::pair<const char*,bool*>{"enabled",&s.enabled},{"draw",&s.draw},{"occludeHud",&s.occludeHud},{"warnBar",&s.warnBar},{"warnRange",&s.warnRange},{"warnFill",&s.warnFill}})if(p->contains(value.first)&&(*p)[value.first].is_boolean())*value.second=(*p)[value.first].template get<bool>();
  if(p->contains("horizonMs")&&(*p)["horizonMs"].is_number_unsigned())s.horizonMs=std::clamp((*p)["horizonMs"].template get<unsigned>(),0u,500u);
  return s;
 }
-template<class Json> void writeSettings(Json& j,const Settings& s){j["tankPrediction"]={{"enabled",s.enabled},{"draw",s.draw},{"horizonMs",s.horizonMs},{"warnBar",s.warnBar},{"warnRange",s.warnRange},{"warnFill",s.warnFill},{"warnOutline",s.warnOutline}};}
+template<class Json> void writeSettings(Json& j,const Settings& s){j["tankPrediction"]={{"enabled",s.enabled},{"draw",s.draw},{"occludeHud",s.occludeHud},{"horizonMs",s.horizonMs},{"warnBar",s.warnBar},{"warnRange",s.warnRange},{"warnFill",s.warnFill}};}
 struct Parameters{std::optional<float> range,arc,windup,duration,interval,missInterval;std::uint64_t tick=0;std::string source="unavailable";};
 inline bool finite(Vec3 v){return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z);}
 inline float horizontal(Vec3 v){return std::hypot(v.x,v.y);}
@@ -41,7 +41,7 @@ inline std::optional<Target> inferTarget(const Record& tank,const Frame& frame,f
 }
 struct RangeWarning{bool known=false,inside=false;float distance=0;};
 struct Observation{RangeWarning warning;std::uint32_t handle=0;Vec3 origin{},velocity{},predicted{};float heading=0,pitch=0,radius=0,halfArc=0;bool eye=false,geometry=false,headingStalled=false,nearVerticalAim=false;std::optional<Target> target,gaze;std::optional<std::uint32_t> lookAt;std::optional<int> sequence;std::optional<float> cycle;float headingRate=0;std::optional<float> cooldown;CooldownReading timing;std::string action="unknown",reason;};
-inline bool warningRequested(const Settings& s){return s.warnBar||s.warnRange||s.warnFill||s.warnOutline;}
+inline bool warningRequested(const Settings& s){return s.warnBar||s.warnRange||s.warnFill;}
 // Match the displayed current sector, not the future dashed arc or a cooldown window.
 inline RangeWarning rangeWarning(const Observation& o,const Record* local,const Record* actor){
  RangeWarning w;if(!o.geometry||!local||!actor||!survivor(*local)||!local->health||!tank(*actor)||!finite(o.origin)||!std::isfinite(o.radius)||o.radius<=0||!std::isfinite(o.heading)||!std::isfinite(o.halfArc)||o.halfArc<=0||o.halfArc>180)return w;

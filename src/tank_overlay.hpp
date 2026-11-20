@@ -1,6 +1,7 @@
 #pragma once
 #include <d3d9.h>
 #include "tank_runtime.hpp"
+#include "tank_visibility.hpp"
 #include "tank_warning_geometry.hpp"
 namespace visual::tank {
 inline bool needed(){auto s=std::atomic_load(&options);auto f=std::atomic_load(&snapshot);auto c=std::atomic_load(&source_camera::snapshot);auto now=GetTickCount64();auto visual=std::atomic_load(&visualSettings);const char* reason=nullptr;
@@ -18,12 +19,13 @@ inline void draw(IDirect3DDevice9* device,float width,float height){
  struct Vertex{float x,y,z,w;DWORD color;};std::vector<Vertex> fillVertices;fillVertices.reserve(960);
  std::vector<Segment> lines;lines.reserve(1800);
  auto line=[&](Vec3 a,Vec3 b,DWORD color,float thick=1){float ax,ay,bx,by;if(project(a,*c,width,height,ax,ay)&&project(b,*c,width,height,bx,by))stroke(lines,{ax,ay},{bx,by},color,thick);};
- for(const auto& o:f->tanks){bool danger=o.warning.known&&o.warning.inside;DWORD rangeColor=danger&&cfg->warnRange?0xffff3030:colors.range;auto center=o.origin+Vec3{0,0,5};auto aimVector=forward(o.heading);if(o.eye){float p=o.pitch*3.14159265358979323846f/180;aimVector=aimVector*std::cos(p);aimVector.z=-std::sin(p);}auto tip=center+aimVector*(60*visual->arrowSize);if(visual->showDirection){line(center,tip,colors.direction,arrowWidth);auto side=forward(o.heading+90);line(tip,center+aimVector*(49*visual->arrowSize)+side*(7*visual->arrowSize),colors.direction,arrowWidth);line(tip,center+aimVector*(49*visual->arrowSize)-side*(7*visual->arrowSize),colors.direction,arrowWidth);}
+ for(const auto& o:f->tanks){const bool bodyVisible=!cfg->occludeHud||visibility::visible(f->epoch,o.handle,GetTickCount64());bool danger=o.warning.known&&o.warning.inside;DWORD rangeColor=danger&&cfg->warnRange?0xffff3030:colors.range;auto center=o.origin+Vec3{0,0,5};auto aimVector=forward(o.heading);if(o.eye){float p=o.pitch*3.14159265358979323846f/180;aimVector=aimVector*std::cos(p);aimVector.z=-std::sin(p);}auto tip=center+aimVector*(60*visual->arrowSize);if(visual->showDirection&&bodyVisible){line(center,tip,colors.direction,arrowWidth);auto side=forward(o.heading+90);line(tip,center+aimVector*(49*visual->arrowSize)+side*(7*visual->arrowSize),colors.direction,arrowWidth);line(tip,center+aimVector*(49*visual->arrowSize)-side*(7*visual->arrowSize),colors.direction,arrowWidth);}
   if(visual->showTarget&&o.target)line(center+Vec3{0,0,60},o.target->origin+Vec3{0,0,60},o.target->authoritativeField?colors.direction:colors.future);
   auto bodyOrigin=o.origin;auto pose=poses.find(o.handle);if(pose!=poses.end()&&validRenderAnchor(pose->second,f->epoch,o.handle,GetTickCount64(),o.origin)){bodyOrigin=pose->second.position;++display::renderAnchorHits;}else ++display::networkAnchorFallbacks;
-  auto at=visual->showBar?placeBar(*c,bodyOrigin+Vec3{0,0,45},width,height,*visual,o.heading):std::nullopt;
+  auto at=visual->showBar&&bodyVisible?placeBar(*c,bodyOrigin+Vec3{0,0,45},width,height,*visual,o.heading):std::nullopt;
   if(at){++display::barProjected;++display::visibleBars;std::optional<float> fraction;if(o.cooldown){auto e=estimates->find(o.handle);float span=e!=estimates->end()&&e->second.span&&*e->second.span>0?*e->second.span:std::max(1.f,*o.cooldown);fraction=std::clamp(*o.cooldown/span,0.f,1.f);}barGeometry(lines,{at->x,at->y},*visual,at->scale,fraction,danger&&cfg->warnBar);}else if(visual->showBar)++display::barRejected;
-  if(!o.geometry||!visual->showRange)continue;
+  // Range, warning fill, near/future arcs and edge marks share the Tank body LOS gate.
+  if(!bodyVisible||!o.geometry||!visual->showRange)continue;
   for(unsigned i=0;i<40;++i){float a=o.heading-o.halfArc+o.halfArc*2*i/40,b=o.heading-o.halfArc+o.halfArc*2*(i+1)/40;if(!colors.dashed||i%2==0)line(center+forward(a)*o.radius,center+forward(b)*o.radius,rangeColor,rangeWidth);
    if(danger&&cfg->warnFill){auto polygon=warningTriangle(*c,width,height,{center,center+forward(a)*o.radius,center+forward(b)*o.radius});for(std::size_t j=1;j+1<polygon.size();++j)for(auto p:{polygon[0],polygon[j],polygon[j+1]})fillVertices.push_back({p.x,p.y,0,1,0x30ff3030});}
    if(colors.ticks&&i%10==0)line(center+forward(a)*o.radius*.95f,center+forward(a)*o.radius*1.04f,rangeColor,rangeDetailWidth);
