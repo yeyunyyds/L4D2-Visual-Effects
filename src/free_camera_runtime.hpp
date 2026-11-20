@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
+#include <mutex>
 namespace visual::freecamera {
 using core::Vec;
 inline std::atomic<bool> requested{false},bound{false},active{false},paused{false};
@@ -23,6 +24,12 @@ inline std::atomic<ULONGLONG> lastInput{0};
 inline std::atomic<float> movementSpeed{1000.f};
 inline std::atomic<float> currentMovementSpeed{0.f};
 inline core::Camera camera;
+inline std::mutex motionMutex;
+inline core::Input latestInput{};
+inline float pendingMouseX=0.f,pendingMouseY=0.f;
+inline core::FrameClock renderClock;
+inline std::atomic<unsigned long> renderSteps{0},renderRepeats{0},renderGaps{0};
+inline std::atomic<float> renderDeltaMs{0.f};
 inline Vec lockedAim{};inline bool haveAim=false;
 inline std::uint32_t epoch=0;
 inline void** table=nullptr;inline void* originalView=nullptr;inline void* originalMove=nullptr;
@@ -89,13 +96,35 @@ inline bool foreground(){
 }
 inline bool key(int code){return (GetAsyncKeyState(code)&0x8000)!=0;}
 inline bool enabled(){return requested.load()&&active.load();}
+// Must hold motionMutex; original game hooks are never called under this lock.
+inline void resetMotionLocked(){
+ camera.ready=false;camera.halt();
+ latestInput={};pendingMouseX=pendingMouseY=0.f;
+ renderClock.reset();haveAim=false;lastInput=0;
+ currentMovementSpeed=0.f;renderDeltaMs=0.f;
+}
+inline double renderTimeSeconds(){
+ static const double inv=[]{
+  LARGE_INTEGER f{};
+  return QueryPerformanceFrequency(&f)&&f.QuadPart>0?
+   1.0/static_cast<double>(f.QuadPart):0.0;
+ }();
+ LARGE_INTEGER t{};
+ return inv>0.0&&QueryPerformanceCounter(&t)?
+  static_cast<double>(t.QuadPart)*inv:0.0;
+}
 inline void disable(const char* reason="FreeCamera off"){
- requested=false;active=false;currentMovementSpeed=0.f;message=reason;
+ requested=false;active=false;
+ {std::lock_guard<std::mutex> lock(motionMutex);resetMotionLocked();}
+ message=reason;
 }
 inline void toggle(){
- const bool next=!requested.load();
- requested=next;active=false;currentMovementSpeed=0.f;
- camera.ready=false;haveAim=false;lastInput=0;
+ bool next=false;
+ {
+  std::lock_guard<std::mutex> lock(motionMutex);
+  next=!requested.load();
+  requested=next;active=false;resetMotionLocked();
+ }
  message=next?(bound?"FreeCamera waiting for valid view/input":"FreeCamera armed; awaiting ClientMode hook"):"FreeCamera off";
  source_camera::log(next?"FreeCamera: request ON":"FreeCamera: request OFF");
 }
@@ -103,19 +132,55 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  auto fn=reinterpret_cast<ViewCallback>(originalView);
  if(fn)fn(self,setup);
  ++viewCount;
- if(!requested){active=false;camera.ready=false;return;}
+ if(!requested){active=false;return;}
  Vec origin{},angles{};ViewLayout layout{};
  if(!viewFields(setup,origin,angles,layout)){
   ++viewRejected;disable("CViewSetup layout mismatch; disabled");return;
  }
  const auto now=GetTickCount64(),last=lastInput.load();
  if(!last||now<last||now-last>1000){
-  active=false;message="Waiting for CreateMove";return;
+  active=false;message="Waiting for CreateMove";
+  std::lock_guard<std::mutex> lock(motionMutex);
+  camera.halt();renderClock.reset();pendingMouseX=pendingMouseY=0.f;
+  currentMovementSpeed=0.f;
+  return;
  }
- if(!camera.ready){camera.start(origin,angles);epoch=source_camera::epoch;}
- if(!camera.ready)return;
- if(!write(setup,layout.origin,&camera.origin,12)||
-    !write(setup,layout.angles,&camera.angles,12)){
+ Vec outputOrigin{},outputAngles{};
+ {
+  std::lock_guard<std::mutex> lock(motionMutex);
+  if(!requested)return;
+  if(!camera.ready){
+   camera.start(origin,angles);
+   epoch=source_camera::epoch;
+   renderClock.reset();
+  }
+  if(!camera.ready)return;
+  const auto renderId=source_camera::renderBegins.load(std::memory_order_relaxed);
+  const core::FrameTick tick=renderClock.next(renderId,renderTimeSeconds());
+  if(tick.kind==core::FrameKind::Repeat){
+   ++renderRepeats;
+  }else{
+   ++renderSteps;
+   renderDeltaMs=tick.dt*1000.f;
+   core::Input i=latestInput;
+   i.dx=pendingMouseX;i.dy=pendingMouseY;
+   pendingMouseX=pendingMouseY=0.f;
+   if(paused.load()||!foreground()){
+    camera.halt();
+   }else if(tick.kind==core::FrameKind::Gap){
+    ++renderGaps;
+    camera.halt();
+   }else{
+    camera.look(i.dx,i.dy);
+    if(tick.kind==core::FrameKind::Step)camera.advance(i,tick.dt);
+   }
+   currentMovementSpeed=camera.currentSpeed();
+  }
+  outputOrigin=camera.origin;
+  outputAngles=camera.angles;
+ }
+ if(!write(setup,layout.origin,&outputOrigin,12)||
+    !write(setup,layout.angles,&outputAngles,12)){
   ++viewRejected;disable("CViewSetup write failed");return;
  }
  active=true;message="FreeCamera ACTIVE";
@@ -124,31 +189,34 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  auto fn=reinterpret_cast<MoveCallback>(originalMove);
  bool result=fn?fn(self,dt,cmd):false;
  ++cmdCount;
- if(!requested){haveAim=false;currentMovementSpeed=0.f;return result;}
- if(!cmd||!cmd->command_number)return result; // Source may issue empty sample commands.
- if(!validCmd(cmd)){++cmdRejected;disable("CUserCmd layout mismatch; disabled");return result;}
- if(!haveAim){lockedAim=cmd->viewangles;haveAim=true;}
- lastInput=GetTickCount64();
- if(camera.ready&&!paused&&foreground()){
-  core::Input i{};
-  i.forward=float(int(key('W'))-int(key('S')));
-  i.side=float(int(key('D'))-int(key('A')));
-  // Space moves up; Shift moves down. Ctrl is not consumed by FreeCamera.
-  i.up=float(int(key(VK_SPACE))-int(key(VK_SHIFT)));
-  i.dx=float(cmd->mousedx);i.dy=float(cmd->mousedy);
-  camera.speed=movementSpeed.load();
-  camera.move(i,dt);
- }else{
-  // Do not resume with stored velocity after Esc, focus loss, or no camera.
-  camera.halt();
+ if(!requested)return result;
+ if(!cmd||!cmd->command_number)return result;
+ if(!validCmd(cmd)){
+  ++cmdRejected;disable("CUserCmd layout mismatch; disabled");return result;
  }
- currentMovementSpeed=camera.currentSpeed();
- cmd->viewangles=lockedAim;
- cmd->forwardmove=cmd->sidemove=cmd->upmove=0;
- cmd->buttons=0;cmd->impulse=0;cmd->weaponselect=0;
- cmd->mousedx=cmd->mousedy=0;
+ {
+  std::lock_guard<std::mutex> lock(motionMutex);
+  if(!requested)return result;
+  if(!haveAim){lockedAim=cmd->viewangles;haveAim=true;}
+  lastInput=GetTickCount64();
+  if(!paused.load()&&foreground()){
+   latestInput.forward=float(int(key('W'))-int(key('S')));
+   latestInput.side=float(int(key('D'))-int(key('A')));
+   latestInput.up=float(int(key(VK_SPACE))-int(key(VK_SHIFT)));
+   pendingMouseX=std::clamp(pendingMouseX+float(cmd->mousedx),-4096.f,4096.f);
+   pendingMouseY=std::clamp(pendingMouseY+float(cmd->mousedy),-4096.f,4096.f);
+  }else{
+   latestInput={};
+   pendingMouseX=pendingMouseY=0.f;
+  }
+  cmd->viewangles=lockedAim;
+  cmd->forwardmove=cmd->sidemove=cmd->upmove=0;
+  cmd->buttons=0;cmd->impulse=0;cmd->weaponselect=0;
+  cmd->mousedx=cmd->mousedy=0;
+ }
  return result;
 }
+
 inline bool changeSlot(void** vt,unsigned index,void* expected,void* replacement){
  if(!vt||!source_camera::readable(vt+index,4))return false;
  DWORD before=0;
@@ -246,20 +314,26 @@ inline void tryBind(){
  source_camera::log(std::string("FreeCamera: verified 2026 ClientMode bound index=")+std::to_string(locatedMode.load())+" view[19] move[27]");
 }
 inline void frame(const dango::GameCameraFrame& f){
- if(!f.active){disable("FreeCamera reset on map exit");camera.ready=false;haveAim=false;lastInput=0;return;}
+ if(!f.active){disable("FreeCamera reset on map exit");return;}
  tryBind();
- if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");camera.ready=false;}
+ if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");}
 }
 inline void poll(bool escape,bool /*menu*/,bool gameForeground){
  ++keyPolls;
  static bool held=false;bool now=key(VK_F6);bool edge=now&&!held;held=now;
  // Native HUD uses digit/navigation keys and does not capture the mouse.
  // Keep FreeCamera input active with its panel open. Esc and focus loss still pause.
- paused=escape||!gameForeground;
+ const bool shouldPause=escape||!gameForeground;
+ const bool previouslyPaused=paused.exchange(shouldPause);
+ if(shouldPause&&!previouslyPaused){
+  std::lock_guard<std::mutex> lock(motionMutex);
+  camera.halt();latestInput={};pendingMouseX=pendingMouseY=0.f;
+  renderClock.reset();currentMovementSpeed=0.f;
+ }
  if(edge&&gameForeground&&!escape){++keyToggles;toggle();}
 }
 inline void stop(){
- disable("FreeCamera stopped");camera.ready=false;
+ disable("FreeCamera stopped");
  if(bound&&table){
   if(!changeSlot(table,moveSlot,reinterpret_cast<void*>(&createMove),originalMove))
    source_camera::log("FreeCamera: move hook downstream owns slot; pinned thunk retained");

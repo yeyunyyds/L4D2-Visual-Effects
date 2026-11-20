@@ -13,6 +13,8 @@ inline HMODULE clientModule=nullptr,engineModule=nullptr;
 inline void* client=nullptr;inline void* engine=nullptr;inline void** table=nullptr;
 inline uint32_t epoch=1;inline bool hooked=false;
 inline std::atomic<int> reason{0};inline std::atomic<unsigned> captureState{0},seenCaptureStates{0};inline std::atomic<uint64_t> capturedFrames{0};
+// Real render starts, not generated presentation frames. Safe FrameClock token.
+inline std::atomic<uint64_t> renderBegins{0};
 inline const char* captureStatus(unsigned state){switch(state){case 1:return "Source not in game";case 2:return "Source loading image";case 3:return "matrix pointer unreadable";case 4:return "scene matrix validation failed";case 5:return "snapshot captured (check age/viewport)";case 6:return "level shutdown";default:return "waiting for View_Render callback";}}
 inline const char* status(){switch(reason.load()){case 1:return "CreateInterface missing";case 2:return "VClient016 unavailable - see interface inventory log";case 3:return "VEngineClient013 unavailable - see interface inventory log";case 4:return "client and engine interfaces unavailable - see log";case 5:return "interface memory/module mismatch - see log";case 6:return captureStatus(captureState.load());case 7:return "game build or callback validation failed - see log";case 8:return "could not install view hook - see log";default:return "waiting for game modules";}}
 template<class Factory> std::string inventory(Factory factory,const char* prefix){
@@ -61,7 +63,7 @@ inline bool sampleDuringDraw(GameCameraFrame& f){
  std::memcpy(f.worldToView.data(),&view,64);
  CameraPose pose;return cameraPose(f,pose);
 }
-inline void __fastcall renderHook(void* self,void*,void* rect){static thread_local int depth=0;++depth;originalRender(self,rect);if(depth==1)capture(true);--depth;}
+inline void __fastcall renderHook(void* self,void*,void* rect){static thread_local int depth=0;++depth;if(depth==1)renderBegins.fetch_add(1,std::memory_order_relaxed);originalRender(self,rect);if(depth==1)capture(true);--depth;}
 inline void __fastcall shutdownHook(void* self,void*){++epoch;capture(false);originalShutdown(self);}
 inline void __fastcall levelHook(void* self,void*){++epoch;capture(false);originalLevelShutdown(self);}
 inline bool replace(size_t slot,void* expected,void* value){DWORD old=0;if(!VirtualProtect(table+slot,sizeof(void*),PAGE_READWRITE,&old))return false;void* actual=InterlockedCompareExchangePointer(table+slot,value,expected);DWORD ignored=0;VirtualProtect(table+slot,sizeof(void*),old,&ignored);return actual==expected;}

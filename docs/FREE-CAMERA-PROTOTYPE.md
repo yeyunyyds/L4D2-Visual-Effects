@@ -89,3 +89,24 @@ acceleration, steering and deceleration. Mouse-look remains direct.
 The new velocity calculation is **Source-like**, not a claim that the game
 uses the same physics implementation. This commit intentionally skips CI and
 does not build the DLL, per the user's previous request.
+
+
+## Render-paced FreeCamera and smooth velocity (source-only)
+
+- CreateMove samples WASD/Space/Shift, accumulates mouse deltas, and suppresses
+  native player commands; it no longer advances the camera.
+- The outer View_Render increments a real-frame marker before OverrideView.
+  Each real render consumes input and integrates exactly once. Repeated
+  OverrideView callbacks in that frame reuse the same pose for GF camera data.
+- QPC render delta and continuous exponential velocity use tau=0.12 seconds
+  for acceleration, 0.065 for release, 0.085 for sharp direction changes.
+  Exact analytic position integration avoids adding separate positional lag.
+- Frames more than 200ms apart, pauses, focus loss, map reset and toggling
+  cancel residual movement. Delta is capped at 50ms.
+- Real FPS and synthetic GF frames are separate; generated frames never
+  execute this movement code. End-to-end GF compatibility still needs testing.
+- New diagnostics show render steps, repeated callbacks, gaps and delta.
+- Cross-thread input and render state is guarded by one short-lived mutex.
+- Math tests cover motion continuity, boundaries, frame id deduplication,
+  mouse direction, release, reversal, and tick-rate invariance.
+- No build or CI run requested for this code change.
