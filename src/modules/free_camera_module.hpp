@@ -12,17 +12,18 @@ inline std::optional<std::string> page(std::uintptr_t id){
   // Keep the frequently adjusted options on one small page.
   return "\"FreeCamera · 设置\" {"+
    item(freecamera::enabled()?u8"自由摄像机：[运行中]":freecamera::requested.load()?u8"自由摄像机：[启动中]":u8"自由摄像机：[关闭]",931)+
-   item(freecamera::hideViewmodel.load()?u8"F6 隐藏第一人称手臂和武器：[开]":u8"F6 隐藏第一人称手臂和武器：[关]",935)+
+   item(freecamera::f6Binding.load()?u8"F6 快捷键绑定：[开]":u8"F6 快捷键绑定：[关]（默认）",937)+
+   item(freecamera::hideViewmodel.load()?u8"隐藏第一人称手臂和武器：[开]":u8"隐藏第一人称手臂和武器：[关]",935)+
    row(u8"最高飞行速度："+std::to_string(int(freecamera::movementSpeed.load())))+
    item(u8"最高速度 +50",932)+item(u8"最高速度 -50",933)+
    item(u8"运行数据与诊断",936)+
-   row(u8"F6 切换；WASD 移动；鼠标转向")+
-   row(u8"Space 上升；Shift 下降；菜单开启仍可飞行")+
-   item(u8"紧急关闭",934)+item(u8"保存设置",101)+"}";
+      item(u8"紧急关闭",934)+item(u8"保存设置",101)+"}";
  }
  // Observational data is collected by existing camera/render callbacks,
  // independent of which native HUD page is open; only its display moves.
  return "\"FreeCamera · 运行数据与诊断\" {"+
+  row(u8"F6 可选绑定；WASD/鼠标移动，Space 上升，Shift 下降")+
+  row(std::string("Runtime phase: ")+freecamera::activation::label(freecamera::currentPhase()))+
   row(std::string("ViewModel: ")+freecamera::viewModelHookStatus.load())+
   row("ViewModel checks/native-visible/hidden: "+
       std::to_string(freecamera::viewModelCalls.load())+"/"+
@@ -52,6 +53,7 @@ inline bool action(std::uintptr_t id){
  if(id==932){freecamera::movementSpeed=std::min(2500.f,freecamera::movementSpeed.load()+50.f);return true;}
  if(id==933){freecamera::movementSpeed=std::max(30.f,freecamera::movementSpeed.load()-50.f);return true;}
  if(id==934){freecamera::disable("Emergency off");return true;}
+ if(id==937){freecamera::f6Binding=!freecamera::f6Binding.load();saveMessage=u8"F6 绑定已更新，保存设置后持久化";return true;}
  if(id==935){
   freecamera::hideViewmodel=!freecamera::hideViewmodel.load();
   saveMessage=u8"已更改F6手臂/武器隐藏选项；保存设置后持久化";
@@ -65,23 +67,28 @@ inline modules::Module create(){
  m.page=page;m.action=action;
  m.frame=freecamera::frame;
  m.load=[](const nlohmann::json& j){
-  bool hide=true;
+  bool hide=true,binding=false;
   auto root=j.find("freeCamera");
   if(root!=j.end()&&root->is_object()){
-   auto value=root->find("hideViewmodel");
+   auto keybind=root->find("f6Binding");
+    if(keybind!=root->end()&&keybind->is_boolean())binding=keybind->get<bool>();
+    auto value=root->find("hideViewmodel");
    if(value!=root->end()&&value->is_boolean())hide=value->get<bool>();
   }
   freecamera::hideViewmodel=hide;
+  freecamera::f6Binding=binding;
  };
  m.save=[](nlohmann::json& j){
   if(!j.contains("freeCamera")||!j["freeCamera"].is_object())
    j["freeCamera"]=nlohmann::json::object();
   j["freeCamera"]["hideViewmodel"]=freecamera::hideViewmodel.load();
+  j["freeCamera"]["f6Binding"]=freecamera::f6Binding.load();
  };
  m.pollOverlay=[](const dango::GameCameraFrame&,bool escape,bool menu,bool foreground){freecamera::poll(escape,menu,foreground);};
  m.diagnostics=[] {return "hook="+std::to_string(freecamera::bound.load())+
   " active="+std::to_string(freecamera::active.load())+
   " hideVM="+std::to_string(freecamera::hideViewmodel.load())+
+  " f6Binding="+std::to_string(freecamera::f6Binding.load())+
   " vmHook="+std::to_string(freecamera::viewModelHookBound.load())+
   " vmCalls="+std::to_string(freecamera::viewModelCalls.load())+
   " vmHidden="+std::to_string(freecamera::viewModelHidden.load())+

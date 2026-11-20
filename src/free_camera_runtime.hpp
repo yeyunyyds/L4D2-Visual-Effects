@@ -4,6 +4,7 @@
 // target DLL must be validated in-game before use outside offline tests.
 #include "free_camera_core.hpp"
 #include "free_camera_viewmodel_policy.hpp"
+#include "free_camera_activation_policy.hpp"
 #include "module_verification.hpp"
 #include "dango/source_camera.hpp"
 #include <windows.h>
@@ -17,6 +18,7 @@
 namespace visual::freecamera {
 using core::Vec;
 inline std::atomic<bool> requested{false},bound{false},active{false},paused{false};
+inline std::atomic<bool> f6Binding{false};
 inline std::atomic<bool> viewModelHookBound{false};
 inline std::atomic<const char*> viewModelHookStatus{"ViewModel predicate hook not installed"};
 inline std::atomic<unsigned long> viewModelCalls{0},viewModelHidden{0},viewModelNativeTrue{0};
@@ -109,6 +111,9 @@ inline bool foreground(){
 }
 inline bool key(int code){return (GetAsyncKeyState(code)&0x8000)!=0;}
 inline bool enabled(){return requested.load()&&active.load();}
+inline activation::Phase currentPhase(){
+ return activation::phase(requested.load(),bound.load(),active.load(),paused.load());
+}
 // Must hold motionMutex; original game hooks are never called under this lock.
 inline void resetMotionLocked(){
  camera.ready=false;camera.halt();
@@ -206,7 +211,7 @@ inline bool __fastcall shouldDrawViewModel(void* self,void*) {
  const bool native=original(self);
  ++viewModelCalls;
  if(native)++viewModelNativeTrue;
- const bool visible=viewmodel::policy::visible(requested.load(std::memory_order_acquire),
+ const bool visible=viewmodel::policy::visible(enabled(),
                                                hideViewmodel.load(std::memory_order_acquire),
                                                native);
  if(native&&!visible)++viewModelHidden;
@@ -218,6 +223,12 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  ++cmdCount;
  if(!requested)return result;
  if(!cmd||!cmd->command_number)return result;
+ // Preserve native commands until the camera is actually Active.
+ // A fresh input timestamp allows OverrideView to complete startup.
+ if(!active.load(std::memory_order_acquire)){
+  lastInput=GetTickCount64();
+  return result;
+ }
  if(!validCmd(cmd)){
   ++cmdRejected;disable("CUserCmd layout mismatch; disabled");return result;
  }
@@ -391,8 +402,9 @@ inline void tryBind(){
  tryBindViewModel();
 }
 inline void frame(const dango::GameCameraFrame& f){
- if(!f.active){disable("FreeCamera reset on map exit");return;}
- tryBind();
+ if(!f.active){if(requested)disable("FreeCamera reset on map exit");return;}
+ // Install ClientMode hooks only after a real enable request.
+ if(requested.load(std::memory_order_acquire))tryBind();
  if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");}
 }
 inline void poll(bool escape,bool /*menu*/,bool gameForeground){
@@ -407,7 +419,7 @@ inline void poll(bool escape,bool /*menu*/,bool gameForeground){
   camera.halt();latestInput={};pendingMouseX=pendingMouseY=0.f;
   renderClock.reset();currentMovementSpeed=0.f;
  }
- if(edge&&gameForeground&&!escape){++keyToggles;toggle();}
+ if(edge&&f6Binding.load(std::memory_order_acquire)&&gameForeground&&!escape){++keyToggles;toggle();}
 }
 inline void stop(){
  disable("FreeCamera stopped");
