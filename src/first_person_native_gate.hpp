@@ -39,7 +39,7 @@ inline bool patch(bool enable) noexcept {
  }
  HMODULE module=enable?source_camera::clientModule:owner;
  if(!module||GetModuleHandleW(L"client.dll")!=module){
-  if(!enable)restoredVerified=false;
+  if(!enable){phase=Phase::Unknown;active=false;restoredVerified=false;}
   fail(u8"client.dll 实例不匹配；拒绝写入");return false;
  }
  const auto base=std::uintptr_t(module);
@@ -47,20 +47,23 @@ inline bool patch(bool enable) noexcept {
  if(!source_entities::reader.read(std::uint32_t(base+branch::LocalGateRva),
                                   sample,sizeof(sample))||
     !branch::matches(sample,sizeof(sample),true)){
-  if(!enable)restoredVerified=false;
-  fail(u8"DrawModel 机器码不匹配；拒绝覆盖第三方修改");return false;
+  if(!enable)uncertain(module,u8"DrawModel 机器码不匹配；拒绝覆盖第三方修改");
+  else fail(u8"DrawModel 机器码不匹配；拒绝覆盖第三方修改");
+  return false;
  }
  const auto observed=gatepolicy::classify(sample[branch::DisplacementOffset],
                                           branch::Original,branch::PassThrough);
  const auto decision=gatepolicy::decide(enable,prior,observed);
  if(decision==Decision::Conflict){
-  if(!enable)restoredVerified=false;
-  fail(u8"DrawModel 原生字节所有权冲突；拒绝写入");return false;
+  if(!enable)uncertain(module,u8"DrawModel 原生字节所有权冲突；拒绝写入");
+  else fail(u8"DrawModel 原生字节所有权冲突；拒绝写入");
+  return false;
  }
  auto target=reinterpret_cast<unsigned char*>(base+branch::DisplacementRva);
  if(!source_camera::executable(target)){
-  if(!enable)restoredVerified=false;
-  fail(u8"DrawModel 目标不可执行；拒绝写入");return false;
+  if(!enable)uncertain(module,u8"DrawModel 目标不可执行；拒绝写入");
+  else fail(u8"DrawModel 目标不可执行；拒绝写入");
+  return false;
  }
  // An earlier protection-restoration failure may have left the page writable.
  // Reconcile that state before declaring the native code clean.
@@ -82,15 +85,16 @@ inline bool patch(bool enable) noexcept {
  }
  DWORD old=0,ignored=0;
  if(!VirtualProtect(target,1,PAGE_EXECUTE_READWRITE,&old)){
-  if(!enable)restoredVerified=false;
-  fail(u8"无法修改 DrawModel 代码页保护");return false;
+  if(!enable)uncertain(module,u8"无法修改 DrawModel 代码页保护");
+  else fail(u8"无法修改 DrawModel 代码页保护");
+  return false;
  }
  // Claim the write before performing it. Failure must preserve the owner
  // for the next disable()/plugin shutdown recovery attempt.
  owner=module;phase=Phase::Unknown;active=false;restoredVerified=false;
  const auto desired=enable?branch::PassThrough:branch::Original;
  *reinterpret_cast<volatile unsigned char*>(target)=desired;
- FlushInstructionCache(GetCurrentProcess(),target,1);
+ const bool cacheFlushed=FlushInstructionCache(GetCurrentProcess(),target,1)!=FALSE;
  const bool protectedAgain=VirtualProtect(target,1,old,&ignored)!=FALSE;
  if(!protectedAgain)pendingProtection=old;
  unsigned char confirmed=0;
@@ -102,6 +106,9 @@ inline bool patch(bool enable) noexcept {
  if(!protectedAgain){
   uncertain(module,u8"DrawModel 页保护未恢复；状态待确认");return false;
  }
+ if(!cacheFlushed){
+  uncertain(module,u8"DrawModel 指令缓存未确认刷新；状态待恢复");return false;
+ }
  phase=enable?Phase::Patched:Phase::Clean;
  active=enable;restoredVerified=!enable;
  if(enable){++enables;}else{owner=nullptr;++restores;}
@@ -110,7 +117,11 @@ inline bool patch(bool enable) noexcept {
                            "FPB: native local draw gate restored (+0x13)");
  return true;
 }
-inline bool disable() noexcept {return patch(false);}
+inline bool disable() noexcept {
+ if(phase.load(std::memory_order_acquire)==gatepolicy::Phase::Clean&&
+    restoredVerified.load(std::memory_order_acquire))return true;
+ return patch(false);
+}
 inline bool verify(std::uint32_t entity) noexcept {
  using namespace source_camera;
  auto cm=clientModule,em=engineModule;

@@ -2,6 +2,7 @@
 #include "first_person_body_patch.hpp"
 #include <stdexcept>
 #include <iostream>
+#include <string>
 using namespace visual::firstperson;
 static void check(bool ok){if(!ok)throw std::runtime_error("Native gate transition contract");}
 int main(){
