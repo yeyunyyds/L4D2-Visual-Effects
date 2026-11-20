@@ -1,12 +1,15 @@
 #pragma once
 #include "tank_runtime.hpp"
 #include "tank_warning.hpp"
+#include "special_glow_settings.hpp"
+#include "entity_visibility_runtime.hpp"
 #include "module_verification.hpp"
 namespace visual::tank::outline {
 using SetType=void(__thiscall*)(void*,int);
 using ColorProxy=void(__cdecl*)(const void*,void*,void*);
 inline SetType setType=nullptr;inline ColorProxy colorProxy=nullptr;
 inline std::atomic<const char*> status{u8"描边提醒关闭"};
+inline std::atomic<unsigned> activeCount{0};
 inline std::atomic<DWORD> owner{0};inline std::atomic<bool> stopped{false},clean{true};
 struct Slot{std::uint32_t epoch=0,handle=0,base=0;GlowLayout layout;GlowLease lease;};
 inline std::map<std::uint32_t,Slot> slots;
@@ -36,7 +39,7 @@ inline void restore(const Slot& s){std::array<int,4> now{};if(!read(s,now)||!con
  for(unsigned i=1;i<3;++i)if(own[i])writeInt(s.base+s.layout.type+i*4,s.lease.before[i]);
  if(own[3])color(s,s.lease.before[3]);if(own[0])setType(reinterpret_cast<void*>(uintptr_t(s.base+s.layout.property)),s.lease.before[0]);
 }
-inline void cleanup(){for(const auto& pair:slots)restore(pair.second);slots.clear();clean=true;}
+inline void cleanup(){for(const auto& pair:slots)restore(pair.second);slots.clear();activeCount=0;clean=true;}
 inline GlowLayout layout(unsigned index){
  static std::uint32_t epoch=0;static std::map<std::uint32_t,GlowLayout> cache;auto camera=std::atomic_load(&source_camera::snapshot);if(epoch!=camera->epoch){cache.clear();epoch=camera->epoch;}auto object=std::uint32_t(reinterpret_cast<uintptr_t>(source_entities::list));std::uint32_t net=0;
  if(!source_entities::wire::load(source_entities::reader,object+source_entities::profile::CacheOffset+index*8,net)||!net)return {};
@@ -44,27 +47,99 @@ inline GlowLayout layout(unsigned index){
  if(!cls||!source_entities::wire::load(source_entities::reader,*cls,cc))return {};
  auto found=cache.find(cc.table);if(found!=cache.end())return found->second;return cache.emplace(cc.table,glowLayout(source_entities::reader,cc.table)).first->second;
 }
-inline void onFrame(const dango::GameCameraFrame& camera)try{
- owner=GetCurrentThreadId();auto cfg=std::atomic_load(&options);auto result=std::atomic_load(&snapshot);
- if(stopped||faulted||!cfg->enabled||!cfg->draw||!cfg->warnOutline||!camera.active||camera.epoch!=result->epoch||camera.tick<result->tick||camera.tick-result->tick>250||!display::foreground||display::paused){if(!clean)cleanup();status=u8"描边提醒关闭或画面暂停";return;}
- static std::shared_ptr<const Result> previous;static std::shared_ptr<const Settings> previousCfg;
- if(previous==result&&previousCfg==cfg)return;previous=result;previousCfg=cfg;
- std::set<std::uint32_t> wanted;for(const auto& o:result->tanks)if(o.warning.known&&o.warning.inside)wanted.insert(o.handle);
- if(wanted.empty()){if(!clean)cleanup();status=u8"等待玩家进入攻击范围";return;}
- if(!contract()){if(!clean)cleanup();status=u8"描边接口未验证，不调用";return;}
- for(auto it=slots.begin();it!=slots.end();)if(!wanted.count(it->first)||it->second.epoch!=camera.epoch){restore(it->second);it=slots.erase(it);}else ++it;
- bool busy=false,rejected=false;
- for(auto handle:wanted){auto old=slots.find(handle);if(old!=slots.end()){std::array<int,4> now{};if(read(old->second,now)&&now==old->second.lease.written)continue;restore(old->second);slots.erase(old);}
-  if(!source_entities::list)continue;Slot s;s.epoch=camera.epoch;s.handle=handle;
-  auto entries=std::uint32_t(std::int64_t(reinterpret_cast<uintptr_t>(source_entities::list))+source_entities::profile::EntryBaseDelta);source_entities::wire::Entry e;
-  if(!source_entities::wire::load(source_entities::reader,entries+(handle&4095)*16,e)||e.serial!=(handle>>12)||!e.entity){rejected=true;continue;}s.base=e.entity;s.layout=layout(handle&4095);
-  std::array<int,4> now{};std::uint32_t vt=0,first=0;
-  if(!s.layout||!read(s,now)||!source_entities::wire::load(source_entities::reader,s.base+s.layout.property,vt)||!source_camera::owns(reinterpret_cast<void*>(uintptr_t(vt)),source_camera::clientModule)||!source_entities::wire::load(source_entities::reader,vt,first)||!source_camera::owns(reinterpret_cast<void*>(uintptr_t(first)),source_camera::clientModule)||!source_camera::executable(reinterpret_cast<void*>(uintptr_t(first)))){rejected=true;continue;}if(!s.lease.acquire(now)){busy=true;continue;}
-  if(!pinModule()){rejected=true;continue;}auto added=slots.emplace(handle,s).first;clean=false;bool okay=true;for(unsigned i=1;i<3;++i)okay=writeInt(s.base+s.layout.type+i*4,s.lease.written[i])&&okay;
-  if(!okay){restore(added->second);slots.erase(added);rejected=true;continue;}
-  color(s,s.lease.written[3]);setType(reinterpret_cast<void*>(uintptr_t(s.base+s.layout.property)),s.lease.written[0]);
+// One manager owns a native Glow lease per entity. Tank attack warning wins
+// over the per-class setting, and both modes return to the same saved original.
+struct Desired{int type=3,color=0;bool operator==(const Desired& r)const{return type==r.type&&color==r.color;}};
+inline bool apply(Slot& s,const Desired& desired){
+ std::array<int,4> next{desired.type,8192,0,desired.color};
+ bool okay=true;for(unsigned i=1;i<3;++i)okay=writeInt(s.base+s.layout.type+i*4,next[i])&&okay;
+ if(!okay){
+  std::array<int,4> now{};if(read(s,now))for(unsigned i=1;i<3;++i)if(now[i]==next[i])writeInt(s.base+s.layout.type+i*4,s.lease.before[i]);
+  return false;
  }
- clean=slots.empty();status=!slots.empty()?u8"范围内 Tank 红色描边中":busy?u8"已有描边，保留原效果":rejected?u8"描边布局或实体校验未通过":u8"等待玩家进入攻击范围";
-}catch(...){cleanup();status=u8"描边异常，已停止本次提醒";}
+ // The native proxy also refreshes the engine RGB cache.
+ color(s,next[3]);setType(reinterpret_cast<void*>(uintptr_t(s.base+s.layout.property)),next[0]);
+ s.lease.written=next;return true;
+}
+inline void onFrame(const dango::GameCameraFrame& camera)try{
+ owner=GetCurrentThreadId();
+ auto cfg=std::atomic_load(&options),special=std::atomic_load(&specialglow::options);
+ auto prediction=std::atomic_load(&snapshot);
+ auto inventory=std::atomic_load(&source_entities::snapshot);
+ auto now=GetTickCount64();
+ bool warn=cfg->enabled&&cfg->draw&&cfg->warnOutline&&!faulted&&
+    display::foreground&&!display::paused&&camera.active&&
+    prediction->epoch==camera.epoch&&camera.tick>=prediction->tick&&camera.tick-prediction->tick<=250;
+ bool native=warn||special->any();
+ if(stopped||!camera.active||!native){if(!clean)cleanup();status=u8"描边已关闭";return;}
+ if(!inventory||inventory->epoch!=camera.epoch||camera.tick<inventory->tick||camera.tick-inventory->tick>350){
+  if(!clean)cleanup();status=u8"实体快照不可用";return;
+ }
+ static std::uint64_t last=0;static std::shared_ptr<const Settings> oldCfg;
+ static std::shared_ptr<const specialglow::Settings> oldSpecial;static std::shared_ptr<const Result> oldPrediction;
+ if(now>=last&&now-last<40&&cfg==oldCfg&&special==oldSpecial&&prediction==oldPrediction)return;
+ last=now;oldCfg=cfg;oldSpecial=special;oldPrediction=prediction;
+ std::map<std::uint32_t,Desired> wanted;
+ for(const auto& r:inventory->records){
+  if(!specialglow::eligible(r))continue;
+  int role=specialCharacter(r);if(role<0)continue;
+  const auto& rule=special->types[unsigned(role)];
+  if(!rule.enabled)continue;
+  if(rule.occlude&&!visibility::visible(camera.epoch,r.handle,now))continue;
+  // LOS-mode glow is used in occluded mode. Constant mode draws through walls.
+  wanted[r.handle]={rule.occlude?2:3,int(rule.color)};
+ }
+ if(warn)for(const auto& o:prediction->tanks){
+  if(!o.warning.known||!o.warning.inside)continue;
+  auto it=std::find_if(inventory->records.begin(),inventory->records.end(),
+     [&](const auto& r){return r.handle==o.handle&&specialglow::eligible(r)&&specialCharacter(r)==6;});
+  if(it!=inventory->records.end())wanted[o.handle]={2,255}; // original red warning priority
+ }
+ if(wanted.empty()){if(!clean)cleanup();status=u8"等待有效特感或 Tank 警告";return;}
+ if(!contract()){if(!clean)cleanup();status=u8"描边接口未验证，不调用";return;}
+ for(auto it=slots.begin();it!=slots.end();){
+  if(!wanted.count(it->first)||it->second.epoch!=camera.epoch){
+   restore(it->second);it=slots.erase(it);
+  }else ++it;
+ }
+ bool busy=false,rejected=false;
+ for(const auto& request:wanted){
+  auto handle=request.first;const auto& desired=request.second;
+  auto old=slots.find(handle);
+  if(old!=slots.end()){
+   std::array<int,4> nowFields{};
+   if(!read(old->second,nowFields)||nowFields!=old->second.lease.written){
+    // Do not fight other mods or the server if they changed our values.
+    restore(old->second);slots.erase(old);busy=true;continue;
+   }
+   if(nowFields[0]==desired.type&&nowFields[3]==desired.color)continue;
+   if(!apply(old->second,desired)){restore(old->second);slots.erase(old);rejected=true;}
+   continue;
+  }
+  if(!source_entities::list)continue;
+  Slot slot;slot.epoch=camera.epoch;slot.handle=handle;
+  auto entries=std::uint32_t(std::int64_t(reinterpret_cast<uintptr_t>(source_entities::list))+source_entities::profile::EntryBaseDelta);
+  source_entities::wire::Entry entry{};
+  if(!source_entities::wire::load(source_entities::reader,entries+(handle&4095)*sizeof(entry),entry)||
+      !entry.entity||entry.serial!=(handle>>12)){rejected=true;continue;}
+  slot.base=entry.entity;slot.layout=layout(handle&4095);
+  std::array<int,4> currentFields{};std::uint32_t vt=0,firstMethod=0;
+  if(!slot.layout||!read(slot,currentFields)||
+     !source_entities::wire::load(source_entities::reader,slot.base+slot.layout.property,vt)||
+     !source_camera::owns(reinterpret_cast<void*>(uintptr_t(vt)),source_camera::clientModule)||
+     !source_entities::wire::load(source_entities::reader,vt,firstMethod)||
+     !source_camera::owns(reinterpret_cast<void*>(uintptr_t(firstMethod)),source_camera::clientModule)||
+     !source_camera::executable(reinterpret_cast<void*>(uintptr_t(firstMethod)))){
+   rejected=true;continue;
+  }
+  if(!slot.lease.acquire(currentFields)){busy=true;continue;}
+  if(!pinModule()){rejected=true;continue;}
+  auto inserted=slots.emplace(handle,slot).first;clean=false;
+  if(!apply(inserted->second,desired)){restore(inserted->second);slots.erase(inserted);rejected=true;}
+ }
+ activeCount=unsigned(slots.size());clean=slots.empty();
+ status=!slots.empty()?u8"特感原生描边运行中":busy?u8"已有描边或被其他插件接管":
+   rejected?u8"描边布局或实体校验失败":u8"等待可用实体";
+}catch(...){cleanup();status=u8"描边异常，已恢复已接管实体";}
 inline void stop(){stopped=true;if(owner==GetCurrentThreadId()){cleanup();return;}for(unsigned i=0;i<30&&!clean;++i)Sleep(5);if(!clean)source_camera::log("Tank outline restore deferred: no game-thread frame during stop");}
 }
