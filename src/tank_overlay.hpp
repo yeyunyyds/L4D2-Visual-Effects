@@ -24,7 +24,8 @@ inline void draw(IDirect3DDevice9* device,float width,float height){
   auto bodyOrigin=o.origin;auto pose=poses.find(o.handle);if(pose!=poses.end()&&validRenderAnchor(pose->second,f->epoch,o.handle,GetTickCount64(),o.origin)){bodyOrigin=pose->second.position;++display::renderAnchorHits;}else ++display::networkAnchorFallbacks;
   auto at=visual->showBar&&bodyVisible?placeBar(*c,bodyOrigin+Vec3{0,0,45},width,height,*visual,o.heading):std::nullopt;
   if(at){++display::barProjected;++display::visibleBars;std::optional<float> fraction;if(o.cooldown){auto e=estimates->find(o.handle);float span=e!=estimates->end()&&e->second.span&&*e->second.span>0?*e->second.span:std::max(1.f,*o.cooldown);fraction=std::clamp(*o.cooldown/span,0.f,1.f);}barGeometry(lines,{at->x,at->y},*visual,at->scale,fraction,danger&&cfg->warnBar);}else if(visual->showBar)++display::barRejected;
-  if(!o.geometry||!visual->showRange)continue;
+  // Range, warning fill, near/future arcs and edge marks share the Tank body LOS gate.
+  if(!bodyVisible||!o.geometry||!visual->showRange)continue;
   for(unsigned i=0;i<40;++i){float a=o.heading-o.halfArc+o.halfArc*2*i/40,b=o.heading-o.halfArc+o.halfArc*2*(i+1)/40;if(!colors.dashed||i%2==0)line(center+forward(a)*o.radius,center+forward(b)*o.radius,rangeColor,rangeWidth);
    if(danger&&cfg->warnFill){auto polygon=warningTriangle(*c,width,height,{center,center+forward(a)*o.radius,center+forward(b)*o.radius});for(std::size_t j=1;j+1<polygon.size();++j)for(auto p:{polygon[0],polygon[j],polygon[j+1]})fillVertices.push_back({p.x,p.y,0,1,0x30ff3030});}
    if(colors.ticks&&i%10==0)line(center+forward(a)*o.radius*.95f,center+forward(a)*o.radius*1.04f,rangeColor,rangeDetailWidth);
