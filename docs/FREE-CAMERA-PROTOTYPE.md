@@ -8,10 +8,12 @@ Implemented together:
 3. IClientMode CreateMove[27] input suppression for movement, attacks, and player aim.
 Additional: F6, HUD toggle/status/emergency off/speed, map-reset and first-person-body gating.
 
-WARNING: NOT GAME-VALIDATED. Hook indexes 19/27 and view offsets 64/76
-are hypotheses from publicly available Source/L4D2 code, not yet independently
-confirmed in the current Windows game binary. ClientMode discovery uses the
-historical code pattern 89 04 B5 [array pointer] E8. Require exact PE and SHA256
+WARNING: NOT GAME-VALIDATED. Hook indexes 19/27 are hypotheses from
+publicly available L4D2 code; the view-offset candidates are L4D2 (+60/+72)
+and SDK2013 (+64/+76), selected only after plausibility checks. The current
+Windows game binary has NOT been independently disassembled to certify the
+ClientMode ABI. Discovery uses the historical code pattern
+89 04 B5 [array pointer] E8 and a two-level pointer read. Require exact PE and SHA256
 match and unique signature; do not bypass the refusal checks. View / command
 plausibility checks abort on a likely incompatible ABI.
 
@@ -22,7 +24,7 @@ No guarantee of VAC safety, third-party MOD compatibility or PVS behavior.
 
 Manual smoke test: menu must report hook ready; press F6, check View/Move
 counters rising, move and rotate, verify player remains still/server-side aim
-unchanged, F6 restore, reload map, test TLTPV and first-person body. If the
+unchanged, F6 restore, reload map, test third-person view compatibility and first-person body. If the
 hook is unavailable, inspect the log and validate the exact game DLL rather
 than forcing a vtable index.
 
