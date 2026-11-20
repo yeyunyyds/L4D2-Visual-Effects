@@ -63,7 +63,8 @@ inline bool apply(Slot& s,const Desired& desired){
 }
 inline void onFrame(const dango::GameCameraFrame& camera)try{
  owner=GetCurrentThreadId();
- auto cfg=std::atomic_load(&options),special=std::atomic_load(&specialglow::options);
+ auto cfg=std::atomic_load(&options);
+ auto special=std::atomic_load(&specialglow::options);
  auto prediction=std::atomic_load(&snapshot);
  auto inventory=std::atomic_load(&source_entities::snapshot);
  auto now=GetTickCount64();
