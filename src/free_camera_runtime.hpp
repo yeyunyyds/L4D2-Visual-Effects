@@ -19,7 +19,9 @@ inline std::atomic<const char*> message{"FreeCamera off"};
 inline std::atomic<unsigned long> viewCount{0},cmdCount{0},viewRejected{0},cmdRejected{0};
 inline std::atomic<unsigned long> menuToggles{0},keyToggles{0},keyPolls{0};
 inline std::atomic<ULONGLONG> lastInput{0};
-inline std::atomic<float> movementSpeed{260.f};
+// Highest velocity; not an instantaneous constant step.
+inline std::atomic<float> movementSpeed{1000.f};
+inline std::atomic<float> currentMovementSpeed{0.f};
 inline core::Camera camera;
 inline Vec lockedAim{};inline bool haveAim=false;
 inline std::uint32_t epoch=0;
@@ -88,11 +90,11 @@ inline bool foreground(){
 inline bool key(int code){return (GetAsyncKeyState(code)&0x8000)!=0;}
 inline bool enabled(){return requested.load()&&active.load();}
 inline void disable(const char* reason="FreeCamera off"){
- requested=false;active=false;message=reason;
+ requested=false;active=false;currentMovementSpeed=0.f;message=reason;
 }
 inline void toggle(){
  const bool next=!requested.load();
- requested=next;active=false;
+ requested=next;active=false;currentMovementSpeed=0.f;
  camera.ready=false;haveAim=false;lastInput=0;
  message=next?(bound?"FreeCamera waiting for valid view/input":"FreeCamera armed; awaiting ClientMode hook"):"FreeCamera off";
  source_camera::log(next?"FreeCamera: request ON":"FreeCamera: request OFF");
@@ -122,7 +124,7 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  auto fn=reinterpret_cast<MoveCallback>(originalMove);
  bool result=fn?fn(self,dt,cmd):false;
  ++cmdCount;
- if(!requested){haveAim=false;return result;}
+ if(!requested){haveAim=false;currentMovementSpeed=0.f;return result;}
  if(!cmd||!cmd->command_number)return result; // Source may issue empty sample commands.
  if(!validCmd(cmd)){++cmdRejected;disable("CUserCmd layout mismatch; disabled");return result;}
  if(!haveAim){lockedAim=cmd->viewangles;haveAim=true;}
@@ -136,7 +138,11 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
   i.dx=float(cmd->mousedx);i.dy=float(cmd->mousedy);
   camera.speed=movementSpeed.load();
   camera.move(i,dt);
+ }else{
+  // Do not resume with stored velocity after Esc, focus loss, or no camera.
+  camera.halt();
  }
+ currentMovementSpeed=camera.currentSpeed();
  cmd->viewangles=lockedAim;
  cmd->forwardmove=cmd->sidemove=cmd->upmove=0;
  cmd->buttons=0;cmd->impulse=0;cmd->weaponselect=0;

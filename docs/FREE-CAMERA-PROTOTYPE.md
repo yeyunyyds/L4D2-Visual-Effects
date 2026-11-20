@@ -63,3 +63,29 @@ The camera/menu integration still requires an offline game test.
 - The native HUD uses number/navigation keys and is configured not to capture the mouse. Opening the FreeCamera panel no longer pauses camera movement or mouse-look; pressing Esc and loss of game focus still pause it. F6 toggles even while the HUD is open.
 - Source's native right basis at yaw=0 is -Y (not +Y). The former +Y strafe direction has been corrected. Horizontal mouse delta now uses negative yaw for rightward mouse movement, matching Source conventions.
 - Updated the standalone camera math tests to assert D/right and mouse/right signs. Per request, **no build, CI or runtime test** was started for this change.
+
+
+## Progressive flight acceleration (source-only change)
+
+The old prototype used a constant speed of 260 Source units/second. The new
+camera uses a world-space velocity vector with a responsive start and physical
+acceleration, steering and deceleration. Mouse-look remains direct.
+
+- Speed menu value is now **maximum flying speed**, default 1000 units/sec,
+  adjustable by +/-50 in the FreeCamera menu (minimum 30, maximum 2500).
+- On a new movement key, an initial 220 units/sec (capped at the chosen maximum)
+  avoids sluggish short taps. Velocity accelerates to the ceiling in about
+  0.35-0.45 seconds of continuous movement, regardless of tick rate.
+- Releasing all movement keys brakes to zero in approximately 0.13 seconds;
+  sharp reversals/steering also use stronger acceleration so switching
+  directions feels responsive.
+- Direction input is normalized (diagonal is not faster). Velocity uses
+  trapezoidal integration with frame delta clamped at 0.05 seconds.
+- Pausing via Esc or focus loss clears accumulated velocity so resuming
+  cannot unexpectedly fling the camera; opening the HUD still permits flight.
+- Tests now cover start/hold/cap/release/reverse/diagonal/vertical/mouse,
+  time step bounds, restart resets and tick-rate consistency.
+
+The new velocity calculation is **Source-like**, not a claim that the game
+uses the same physics implementation. This commit intentionally skips CI and
+does not build the DLL, per the user's previous request.
