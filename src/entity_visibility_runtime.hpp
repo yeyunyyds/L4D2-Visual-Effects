@@ -22,7 +22,7 @@ inline bool requested(){
  auto tank=std::atomic_load(&tank::options);
  auto visual=std::atomic_load(&tank::visualSettings);
  auto specials=std::atomic_load(&specialglow::options);
- return (tank->enabled&&tank->draw&&tank->occludeHud&&(visual->showBar||visual->showDirection))||specials->usesVisibility();
+ return (tank->enabled&&tank->draw&&tank->occludeHud&&(visual->showBar||visual->showDirection||visual->showRange))||specials->usesVisibility();
 }
 inline void reset(std::uint32_t next=0){
  epoch=next;polled=0;cursor=0;trace.reset();cached.clear();
@@ -52,7 +52,7 @@ inline void onFrame(const dango::GameCameraFrame& camera)try{
  auto special=std::atomic_load(&specialglow::options);
  auto cfg=std::atomic_load(&tank::options);
  auto style=std::atomic_load(&tank::visualSettings);
- bool tankHud=cfg->enabled&&cfg->draw&&cfg->occludeHud&&(style->showBar||style->showDirection);
+ bool tankHud=cfg->enabled&&cfg->draw&&cfg->occludeHud&&(style->showBar||style->showDirection||style->showRange);
  std::vector<const dango::inventory::Record*> wanted;std::set<std::uint32_t> handles;
  for(const auto& r:inventory->records){
   int role=specialCharacter(r);if(role<0||!specialglow::eligible(r))continue;
