@@ -18,12 +18,18 @@ inline constexpr std::array<std::uint32_t,10> palette={
  rgb(255,75,75),rgb(255,156,60),rgb(255,228,90),rgb(128,231,88),
  rgb(74,223,183),rgb(80,185,255),rgb(118,135,255),rgb(201,112,255),
  rgb(255,119,203),rgb(255,255,255)};
-struct Rule {bool enabled=false,occlude=false;std::uint32_t color=0;};
+inline constexpr std::array<const char*,palette.size()> paletteNames={
+ u8"珊瑚红",u8"橙色",u8"金黄",u8"草绿",u8"青绿",
+ u8"天蓝",u8"靛蓝",u8"紫色",u8"粉色",u8"白色"};
+struct Rule {bool enabled=false,occlude=true;std::uint32_t color=0;};
 struct Settings {
  std::array<Rule,SpecialCount> types{};
  Settings(){for(unsigned i=0;i<SpecialCount;++i)types[i].color=defaults[i];}
  bool any()const{for(const auto& r:types)if(r.enabled)return true;return false;}
  bool all()const{return std::all_of(types.begin(),types.end(),[](const Rule& r){return r.enabled;});}
+ bool allOccluded()const{return std::all_of(types.begin(),types.end(),[](const Rule& r){return r.occlude;});}
+ void setAllEnabled(bool value){for(auto& rule:types)rule.enabled=value;}
+ void setAllOccluded(bool value){for(auto& rule:types)rule.occlude=value;}
  bool usesVisibility()const{for(const auto& r:types)if(r.enabled&&r.occlude)return true;return false;}
 };
 inline std::shared_ptr<const Settings> options=std::make_shared<const Settings>();
