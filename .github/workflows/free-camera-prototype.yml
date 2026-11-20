@@ -26,8 +26,37 @@ jobs:
           ASAN_OPTIONS: detect_leaks=0
         run: bash scripts/test.sh
       - run: python3 scripts/package.py
+      # GitHub Artifacts are themselves downloaded as ZIP archives. Uploading
+      # an installer ZIP would create ZIP-inside-ZIP. Stage the installer files
+      # instead so the downloaded artifact is the only archive layer.
+      - name: Stage single-layer installation artifact
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          archive = Path("build/L4D2Visual-0.8.0.zip")
+          stage = Path("build/free-camera-artifact")
+          expected = {
+              "README.md",
+              "bin/neko/plugins/L4D2Visual.dll",
+              "bin/neko/plugins/L4D2Visual/hud.json",
+          }
+          with ZipFile(archive) as package:
+              assert package.testzip() is None
+              assert set(package.namelist()) == expected
+              package.extractall(stage)
+
+          actual = {
+              item.relative_to(stage).as_posix()
+              for item in stage.rglob("*")
+              if item.is_file()
+          }
+          assert actual == expected, f"Unexpected install entries: {actual ^ expected}"
+          assert not any(stage.rglob("*.zip")), "Nested archive in artifact"
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: L4D2Visual-FreeCamera-x86
-          path: build/L4D2Visual-0.8.0.zip
+          path: build/free-camera-artifact/
           if-no-files-found: error

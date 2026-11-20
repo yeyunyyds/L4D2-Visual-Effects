@@ -110,3 +110,15 @@ does not build the DLL, per the user's previous request.
 - Math tests cover motion continuity, boundaries, frame id deduplication,
   mouse direction, release, reversal, and tick-rate invariance.
 - No build or CI run requested for this code change.
+
+## Single-layer GitHub Actions installation download
+
+The workflow keeps generating `build/L4D2Visual-0.8.0.zip` internally for
+packaging validation and direct release distribution. Because GitHub Actions
+artifact downloads are ZIP files already, the workflow now extracts that
+installer into `build/free-camera-artifact/` before upload. As a result,
+the downloaded `L4D2Visual-FreeCamera-x86.zip` contains `bin/` and
+`README.md` immediately, not a second nested `.zip` file. The workflow
+checks the exact file set before upload and includes no separate license files.
+Previous workflow artifacts are unaffected; the change applies to subsequent
+builds. No build is triggered by this documentation/workflow commit.
