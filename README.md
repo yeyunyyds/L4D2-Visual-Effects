@@ -80,3 +80,8 @@ GPL-3.0，见 [LICENSE](LICENSE)。DangoMusic、Skeeto 及第三方来源见 [NO
 
 功能通过模块协议注册，菜单、配置、采集需求、生命周期和覆盖层调度与插件入口分离。
 注册点为 `src/feature_composition.hpp`，依赖边界与线程/恢复顺序见 [模块结构](docs/MODULE-ARCHITECTURE.md)。
+
+
+## FreeCamera 实验分支
+
+`experimental/free-camera-73c6dc8a` 基于第一人称身体更新版 `73c6dc8a`。新增默认关闭的自由摄像机，修复原原型菜单 930 未注册、ClientMode 指针层级和 L4D2 视角偏移差异。仅供离线测试，仍需实机验证。详见 `docs/FREE-CAMERA-PROTOTYPE.md`。

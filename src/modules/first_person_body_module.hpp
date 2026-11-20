@@ -2,6 +2,7 @@
 #include "../module_host.hpp"
 #include "../ui_services.hpp"
 #include "../first_person_body_effects.hpp"
+#include "../free_camera_runtime.hpp"
 #include "../diagnostics.hpp"
 #include <cstdio>
 #include <optional>
@@ -111,11 +112,15 @@ inline modules::Module create(){
   firstperson::writeSettings(j,*std::atomic_load(&firstperson::options));
  };
  m.needsEntities=[] {return std::atomic_load(&firstperson::options)->enabled;};
- m.frame=firstperson::onFrame;
+ m.frame=[](const dango::GameCameraFrame& frame) {
+  if(freecamera::requested.load()){firstperson::native::disable();return;}
+  firstperson::onFrame(frame);
+ };
  // At this point the shared Studio pipeline has already applied any entity
  // deformation. First-person effects decorate the FINAL draw only.
  m.studioDraw=[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,
                   void* context,modules::StudioNext next){
+  if(freecamera::requested.load()){next(context,bones,origin);return;}
   firstperson::effects::draw(info,bones,origin,[&](Matrix3x4* transformed,const dango::Vec3& adjusted){
    next(context,transformed,adjusted);
   });

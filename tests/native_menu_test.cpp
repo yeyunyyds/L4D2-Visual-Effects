@@ -5,9 +5,16 @@
 using namespace dango::hud;
 void check(bool v){if(!v)throw std::runtime_error("Native menu regression");}
 int main(){
+ check(opensChild(930)&&!opensChild(931)&&!opensChild(932)&&!opensChild(933)&&!opensChild(934));
  check(opensChild(9001)&&opensChild(860)&&opensChild(865)&&!opensChild(862)&&opensChild(863)&&opensChild(864));
  check(!opensChild(896)&&!opensChild(9000)&&!opensChild(886)&&opensChild(300));
  for(uintptr_t id=887;id<=895;++id)check(!opensChild(id));
+ auto freeRoot=document(R"kv("L4D2Visual" {"FreeCamera" {"user_data" "0x3a2"}})kv");
+ check(freeRoot.rows.size()==1&&freeRoot.rows[0].action==930&&opensChild(930));
+ MenuStack freeStack;freeStack.enter(freeRoot.rows[0].action);
+ check(freeStack.current().page==930);
+ auto freePage=document(R"kv("FreeCamera" {"Toggle" {"user_data" "0x3a3"}})kv");
+ check(freePage.rows.size()==1&&freePage.rows[0].action==931&&!opensChild(931));
  auto root=document(R"kv("L4D2Visual" {
   "实体缩放与拉伸" {"user_data" "0x320"}
   "第一人称身体" {"user_data" "0x35c"}
