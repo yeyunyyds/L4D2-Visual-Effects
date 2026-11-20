@@ -27,7 +27,7 @@ inline thread_local unsigned depth=0;
 inline std::atomic<unsigned long> presents{0},frames{0};
 inline std::atomic<const char*> paintStatus{"No Present callback"};
 inline void* original(void* object,unsigned slot){std::lock_guard<std::mutex> lock(hookMutex);auto table=*reinterpret_cast<void***>(object);for(auto& h:hooks)if(h.table==table&&h.slot==slot)return h.before;return nullptr;}
-inline void attach(void* object,unsigned slot,void* after){if(!object)return;auto table=*reinterpret_cast<void***>(object);std::lock_guard<std::mutex> lock(hookMutex);for(auto& h:hooks)if(h.table==table&&h.slot==slot)return;DWORD old{};if(!VirtualProtect(table+slot,4,PAGE_READWRITE,&old))return;auto before=table[slot];hooks.push_back({table,slot,before,after});InterlockedExchangePointer(table+slot,after);DWORD ignored{};VirtualProtect(table+slot,4,old,&ignored);}
+inline void attach(void* object,unsigned slot,void* after){if(!object)return;auto table=*reinterpret_cast<void***>(object);std::lock_guard<std::mutex> lock(hookMutex);for(auto& h:hooks)if(h.table==table&&h.slot==slot)return;DWORD old{};if(!VirtualProtect(table+slot,4,PAGE_READWRITE,&old))return;auto before=table[slot];hooks.push_back({table,slot,before,after});if(InterlockedCompareExchangePointer(table+slot,after,before)!=before)hooks.pop_back();DWORD ignored{};VirtualProtect(table+slot,4,old,&ignored);}
 // Restore the pristine backbuffer after Present to prevent HUD ghosting on reuse.
 // If backup fails, skip drawing rather than modifying an unprotected surface.
 template<class Present> HRESULT paint(IDirect3DDevice9* device,IDirect3DSwapChain9* chain,Present present){
@@ -36,9 +36,14 @@ template<class Present> HRESULT paint(IDirect3DDevice9* device,IDirect3DSwapChai
  if(FAILED(device->TestCooperativeLevel())){if(features)features->unavailable("D3D device unavailable");auto hr=present();--depth;return hr;}
  ++presents;hud.pollHotkey(device);auto camera=std::atomic_load(&source_camera::snapshot);
  if(features)features->pollOverlay(*camera,(GetAsyncKeyState(VK_ESCAPE)&0x8000)!=0,hud.isOpen(),overlaywindow::foregroundGame(device));
- if(!hud.isOpen()&&!effectsNeeded())releaseBackup();paintStatus=hud.isOpen()?"HUD requested":"HUD closed";
+ const bool overlayRequested=hud.isOpen()||effectsNeeded();
+ if(!overlayRequested){
+  releaseBackup();paintStatus="HUD closed";
+  auto hr=present();--depth;return hr; // Avoid GPU RT and viewport queries.
+ }
+ paintStatus=hud.isOpen()?"HUD requested":"Overlay requested";
  IDirect3DSurface9* back=nullptr;IDirect3DSurface9* backup=nullptr;D3DSURFACE_DESC desc{};
- bool ready=(hud.isOpen()||effectsNeeded()) && SUCCEEDED(chain?chain->GetBackBuffer(0,D3DBACKBUFFER_TYPE_MONO,&back):device->GetBackBuffer(0,0,D3DBACKBUFFER_TYPE_MONO,&back));
+ bool ready=overlayRequested && SUCCEEDED(chain?chain->GetBackBuffer(0,D3DBACKBUFFER_TYPE_MONO,&back):device->GetBackBuffer(0,0,D3DBACKBUFFER_TYPE_MONO,&back));
  if(ready)ready=SUCCEEDED(back->GetDesc(&desc))&&acquireBackup(device,desc,&backup)&&SUCCEEDED(device->StretchRect(back,nullptr,backup,nullptr,D3DTEXF_NONE));
  if(!ready&&effectsNeeded()&&features)features->unavailable("presentation backbuffer backup unavailable");if(hud.isOpen()&&!ready)paintStatus="Backbuffer backup failed; HUD skipped";
  D3DVIEWPORT9 viewport{};bool haveViewport=SUCCEEDED(device->GetViewport(&viewport));

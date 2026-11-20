@@ -198,3 +198,42 @@ diagnostics page is not open. This is a presentation-only reorganization;
 F6 behavior, ViewModel hiding, camera hooks, configuration, saved settings
 and diagnostics logging are unaffected. No binary build or CI run was
 requested for this commit.
+
+## Native-first 2026-11-20 integration
+
+- Removed the native Tank Glow outline and its entire native type/color/range
+  mutation, original-value lease and cleanup paths. Independent special
+  infected Glow from the other experimental branch was NOT merged.
+  Legacy tankPrediction.warnOutline is ignored and excluded on save.
+  Red Tank warning bars, range borders and range fill remain HUD-only effects.
+- Only the Tank world geometry occlusion mechanism is ported: existing
+  verified EngineTraceClient003 TraceRay calls on the Source frame, up to
+  three world-only rays per Tank and ~50ms sampling. No new Hook is added.
+  Bar, arrow, range/fill/forecast share one per-Tank occlusion decision.
+  Target lines remain unchanged; invalid LOS fails closed. This is not a
+  per-pixel depth test, and dynamic objects/partial occlusion may differ.
+- FPB no longer installs its diagnostic Renderable ShouldDraw[3] Hook; native
+  CTerrorPlayer/DrawModel identity verification remains. Patched branch byte
+  is checked by readback after writing; restoration uncertainty remains
+  visible in diagnostics. Disabled FPB is not registered as Studio decorator
+  and its callback returns before model identity/pose reads.
+- F6 keybind is separately enabled in the FreeCamera menu, OFF by default,
+  persisted as freeCamera.f6Binding. The manual menu toggle remains. The
+  existing hideViewmodel option stays default ON. First-ever FreeCamera
+  activation installs ClientMode[19/27/30] only after the request. Once
+  installed, these are retained and transparently forwarded when disabled.
+  No hot-swapping per key press; pending camera startup preserves player
+  input and does not hide the first-person ViewModel.
+- FreeCamera diagnostics display derived off/binding/starting/active/paused
+  state. Opening the diagnostics submenu uses menu page ID 936.
+- Shared Engine/Studio render hooks use direct-native fast paths when no
+  observers or modifiers are active. Existing D3D9 Present hooks remain,
+  but with no menu/overlay they bypass GPU viewport and target inspection.
+  D3D9 hook installation now compares its expected slot before replacing.
+- CI tests include Tank world-only LOS, FreeCamera activation state,
+  native menu routing, defaults, and existing regression suites.
+
+These checks do not establish in-game FPS gains, universal third-party
+hook-chain compatibility or VAC safety. Test high-entity-load scenes,
+LOS behind BSP walls/partial cover, F6 default off and enabled, menu toggle,
+FPB toggling, map transitions, and D3D9/DXVK device lifecycle.
