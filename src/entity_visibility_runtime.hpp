@@ -19,7 +19,8 @@ inline std::size_t cursor=0;
 inline std::map<std::uint32_t,Sample> cached;
 inline std::atomic<const char*> status{"disabled"};
 inline bool requested(){
- auto tank=std::atomic_load(&tank::options),visual=std::atomic_load(&tank::visualSettings);
+ auto tank=std::atomic_load(&tank::options);
+ auto visual=std::atomic_load(&tank::visualSettings);
  auto specials=std::atomic_load(&specialglow::options);
  return (tank->enabled&&tank->draw&&tank->occludeHud&&(visual->showBar||visual->showDirection))||specials->usesVisibility();
 }
@@ -48,7 +49,9 @@ inline void onFrame(const dango::GameCameraFrame& camera)try{
  }
  dango::CameraPose pose;
  if(!dango::cameraPose(camera,pose)){cached.clear();std::atomic_store(&published,std::make_shared<const Snapshot>(Snapshot{epoch,{}}));status="camera pose unavailable";return;}
- auto special=std::atomic_load(&specialglow::options),cfg=std::atomic_load(&tank::options),style=std::atomic_load(&tank::visualSettings);
+ auto special=std::atomic_load(&specialglow::options);
+ auto cfg=std::atomic_load(&tank::options);
+ auto style=std::atomic_load(&tank::visualSettings);
  bool tankHud=cfg->enabled&&cfg->draw&&cfg->occludeHud&&(style->showBar||style->showDirection);
  std::vector<const dango::inventory::Record*> wanted;std::set<std::uint32_t> handles;
  for(const auto& r:inventory->records){
