@@ -1,54 +1,42 @@
-# Evo-style first-person body presentation
+# First-person body rendering
 
-## Design goal and authorship
+## Scope
 
-This experimental feature aims to reproduce the **visual characteristics of an
-Evo-style first-person body view**: showing the local player’s body while
-reducing obstructive head, arm, and animation geometry near the camera.
-The description refers to a **visual style**, not a shared implementation.
+This project implements a local-player body display using the game's native
+model rendering path. It adjusts render-only Studio bone matrices to reduce
+head and arm geometry obscuring the first-person camera. It does not alter
+gameplay collision, networking, player physics or the weapon viewmodel.
 
-All first-person body handling described here is independently implemented
-within L4D2 Visual Effects. **No Evo source code, binary code, or proprietary
-assets are copied, extracted, ported, or incorporated.** Naming the visual
-reference does not imply affiliation, endorsement, or feature-level parity.
+## Rendering behavior
 
-## Local model and bone handling
+1. Identify the verified local player and validate model metadata and the
+   Studio bone hierarchy.
+2. When a valid neck ancestor exists, collapse head descendants toward the
+   neck using a temporary matrix copy.
+3. Independently locate left and right upper-arm branches and, when enabled,
+   collapse descendants toward their shoulder parents.
+4. Apply optional camera-relative body positioning to the render-only copy.
+5. Call the original Studio drawing continuation exactly once; if a model
+   cannot be safely classified, leave its unknown bone branches unchanged.
 
-The plugin retains the game's native model drawing path and processes only
-validated, local-player Studio render data. Its display-only operations are:
+No GPU height-clipping path is used.
 
-1. Inspect validated Studio model metadata and its bone parent hierarchy.
-2. Identify the head bone and its descendants when a verifiable neck
-   ancestor is available. Collapse that branch toward the neck on a temporary
-   per-draw matrix copy, leaving the original pose unchanged.
-3. Independently identify left and right upper-arm branches and, if enabled,
-   collapse their descendants toward the corresponding shoulder parent.
-4. Apply optional camera-relative body positioning to the same render-only
-   matrix copy, then call the original Studio drawing function once.
-5. Leave unrecognized bone structures unchanged rather than guessing which
-   vertices belong to the head or arms.
+## Settings
 
-These transformations do not change the player entity, original animation
-buffers, game collision, network state, or first-person weapon viewmodel.
+The feature is **off by default**. Once enabled, the menu offers local-body
+display, independent head and arm hiding, dynamic positioning, camera yaw
+following, manual XYZ adjustments, per-model calibration, diagnostics, and
+saving settings.
 
-## User controls
+Optional third-person view compatibility is also off by default. It only
+governs whether this feature participates in the local player's drawing when
+the view changes; it does not provide a camera or alter external plug-ins.
 
-The unified First-person Body submenu contains the body visibility switch,
-head/arm hiding controls, dynamic positioning and per-model calibration,
-manual XYZ adjustments, legacy GPU height clipping, diagnostics, and saving.
-Head and arm hiding are independent options. The legacy clipping experiment
-is separate from bone-based hiding and remains disabled in the current
-experimental visual preset.
+## Limitations
 
-## Limitations and validation
-
-The appearance depends on each MOD's skeleton, skin weighting, and animation
-poses. Accessories may use independent bones, or geometry near the neck may
-remain visible during jumps, crouches, or other extreme poses. This feature
-does not claim to reproduce external VR/IK, material-management, or weapon
-interaction systems.
-
-The original native-body display and manual positioning were confirmed in
-game by the user. Head/arm hiding and dynamic alignment have passed isolated
-source tests and builds, but broader animation and MOD compatibility have
-not been verified. These are experimental capabilities, not a stable release.
+Visual results depend on model skeletons, vertex skinning and animations.
+Accessories with separate bones and extreme camera or character motions can
+still reveal geometry near the neck or shoulders. Camera/body alignment is
+render-only and does not provide full inverse kinematics or independent
+weapon interaction. The current user-tested view-switching behavior does not
+guarantee compatibility with every model or game configuration.

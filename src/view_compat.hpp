@@ -1,13 +1,13 @@
 #pragma once
-// TLTPV uses L4D2's native firstperson / thirdpersonshoulder commands.
+// Local view compatibility observes the active first-/third-person camera.
 // These camera observations are evidence, not an immediate permission to
-// rewrite the local DrawModel branch. A state machine in tltpv_runtime.hpp
+// rewrite the local DrawModel branch. A state machine in view_compat_runtime.hpp
 // commits changes only on the post-render game thread.
 #include "dango/world_camera.hpp"
 #include <cmath>
 #include <optional>
 #include <cstdint>
-namespace visual::tltpv {
+namespace visual::viewcompat {
 enum class Mode : unsigned char { Unknown, First, Third };
 inline const char* label(Mode value) noexcept {
  switch(value){case Mode::First:return "first-person";case Mode::Third:return "third-person";default:return "unverified";}
@@ -79,4 +79,4 @@ struct CameraLatch {
   return committed;
  }
 };
-} // namespace visual::tltpv
+} // namespace visual::viewcompat

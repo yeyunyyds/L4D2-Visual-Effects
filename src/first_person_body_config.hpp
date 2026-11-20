@@ -14,17 +14,16 @@ inline bool validModelKey(const std::string& name){
  return !name.empty()&&name.size()<=180&&std::all_of(name.begin(),name.end(),[](unsigned char c){return c>=32 && c!=127;});
 }
 struct Settings {
- bool enabled=true,clipEnabled=false,hideHead=true,hideArms=true;
- bool tltpvCompatibility=false; // Explicit opt-in; old configurations retain behavior.
- // User-tested visual baseline (experimental, not a universal per-MOD calibration).
+ bool enabled=false,hideHead=true,hideArms=true;
+ bool thirdPersonCompatibility=false; // Optional view-mode compatibility, off by default.
+ // User-adjusted view preset, not a universal per-model calibration.
  bool dynamicAnchor=true,followCameraYaw=true;
- float clipHeight=81.f,forward=-13.f,right=-1.f,up=-1.f,step=1;
+ float forward=-13.f,right=-1.f,up=-1.f,step=1;
  float fallbackEyeHeight=5.f,yawTrim=0.f;
  std::vector<ModelProfile> modelProfiles;
 };
 inline void normalize(Settings& s){
  auto clamp=[](float v,float lower,float upper,float fallback){return std::isfinite(v)?std::clamp(v,lower,upper):fallback;};
- s.clipHeight=clamp(s.clipHeight,0.f,128.f,65.f);
  s.forward=clamp(s.forward,-64.f,64.f,0.f);
  s.right=clamp(s.right,-64.f,64.f,0.f);
  s.up=clamp(s.up,-64.f,64.f,0.f);
@@ -72,11 +71,13 @@ template<class Json> Settings readSettings(const Json& root){
  if(it==root.end()||!it->is_object())return s;
  auto readBool=[&](const char* key,bool& value){auto v=it->find(key);if(v!=it->end()&&v->is_boolean())value=v->template get<bool>();};
  auto readFloat=[&](const char* key,float& value){auto v=it->find(key);if(v!=it->end()&&v->is_number())value=v->template get<float>();};
- readBool("enabled",s.enabled);readBool("clipEnabled",s.clipEnabled);
- readBool("tltpvCompatibility",s.tltpvCompatibility);
+ readBool("enabled",s.enabled);
+ // Read the retired key first; the neutral name takes priority when both exist.
+ readBool("tltpvCompatibility",s.thirdPersonCompatibility);
+ readBool("thirdPersonCompatibility",s.thirdPersonCompatibility);
  readBool("hideHead",s.hideHead);readBool("hideArms",s.hideArms);
  readBool("dynamicAnchor",s.dynamicAnchor);readBool("followCameraYaw",s.followCameraYaw);
- readFloat("clipHeight",s.clipHeight);readFloat("forward",s.forward);
+ readFloat("forward",s.forward);
  readFloat("right",s.right);readFloat("up",s.up);readFloat("step",s.step);
  readFloat("fallbackEyeHeight",s.fallbackEyeHeight);readFloat("yawTrim",s.yawTrim);
  auto profiles=it->find("modelProfiles");
@@ -100,27 +101,23 @@ template<class Json> void writeSettings(Json& root,const Settings& settings){
  for(const auto& p:s.modelProfiles)
   array.push_back(Json{{"model",p.model},{"checksum",p.checksum},{"forward",p.forward},
    {"right",p.right},{"up",p.up},{"yaw",p.yaw}});
- root["firstPersonBody"]=Json{{"enabled",s.enabled},{"clipEnabled",s.clipEnabled},
-  {"tltpvCompatibility",s.tltpvCompatibility},
+ root["firstPersonBody"]=Json{{"enabled",s.enabled},
+  {"thirdPersonCompatibility",s.thirdPersonCompatibility},
   {"hideHead",s.hideHead},{"hideArms",s.hideArms},
   {"dynamicAnchor",s.dynamicAnchor},{"followCameraYaw",s.followCameraYaw},
-  {"clipHeight",s.clipHeight},{"forward",s.forward},{"right",s.right},
+  {"forward",s.forward},{"right",s.right},
   {"up",s.up},{"step",s.step},{"fallbackEyeHeight",s.fallbackEyeHeight},
   {"yawTrim",s.yawTrim},{"modelProfiles",std::move(array)}};
 }
 inline bool adjust(Settings& s,std::uintptr_t id){
  switch(id){
- case 870:s.clipEnabled=!s.clipEnabled;break;
- case 871:s.clipHeight-=1;break;case 872:s.clipHeight+=1;break;
- case 873:s.clipHeight-=5;break;case 874:s.clipHeight+=5;break;
- case 875:s.clipHeight=65;break;
  case 876:s.forward+=s.step;break;case 877:s.forward-=s.step;break;
  case 878:s.right+=s.step;break;case 879:s.right-=s.step;break;
  case 880:s.up+=s.step;break;case 881:s.up-=s.step;break;
  case 882:s.step=s.step==.5f?1.f:s.step==1.f?5.f:.5f;break;
  case 883:s.forward=s.right=s.up=0;break;
  case 884:s.hideHead=!s.hideHead;break;case 885:s.hideArms=!s.hideArms;break;
- case 886:s.tltpvCompatibility=!s.tltpvCompatibility;break;
+ case 886:s.thirdPersonCompatibility=!s.thirdPersonCompatibility;break;
  case 887:s.dynamicAnchor=!s.dynamicAnchor;break;
  case 888:s.followCameraYaw=!s.followCameraYaw;break;
  case 889:s.fallbackEyeHeight+=1;break;case 890:s.fallbackEyeHeight-=1;break;

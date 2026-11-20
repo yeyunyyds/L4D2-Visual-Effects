@@ -53,10 +53,10 @@ D3D 覆盖层仍在原呈现回调中绘制，背缓冲备份/恢复及重置逻
 所有适配器和公共 HUD 已分别进行独立头文件 x86 语法检查，避免依赖包含顺序。
 另验证 x86 DLL 构建和安装包布局；不代替游戏内并发、切图与退出实机验收。
 
-## 第一人称身体与日志整合（实验分支）
+## 第一人称身体与日志整合
 
 第一人称身体由 `src/modules/first_person_body_module.hpp` 注册，管理菜单、配置、游戏帧、
-D3D 设备引用及退出 Hook 恢复。模块不引入喷漆功能，也不直接与 Tank 或形变模块互相包含。
+原生绘制门控及退出 Hook 恢复。模块不引入喷漆功能，也不直接与 Tank 或形变模块互相包含。
 公共 `source_render.hpp` 只定义 `StudioDecorator` 的中立绘制回调；它在原有
 `modifyPose` 处理后、最终 `studioOriginal` 调用前执行，保持一次原始绘制。
 `feature_composition.hpp` 将注册的模块适配到此回调。

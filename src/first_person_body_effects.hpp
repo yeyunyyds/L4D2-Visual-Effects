@@ -5,18 +5,12 @@
 #include "studio_cache.hpp"
 #include "first_person_body_parts.hpp"
 #include "first_person_dynamic_alignment.hpp"
-#include <d3d9.h>
-#include <array>
 #include <atomic>
 #include <memory>
-#include <mutex>
 #include <cmath>
 #include <cstring>
 namespace visual::firstperson::effects {
-inline std::mutex deviceMutex;
-inline IDirect3DDevice9* renderDevice=nullptr;
-inline std::atomic<unsigned long> matched{0},shifted{0},shiftRejected{0},clipSet{0},clipRejected{0};
-inline std::atomic<const char*> clipStatus{u8"高度裁剪未启用"};
+inline std::atomic<unsigned long> matched{0},shifted{0},shiftRejected{0};
 inline std::atomic<const char*> offsetStatus{u8"位置偏移为零"};
 inline std::atomic<const char*> headStatus{u8"头部分支隐藏关闭"},armStatus{u8"双臂分支隐藏关闭"};
 inline std::atomic<unsigned long> headHidden{0},headRejected{0},armsHidden{0},armsRejected{0};
@@ -42,20 +36,6 @@ inline void observeModel(const visual::StudioPose& studio,std::uint32_t epoch){
  }
  modelSeenAt=GetTickCount64();
 }
-inline void setDevice(IDirect3DDevice9* next) noexcept {
- std::lock_guard<std::mutex> lock(deviceMutex);
- if(next==renderDevice)return;
- if(next)next->AddRef();
- auto old=renderDevice;renderDevice=next;
- if(old)old->Release();
-}
-inline IDirect3DDevice9* acquire() noexcept {
- std::lock_guard<std::mutex> lock(deviceMutex);
- auto p=renderDevice;
- if(p)p->AddRef();
- return p;
-}
-inline void stop() noexcept {setDevice(nullptr);}
 struct Context {
  std::shared_ptr<const Settings> options;
  std::shared_ptr<const dango::GameCameraFrame> camera;
@@ -68,9 +48,9 @@ inline bool select(std::uint32_t renderable,Context& ctx) noexcept {
  if(!base||renderable!=base+4)return false;
  ctx.options=std::atomic_load(&options);
  if(!ctx.options->enabled)return false;
- if(ctx.options->tltpvCompatibility&&
-    tltpv::mode.load(std::memory_order_acquire)!=tltpv::Mode::First)return false;
- if(!ctx.options->clipEnabled&&!ctx.options->hideHead&&!ctx.options->hideArms&&
+ if(ctx.options->thirdPersonCompatibility&&
+    viewcompat::mode.load(std::memory_order_acquire)!=viewcompat::Mode::First)return false;
+ if(!ctx.options->hideHead&&!ctx.options->hideArms&&
     ctx.options->forward==0&&ctx.options->right==0&&ctx.options->up==0&&!ctx.options->dynamicAnchor)return false;
  ctx.camera=std::atomic_load(&source_camera::snapshot);
  if(!ctx.camera->active||ctx.camera->epoch!=currentEpoch.load(std::memory_order_acquire))return false;
@@ -86,53 +66,6 @@ inline bool select(std::uint32_t renderable,Context& ctx) noexcept {
     entry.entity!=base||entry.serial!=(ctx.handle>>12))return false;
  return true;
 }
-class ClipScope {
- IDirect3DDevice9* device=nullptr;
- DWORD previousState=0,index=0;
- std::array<float,4> previousPlane{};
- bool applied=false;
-public:
- ClipScope(const dango::GameCameraFrame& camera,float cutZ) noexcept {
-  device=acquire();
-  if(!device){clipStatus=u8"没有可用的 D3D9 设备";++clipRejected;return;}
-  D3DCAPS9 caps{};
-  if(FAILED(device->GetDeviceCaps(&caps))||caps.MaxUserClipPlanes==0||
-     FAILED(device->GetRenderState(D3DRS_CLIPPLANEENABLE,&previousState))) {
-    clipStatus=u8"设备不支持裁剪平面或无法读取渲染状态";++clipRejected;return;
-  }
-  auto maxPlane=std::min<UINT>(caps.MaxUserClipPlanes,6);
-  bool freePlane=false;
-  for(UINT i=0;i<maxPlane;++i)if(!(previousState&(1u<<i))){index=i;freePlane=true;break;}
-  if(!freePlane||FAILED(device->GetClipPlane(index,previousPlane.data()))) {
-    clipStatus=u8"没有可安全复用的裁剪平面槽位";++clipRejected;return;
-  }
-  IDirect3DVertexShader9* shader=nullptr;
-  if(FAILED(device->GetVertexShader(&shader))) {
-    clipStatus=u8"无法检测顶点着色器状态";++clipRejected;return;
-  }
-  bool programmable=shader!=nullptr;
-  if(shader)shader->Release();
-  std::array<float,4> plane{};
-  if(!math::clipPlane(camera.worldToClip,cutZ,programmable,plane)) {
-    clipStatus=u8"世界高度到 GPU 裁剪空间的转换失败";++clipRejected;return;
-  }
-  if(FAILED(device->SetClipPlane(index,plane.data()))) {
-    clipStatus=u8"GPU 拒绝 SetClipPlane";++clipRejected;return;
-  }
-  if(FAILED(device->SetRenderState(D3DRS_CLIPPLANEENABLE,previousState|(1u<<index)))) {
-    device->SetClipPlane(index,previousPlane.data());
-    clipStatus=u8"GPU 拒绝启用 ClipPlane";++clipRejected;return;
-  }
-  applied=true;++clipSet;
-  clipStatus=programmable?u8"裁剪平面已设置（VS/clip-space，画面待实测）":u8"裁剪平面已设置（fixed/world-space，画面待实测）";
- }
- ~ClipScope() noexcept {
-  if(applied){device->SetRenderState(D3DRS_CLIPPLANEENABLE,previousState);device->SetClipPlane(index,previousPlane.data());}
-  if(device)device->Release();
- }
- ClipScope(const ClipScope&)=delete;
- ClipScope& operator=(const ClipScope&)=delete;
-};
 template<class Original> inline void draw(const void* info,visual::Matrix3x4* bones,
  const dango::Vec3& origin,Original&& original) {
  std::uint32_t renderable=0,header=0;
@@ -143,7 +76,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  }
  Context ctx;
  if(!select(renderable,ctx)) {original(bones,origin);return;}
- // TLTPV camera mode is committed once by the game-frame callback.
+ // View-compatibility camera mode is committed once by the game-frame callback.
  // Do not reclassify/rewrite its state from individual Studio draw calls:
  // doing so flips the native gate during movement and resets alignment.
  ++matched;
@@ -170,7 +103,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  if(wantDynamic){
   static thread_local dynamic::Track tracking;
   static thread_local unsigned lastModeGeneration=0;
-  const unsigned now=tltpv::generation.load(std::memory_order_acquire);
+  const unsigned now=viewcompat::generation.load(std::memory_order_acquire);
   if(now!=lastModeGeneration){tracking=dynamic::Track{};lastModeGeneration=now;}
   dango::GameCameraFrame live{};
   dango::CameraPose pose{};
@@ -242,12 +175,6 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   }
  }else{headStatus=u8"头部分支隐藏关闭";armStatus=u8"双臂分支隐藏关闭";}
  dango::Vec3 shiftedOrigin=origin+shift;
- if(settings->clipEnabled){
-   ClipScope clip(*ctx.camera,shiftedOrigin.z+settings->clipHeight);
-   original((moved||partChanged)?temporary:bones,shiftedOrigin);
- }else{
-   clipStatus=u8"高度裁剪未启用";
-   original((moved||partChanged)?temporary:bones,shiftedOrigin);
- }
+ original((moved||partChanged)?temporary:bones,shiftedOrigin);
 }
 }

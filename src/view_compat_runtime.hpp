@@ -1,8 +1,8 @@
 #pragma once
-// Verified, read-only 2026 L4D2 client.dll ConVar probe for TLTPV's native
-// c_thirdpersonshoulder state. This never calls an unverified engine virtual
-// and never writes/redirects game memory. No TLTPV hooks or file dependencies.
-#include "tltpv_camera_compat.hpp"
+// Verified, read-only 2026 L4D2 client.dll ConVar probe for a verified native
+// camera-state indicator. This never calls an unverified engine virtual
+// and never writes/redirects game memory. No external camera add-on hooks or dependencies.
+#include "view_compat.hpp"
 #include "module_verification.hpp"
 #include "dango/source_entities.hpp"
 #include <atomic>
@@ -10,11 +10,11 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
-namespace visual::tltpv {
+namespace visual::viewcompat {
 inline std::atomic<std::uintptr_t> acceptedImage{0};
 inline std::atomic<Mode> mode{Mode::Unknown};
 inline std::atomic<unsigned> generation{1};
-inline std::atomic<const char*> status{"TLTPV compatibility disabled"};
+inline std::atomic<const char*> status{"View compatibility disabled"};
 inline std::atomic<int> shoulderValue{-1};
 inline std::atomic<int> horizontalUnits{-1},eyeHeightUnits{-1};
 inline CameraLatch latch{}; // Game-thread only: never modified from Studio draw.
@@ -22,7 +22,7 @@ inline void reset() noexcept {
  latch.reset();
  if(mode.exchange(Mode::Unknown,std::memory_order_acq_rel)!=Mode::Unknown)
   generation.fetch_add(1,std::memory_order_acq_rel);
- status="TLTPV mode unverified";
+ status="View mode unverified";
  shoulderValue=-1;horizontalUnits=-1;eyeHeightUnits=-1;
 }
 inline std::optional<bool> readShoulder() noexcept {
@@ -31,7 +31,7 @@ inline std::optional<bool> readShoulder() noexcept {
  auto base=std::uintptr_t(module);
  if(acceptedImage.load(std::memory_order_acquire)!=base){
   if(!source_camera::matchesImage(module,source_camera::ClientTimestamp,
-        source_camera::ClientImageSize,"TLTPV cvar client")||
+        source_camera::ClientImageSize,"view-mode client")||
      !verifiedModuleFile(module,
         "c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f"))
    return std::nullopt;
@@ -90,11 +90,11 @@ inline Mode detectAndCommit(const dango::GameCameraFrame& camera,
   mode.store(resolved,std::memory_order_release);
   generation.fetch_add(1,std::memory_order_acq_rel);
   char info[256]{};
-  std::snprintf(info,sizeof(info),"FPB TLTPV committed: %s (sample=%s shoulder=%d xy=%d eyeZ=%d)",
+  std::snprintf(info,sizeof(info),"FPB view committed: %s (sample=%s shoulder=%d xy=%d eyeZ=%d)",
    label(resolved),label(evidence.evidence),shoulderValue.load(),
    horizontalUnits.load(),eyeHeightUnits.load());
   source_camera::log(info);
  }
  return resolved;
 }
-} // namespace visual::tltpv
+} // namespace visual::viewcompat

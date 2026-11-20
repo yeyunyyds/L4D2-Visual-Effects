@@ -1,8 +1,8 @@
-#include "tltpv_camera_compat.hpp"
+#include "view_compat.hpp"
 #include <cassert>
 #include <limits>
 int main(){
- using namespace visual::tltpv;
+ using namespace visual::viewcompat;
  using dango::Vec3;dango::CameraPose p{};
  p.eye={5,3,64};
  assert(classify(p,Vec3{0,0,0},false).evidence==Mode::First);

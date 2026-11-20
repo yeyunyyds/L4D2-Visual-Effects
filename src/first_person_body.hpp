@@ -6,7 +6,7 @@
 #include <cstring>
 #include "first_person_body_config.hpp"
 #include "first_person_native_gate.hpp"
-#include "tltpv_runtime.hpp"
+#include "view_compat_runtime.hpp"
 #include "local_player.hpp"
 #include "survivors.hpp"
 namespace visual::firstperson {
@@ -149,33 +149,33 @@ inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
  // Compatibility is opt-in. Do not force native local DrawModel in a
  // confirmed third-person view or when the current mode is unverified.
  const auto cfg=std::atomic_load(&options);
- if(cfg->tltpvCompatibility){
+ if(cfg->thirdPersonCompatibility){
   // Prefer a fresh verified networked position; the full inventory snapshot
   // is 200ms old and can falsely change XY camera separation while moving.
-  auto origin=tltpv::freshLocalOrigin(entry.entity);
+  auto origin=viewcompat::freshLocalOrigin(entry.entity);
   if(!origin && frame->tick+75>=camera.tick)origin=actor->networkOrigin;
-  const auto viewed=tltpv::detectAndCommit(camera,origin);
-  tltpv::status=viewed==tltpv::Mode::First?"TLTPV: first-person body enabled":
-      viewed==tltpv::Mode::Third?"TLTPV: third-person, native body restored":
-      "TLTPV: unknown camera mode, native body restored";
-  if(viewed!=tltpv::Mode::First){
+  const auto viewed=viewcompat::detectAndCommit(camera,origin);
+  viewcompat::status=viewed==viewcompat::Mode::First?"第一人称：身体显示已启用":
+      viewed==viewcompat::Mode::Third?"第三人称：已恢复原生绘制":
+      "视角状态不明确：保持原生绘制";
+  if(viewed!=viewcompat::Mode::First){
    clear();detach();
-   status=viewed==tltpv::Mode::Third?u8"TLTPV 第三人称：恢复原生模型":
-      u8"TLTPV 视角未验证：保持原生模型";
+   status=viewed==viewcompat::Mode::Third?u8"第三人称：恢复原生模型":
+      u8"视角未确认：保持原生模型";
    return; // RestoreOnFailure invokes native::disable().
   }
- }else if(tltpv::mode.load(std::memory_order_acquire)!=tltpv::Mode::Unknown){
-  tltpv::reset();tltpv::status="TLTPV compatibility disabled";
+ }else if(viewcompat::mode.load(std::memory_order_acquire)!=viewcompat::Mode::Unknown){
+  viewcompat::reset();viewcompat::status="视角兼容已关闭";
  }
  if(!install(entry.entity)){clear();return;}
  currentHandle=handle;currentEpoch=camera.epoch;localBase=entry.entity;localTick=camera.tick;
  validatedLocal=true;
  if(!native::enable(entry.entity)){status=native::state.load();return;}
  gate.succeeded=true;
- status=u8"本机原生 DrawModel 分支已放行（游戏内未验证）";
+ status=u8"本机原生 DrawModel 分支已放行";
 }
 inline void stop() noexcept {
- native::disable();clear();detach();tltpv::reset();status=u8"插件退出；原生可见性未修改";
+ native::disable();clear();detach();viewcompat::reset();status=u8"插件退出；原生可见性未修改";
 }
 inline bool isDrawing() noexcept {return false;}
 }

@@ -1,4 +1,4 @@
-"""Verify the experimental Windows x86 package and module source boundaries."""
+"""Verify the Windows x86 package and module source boundaries."""
 import json
 from pathlib import Path
 import struct
@@ -15,18 +15,19 @@ with zipfile.ZipFile(install) as archive:
     offset = struct.unpack_from("<I", dll, 0x3C)[0]
     assert dll[offset:offset + 4] == b"PE\x00\x00"
     assert struct.unpack_from("<H", dll, offset + 4)[0] == 0x14C
-    assert b"0.8.0-module-body-experimental" in dll
+    assert b"0.8.0-module-body" in dll
     config = json.loads(archive.read("bin/neko/plugins/L4D2Visual/hud.json"))
     assert config["logging"]["level"] == "info"
     body = config["firstPersonBody"]
-    assert body["enabled"] and body["dynamicAnchor"] and body["followCameraYaw"]
-    assert body["hideHead"] and body["hideArms"] and not body["clipEnabled"]
-    assert body["tltpvCompatibility"] is False
+    assert not body["enabled"] and body["dynamicAnchor"] and body["followCameraYaw"]
+    assert body["hideHead"] and body["hideArms"]
+    assert body["thirdPersonCompatibility"] is False
+    assert "clipEnabled" not in body and "clipHeight" not in body
     assert (body["forward"], body["right"], body["up"]) == (-13, -1, -1)
     assert "wallPictures" not in config and "sprayP2P" not in config
     assert not any("/images/" in p or "spray-cache" in p for p in names)
     readme = archive.read("README.md").decode("utf-8")
-    assert "实验分支" in readme
+    assert "第一人称身体" in readme and "实验分支" not in readme
 with zipfile.ZipFile(source) as archive:
     assert archive.testzip() is None
     names = set(archive.namelist())
@@ -37,9 +38,9 @@ with zipfile.ZipFile(source) as archive:
         "src/first_person_body_effects.hpp",
         "src/first_person_dynamic_alignment.hpp",
         "src/log_settings.hpp",
-        "src/tltpv_camera_compat.hpp",
-        "src/tltpv_runtime.hpp",
-        "tests/tltpv_camera_compat_test.cpp",
+        "src/view_compat.hpp",
+        "src/view_compat_runtime.hpp",
+        "tests/view_compat_test.cpp",
         "tests/module_host_test.cpp",
         "tests/first_person_dynamic_alignment_test.cpp",
     }
