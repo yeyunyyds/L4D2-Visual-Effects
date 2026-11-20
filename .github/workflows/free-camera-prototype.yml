@@ -1,0 +1,33 @@
+name: FreeCamera Windows x86 experiment
+on:
+  push:
+    branches: [experimental/free-camera-prototype]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: Free camera math smoke test
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror tests/free_camera_core_test.cpp -o /tmp/freecam_test
+          /tmp/freecam_test
+      - name: Existing tests
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: bash scripts/test.sh
+      - name: Windows x86 DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: bash scripts/build-mingw.sh
+      - run: python3 scripts/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-FreeCamera-x86
+          path: build/L4D2Visual-0.8.0.zip
+          if-no-files-found: error

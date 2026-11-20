@@ -4,6 +4,7 @@
 #include "modules/rock_module.hpp"
 #include "modules/animation_module.hpp"
 #include "modules/first_person_body_module.hpp"
+#include "modules/free_camera_module.hpp"
 namespace visual::features {
 inline modules::Host& host(){static modules::Host instance;return instance;}
 inline void prepareRender(){
@@ -22,6 +23,7 @@ inline void install(){
  h.add(rockfeature::create());
  h.add(animationfeature::create());
  h.add(firstpersonfeature::create());
+ h.add(freecamerafeature::create());
  h.freeze();
  // Source Studio remains shared infrastructure, with a generic render callback.
  render::studioDecorator=+[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,void* data,render::StudioNext next){
