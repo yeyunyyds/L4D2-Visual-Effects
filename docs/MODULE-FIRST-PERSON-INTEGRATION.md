@@ -29,20 +29,34 @@ camera/Studio callback timing under load, exotic third-party skeletons,
 game online/anti-cheat compatibility. Back up the original DLL and hud.json.
 Test in offline environments before wider use.
 
-## TLTPV first-/third-person mode gate (opt-in)
+## TLTPV first-/third-person mode gate (opt-in, revised)
 
-`firstPersonBody.tltpvCompatibility` defaults to `false`, including old
-configurations. It does not parse the complete TLTPV CFG state machine.
-The module reads the SHA-256-verified client.dll ConVar object at RVA
-`0x7589c8` for `c_thirdpersonshoulder` (read-only name/parent checks),
-then compares the current camera eye to the local networked player origin.
+`firstPersonBody.tltpvCompatibility` remains **false by default**. The option
+only adapts native `firstperson` / `thirdpersonshoulder` camera changes.
 
-Third and Unknown modes restore the native DrawModel gate on the next game
-frame and skip the Studio draw decoration; a second camera probe occurs at
-draw time. Changing camera modes invalidates the dynamic alignment tracking
-state. When compatibility is disabled, the original body rendering path remains.
+The initial experimental version repeatedly switched the native local-DrawModel
+byte during movement because the horizontal camera distance was compared
+against a network entity snapshot updated once every 200 ms. Studio draw and
+the game-frame callback also both wrote a shared mode; top-down views with
+small XY separation were incorrectly identified as first person.
 
-Test TLTPV's ordinary `firstperson` and `thirdpersonshoulder` transitions
-in game. Shoulder camera collision and network interpolation can produce an
-Unknown result. This is an experimental spatial heuristic, not a verified
-engine camera-mode accessor.
+The revised camera observer:
+
+* Reads verified `c_thirdpersonshoulder` (advisory, never assumed universally
+  synchronized with the current view).
+* Directly re-reads the local player's verified `m_vecOrigin` recvprop during
+  the camera game frame, instead of relying on the stale 200-ms inventory
+  snapshot; never calls an unverified game virtual.
+* Includes eye height (`camera.eye.z - localOrigin.z`) when looking for a
+  first-person eye, not merely XY distance.
+* Publishes view changes from the game frame only. Unknown samples briefly
+  preserve the previous mode; confirmed Third immediately restores the native
+  DrawModel gate; First requires at least 96 ms of consecutive evidence.
+* Studio drawing reads the committed mode without reclassifying or updating it.
+  The dynamic-alignment history resets only when the committed mode changes.
+
+Diagnostics report the committed mode, most recently read shoulder CVar,
+XY separation and eye height. `-1` indicates unavailable distance or CVar.
+This remains an experimental heuristic, not direct access to the engine's
+`CAM_IsThirdPerson()` implementation. Real camera mode, renderer interactions
+and TLTPV game behavior require in-game validation.

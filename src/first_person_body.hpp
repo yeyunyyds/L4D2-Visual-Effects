@@ -150,10 +150,11 @@ inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
  // confirmed third-person view or when the current mode is unverified.
  const auto cfg=std::atomic_load(&options);
  if(cfg->tltpvCompatibility){
-  const auto viewed=tltpv::detect(camera,actor->networkOrigin);
-  const auto before=tltpv::mode.load(std::memory_order_acquire);
-  tltpv::observe(viewed);
-  if(before!=viewed)source_camera::log(std::string("FPB TLTPV view: ")+tltpv::label(viewed));
+  // Prefer a fresh verified networked position; the full inventory snapshot
+  // is 200ms old and can falsely change XY camera separation while moving.
+  auto origin=tltpv::freshLocalOrigin(entry.entity);
+  if(!origin && frame->tick+75>=camera.tick)origin=actor->networkOrigin;
+  const auto viewed=tltpv::detectAndCommit(camera,origin);
   tltpv::status=viewed==tltpv::Mode::First?"TLTPV: first-person body enabled":
       viewed==tltpv::Mode::Third?"TLTPV: third-person, native body restored":
       "TLTPV: unknown camera mode, native body restored";

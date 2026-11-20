@@ -143,27 +143,9 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  }
  Context ctx;
  if(!select(renderable,ctx)) {original(bones,origin);return;}
- if(ctx.options->tltpvCompatibility){
-  // TLTPV can switch cameras after the previous game-frame snapshot.
-  // Validate the current Studio-draw camera before changing any matrix.
-  const auto frame=std::atomic_load(&source_entities::snapshot);
-  std::optional<dango::Vec3> playerOrigin;
-  if(frame&&frame->epoch==ctx.camera->epoch)
-   for(const auto& actor:frame->records)if(actor.handle==ctx.handle){
-    playerOrigin=actor.networkOrigin;break;
-   }
-  dango::GameCameraFrame live{};
-  auto viewed=tltpv::Mode::Unknown;
-  if(source_camera::sampleDuringDraw(live)&&live.epoch==ctx.camera->epoch)
-   viewed=tltpv::detect(live,playerOrigin);
-  tltpv::observe(viewed);
-  if(viewed!=tltpv::Mode::First){
-   tltpv::status=viewed==tltpv::Mode::Third?
-     "TLTPV: draw-time third-person camera, body bypassed":
-     "TLTPV: draw-time camera uncertain, body bypassed";
-   original(bones,origin);return;
-  }
- }
+ // TLTPV camera mode is committed once by the game-frame callback.
+ // Do not reclassify/rewrite its state from individual Studio draw calls:
+ // doing so flips the native gate during movement and resets alignment.
  ++matched;
  dango::Vec3 shift{};bool moved=false,partChanged=false,dynamicMoved=false;
  visual::Matrix3x4 temporary[256];

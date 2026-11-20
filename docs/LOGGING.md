@@ -49,5 +49,6 @@ components from writing event messages, or change file rotation.
 When the optional compatibility mode is enabled, the first-person-body
 runtime diagnostics show the camera classification and read-only
 `c_thirdpersonshoulder` cached value (`-1` means unavailable).
-Changes in camera classification emit Info-level event logs.
+Only confirmed camera-mode transitions emit Info-level event logs; the
+message includes observed mode, shoulder value, XY separation and eye height.
 Unknown mode deliberately retains native rendering.

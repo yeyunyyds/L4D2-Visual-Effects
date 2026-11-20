@@ -60,7 +60,9 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"Evo
   return "\"第一人称身体 · 运行诊断\" {"+
   row(visual::firstperson::status.load())+
   row(std::string("TLTPV: ")+visual::tltpv::status.load()+
-      " c_thirdpersonshoulder="+std::to_string(visual::tltpv::shoulderValue.load()))+
+      " shoulder="+std::to_string(visual::tltpv::shoulderValue.load())+
+      " xy="+std::to_string(visual::tltpv::horizontalUnits.load())+
+      " eyeZ="+std::to_string(visual::tltpv::eyeHeightUnits.load()))+
   row("Native gate active/enables/restores/failures: "+std::to_string(visual::firstperson::native::active.load())+"/"+std::to_string(visual::firstperson::native::enables.load())+"/"+std::to_string(visual::firstperson::native::restores.load())+"/"+std::to_string(visual::firstperson::native::failures.load()))+
   row("Body Studio matches/shifts/rejects: "+std::to_string(visual::firstperson::effects::matched.load())+"/"+std::to_string(visual::firstperson::effects::shifted.load())+"/"+std::to_string(visual::firstperson::effects::shiftRejected.load()))+
   row("Head branch applied/rejected: "+std::to_string(visual::firstperson::effects::headHidden.load())+"/"+std::to_string(visual::firstperson::effects::headRejected.load()))+

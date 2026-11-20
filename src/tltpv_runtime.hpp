@@ -9,20 +9,21 @@
 #include <optional>
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
 namespace visual::tltpv {
 inline std::atomic<std::uintptr_t> acceptedImage{0};
 inline std::atomic<Mode> mode{Mode::Unknown};
 inline std::atomic<unsigned> generation{1};
 inline std::atomic<const char*> status{"TLTPV compatibility disabled"};
 inline std::atomic<int> shoulderValue{-1};
-inline void observe(Mode next) noexcept {
- if(mode.exchange(next,std::memory_order_acq_rel)!=next)
-  generation.fetch_add(1,std::memory_order_acq_rel);
-}
+inline std::atomic<int> horizontalUnits{-1},eyeHeightUnits{-1};
+inline CameraLatch latch{}; // Game-thread only: never modified from Studio draw.
 inline void reset() noexcept {
- observe(Mode::Unknown);
+ latch.reset();
+ if(mode.exchange(Mode::Unknown,std::memory_order_acq_rel)!=Mode::Unknown)
+  generation.fetch_add(1,std::memory_order_acq_rel);
  status="TLTPV mode unverified";
- shoulderValue=-1;
+ shoulderValue=-1;horizontalUnits=-1;eyeHeightUnits=-1;
 }
 inline std::optional<bool> readShoulder() noexcept {
  auto module=source_camera::clientModule;
@@ -55,12 +56,45 @@ inline std::optional<bool> readShoulder() noexcept {
     (value!=0&&value!=1))return std::nullopt;
  return value==1;
 }
-inline Mode detect(const dango::GameCameraFrame& camera,
-                   const std::optional<dango::Vec3>& origin) noexcept {
+// Refresh the player's verified m_vecOrigin directly from the live entity.
+// The inventory snapshot is captured only once per 200ms and is too old for
+// a movement-sensitive camera comparison. This reads a previously verified
+// recvprop; it does not dispatch new engine virtual methods.
+inline std::optional<dango::Vec3> freshLocalOrigin(std::uint32_t entity) noexcept {
+ if(!entity)return std::nullopt;
+ for(const auto& pair:source_entities::classes){
+  if(pair.second.name=="CTerrorPlayer"){
+   return source_entities::vectorField(entity,pair.second,"m_vecOrigin");
+  }
+ }
+ return std::nullopt;
+}
+// Only called from firstperson::onFrame after the local player is verified.
+// Draw-time code reads the committed mode but does not update it.
+inline Mode detectAndCommit(const dango::GameCameraFrame& camera,
+                            const std::optional<dango::Vec3>& origin) noexcept {
  dango::CameraPose pose{};
  auto shoulder=readShoulder();
  shoulderValue=shoulder?(*shoulder?1:0):-1;
- if(!camera.active||!dango::cameraPose(camera,pose))return Mode::Unknown;
- return classify(pose,origin,shoulder);
+ Observation evidence{};
+ if(camera.active&&dango::cameraPose(camera,pose))
+  evidence=classify(pose,origin,shoulder);
+ // The actual shoulder camera should remain Third even if the entity origin
+ // cannot be read for one frame (but camera validity is still required).
+ if(camera.active&&shoulder&&*shoulder)evidence.evidence=Mode::Third;
+ horizontalUnits=std::isfinite(evidence.horizontal)?int(evidence.horizontal):-1;
+ eyeHeightUnits=std::isfinite(evidence.eyeHeight)?int(evidence.eyeHeight):-1;
+ auto previous=mode.load(std::memory_order_acquire);
+ auto resolved=latch.update(evidence.evidence,camera.tick,camera.epoch);
+ if(resolved!=previous){
+  mode.store(resolved,std::memory_order_release);
+  generation.fetch_add(1,std::memory_order_acq_rel);
+  char info[256]{};
+  std::snprintf(info,sizeof(info),"FPB TLTPV committed: %s (sample=%s shoulder=%d xy=%d eyeZ=%d)",
+   label(resolved),label(evidence.evidence),shoulderValue.load(),
+   horizontalUnits.load(),eyeHeightUnits.load());
+  source_camera::log(info);
+ }
+ return resolved;
 }
 } // namespace visual::tltpv
