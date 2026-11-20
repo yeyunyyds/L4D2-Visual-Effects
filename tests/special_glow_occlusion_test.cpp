@@ -7,20 +7,37 @@
 using namespace visual;
 static void check(bool good){if(!good)throw std::runtime_error("special glow / occlusion regression");}
 int main(){
- check(dango::hud::opensChild(940)&&dango::hud::opensChild(950)&&dango::hud::opensChild(957));
- check(!dango::hud::opensChild(4000)&&!dango::hud::opensChild(4017)&&!dango::hud::opensChild(4147));
+ check(dango::hud::opensChild(940));
+ check(!dango::hud::opensChild(4480)&&!dango::hud::opensChild(4481));
+ for(unsigned role=0;role<SpecialCount;++role){
+  check(dango::hud::opensChild(950+role)&&dango::hud::opensChild(960+role));
+  check(!dango::hud::opensChild(4000+role)&&!dango::hud::opensChild(4010+role));
+  for(unsigned index=0;index<specialglow::palette.size();++index)
+   check(!dango::hud::opensChild(4400+role*unsigned(specialglow::palette.size())+index));
+ }
+ check(!dango::hud::opensChild(4100)&&!dango::hud::opensChild(4147));
  specialglow::Settings cfg;
- check(!cfg.any()&&!cfg.all()&&!cfg.usesVisibility());
- for(unsigned i=0;i<SpecialCount;++i)check(!cfg.types[i].enabled&&!cfg.types[i].occlude&&cfg.types[i].color==specialglow::defaults[i]);
+ check(!cfg.any()&&!cfg.all()&&cfg.allOccluded()&&!cfg.usesVisibility());
+ for(unsigned i=0;i<SpecialCount;++i)check(!cfg.types[i].enabled&&cfg.types[i].occlude&&cfg.types[i].color==specialglow::defaults[i]);
  cfg.types[0].enabled=true;cfg.types[0].occlude=true;cfg.types[0].color=specialglow::rgb(17,150,255);
- cfg.types[7].enabled=true;cfg.types[7].color=specialglow::rgb(100,20,1);
+ cfg.types[7].enabled=true;cfg.types[7].occlude=false;cfg.types[7].color=specialglow::rgb(100,20,1);
  check(cfg.any()&&!cfg.all()&&cfg.usesVisibility());
- auto all=cfg;for(auto& role:all.types)role.enabled=true;
+ auto all=cfg;all.setAllEnabled(true);
  check(all.any()&&all.all());all.types[4].enabled=false;check(all.any()&&!all.all());
+ all.setAllEnabled(true);check(all.all());all.setAllOccluded(false);
+ check(!all.allOccluded()&&!all.usesVisibility());
+ for(const auto& role:all.types)check(role.enabled&&!role.occlude);
+ all.setAllOccluded(true);check(all.allOccluded()&&all.usesVisibility());
+ auto preservedColor=all.types[7].color;all.setAllEnabled(false);
+ check(!all.any()&&!all.all()&&all.allOccluded()&&all.types[7].color==preservedColor);
+ for(unsigned i=0;i<specialglow::palette.size();++i)
+  check(specialglow::paletteNames[i]&&*specialglow::paletteNames[i]);
  nlohmann::json saved;specialglow::writeSettings(saved,cfg);
  auto decoded=specialglow::readSettings(saved);
  check(decoded.types[0].enabled&&decoded.types[0].occlude&&decoded.types[0].color==specialglow::rgb(17,150,255));
  check(decoded.types[7].enabled&&!decoded.types[7].occlude&&decoded.types[7].color==specialglow::rgb(100,20,1));
+ auto missing= saved;missing["specialGlow"]["Smoker"].erase("occlude");
+ check(specialglow::readSettings(missing).types[0].occlude);
  saved["specialGlow"]["Smoker"]["color"]={-1,999,2};
  check(specialglow::readSettings(saved).types[0].color==specialglow::defaults[0]);
  check(specialglow::stepChannel(specialglow::rgb(250,0,0),0,+16)==specialglow::rgb(255,0,0));
@@ -50,5 +67,5 @@ int main(){
  check(partial&&*partial);
  auto unknown=occlusion::bodyVisible(eye,tank,[](auto,auto,auto&){return false;},true);
  check(!unknown);
- std::cout<<"PASS: 8 independent roles, RGB config/validation, per-role occlusion, 3-sample body LOS fail-closed\n";
+ std::cout<<"PASS: 8 roles, bulk enable/occlusion and default LOS, color presets, submenu ID routing, config roundtrip, 3-sample body LOS\n";
 }
