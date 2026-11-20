@@ -48,8 +48,9 @@ inline bool action(std::uintptr_t id){
 }
 inline modules::Module create(){
  modules::Module m;m.id="special-glow";m.menuOrder=2;
- m.rootItem=[] {return ui::item(std::atomic_load(&specialglow::options)->any()?
-  u8"特感描边 [部分开启]":u8"特感描边 [全关]",940);};
+ m.rootItem=[] {auto cfg=std::atomic_load(&specialglow::options);
+  return ui::item(cfg->all()?u8"特感描边 [全开]":
+    cfg->any()?u8"特感描边 [部分开启]":u8"特感描边 [全关]",940);};
  m.page=[](std::uintptr_t id)->std::optional<std::string>{
   if(id==940||(id>=950&&id<950+SpecialCount))return page(id);return std::nullopt;
  };
