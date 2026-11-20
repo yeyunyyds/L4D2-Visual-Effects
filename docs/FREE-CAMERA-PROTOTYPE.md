@@ -36,3 +36,22 @@ than forcing a vtable index.
 - Added in-menu counts for toggle, F6 polling and F6 edges, and a camera layout label to separate UI errors from hooking/ABI errors.
 
 The exact 2026 target binary must still confirm IClientMode slots 19/27 in practice. No successful in-game test has been performed.
+
+## Exact binary correction after user screenshot
+
+The older conclusion that ClientMode needed an extra pointer dereference was
+**incorrect**. The prior uploaded Windows x86 client.dll is 8,305,664 bytes;
+SHA256 c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f
+matches the repository's required build exactly. Disassembly shows:
+
+- client+0x22854e writes EAX directly into the two-entry ClientMode array
+  at client+0x7b1b8c plus 4*esi. Read the object pointer ONCE.
+- client+0x26edc0 calculates object address as client+0x7c3240 + 0x148*index.
+- constructor client+0x273ddd sets vtable at client+0x5bd4fc.
+- vtable entry 19 = client+0x26ff40, entry 27 = client+0xc2d70.
+- L4D2 view origin is at CViewSetup+0x3c, angles at +0x48.
+
+The locator uses exact build RVAs and checks registration opcode, object
+identity and original vtable slots before installing the experimental hooks.
+It no longer relies on a large code-section scan or a wrong extra pointer read.
+The camera/menu integration still requires an offline game test.

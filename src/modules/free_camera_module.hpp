@@ -12,6 +12,7 @@ inline std::optional<std::string> page(std::uintptr_t id){
  item(freecamera::enabled()?u8"自由摄像机：[运行中]":freecamera::requested.load()?u8"自由摄像机：[启动中]":u8"自由摄像机：[关闭]",931)+
  row(std::string("Hook: ")+(freecamera::bound?"ready":"unavailable"))+
  row(std::string("State: ")+freecamera::message.load())+
+ row(std::string("Locator: ")+freecamera::locateDetail.load())+
  row("Camera layout: "+std::string(freecamera::detectedLayout.load()))+
  row("Menu/F6 poll/F6 edge: "+std::to_string(freecamera::menuToggles.load())+"/"+std::to_string(freecamera::keyPolls.load())+"/"+std::to_string(freecamera::keyToggles.load()))+
  row("View/Move: "+std::to_string(freecamera::viewCount.load())+"/"+std::to_string(freecamera::cmdCount.load()))+
