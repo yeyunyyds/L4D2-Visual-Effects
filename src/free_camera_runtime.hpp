@@ -131,8 +131,9 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
   core::Input i{};
   i.forward=float(int(key('W'))-int(key('S')));
   i.side=float(int(key('D'))-int(key('A')));
-  i.up=float(int(key(VK_SPACE))-int(key(VK_CONTROL)));
-  i.fast=key(VK_SHIFT);i.dx=float(cmd->mousedx);i.dy=float(cmd->mousedy);
+  // Space moves up; Shift moves down. Ctrl is not consumed by FreeCamera.
+  i.up=float(int(key(VK_SPACE))-int(key(VK_SHIFT)));
+  i.dx=float(cmd->mousedx);i.dy=float(cmd->mousedy);
   camera.speed=movementSpeed.load();
   camera.move(i,dt);
  }
@@ -243,11 +244,13 @@ inline void frame(const dango::GameCameraFrame& f){
  tryBind();
  if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");camera.ready=false;}
 }
-inline void poll(bool escape,bool menu,bool gameForeground){
+inline void poll(bool escape,bool /*menu*/,bool gameForeground){
  ++keyPolls;
  static bool held=false;bool now=key(VK_F6);bool edge=now&&!held;held=now;
- paused=escape||menu||!gameForeground;
- if(edge&&gameForeground&&!escape&&!menu){++keyToggles;toggle();}
+ // Native HUD uses digit/navigation keys and does not capture the mouse.
+ // Keep FreeCamera input active with its panel open. Esc and focus loss still pause.
+ paused=escape||!gameForeground;
+ if(edge&&gameForeground&&!escape){++keyToggles;toggle();}
 }
 inline void stop(){
  disable("FreeCamera stopped");camera.ready=false;

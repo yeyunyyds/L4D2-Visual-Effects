@@ -17,9 +17,9 @@ inline std::optional<std::string> page(std::uintptr_t id){
  row("Menu/F6 poll/F6 edge: "+std::to_string(freecamera::menuToggles.load())+"/"+std::to_string(freecamera::keyPolls.load())+"/"+std::to_string(freecamera::keyToggles.load()))+
  row("View/Move: "+std::to_string(freecamera::viewCount.load())+"/"+std::to_string(freecamera::cmdCount.load()))+
  row("Rejected view/cmd: "+std::to_string(freecamera::viewRejected.load())+"/"+std::to_string(freecamera::cmdRejected.load()))+
- row(u8"F6 切换；WASD/鼠标/Space/Ctrl/Shift")+
+ row(u8"F6 切换；WASD 移动；鼠标转向")+row(u8"Space 上升；Shift 下降；菜单开启仍可飞行")+
  row("Speed: "+std::to_string(int(freecamera::movementSpeed.load())))+
- item(u8"加速 +50",932)+item(u8"减速 -50",933)+
+ item(u8"飞行速度 +50",932)+item(u8"飞行速度 -50",933)+
  item(u8"紧急关闭",934)+item(u8"保存设置",101)+"}";
 }
 inline bool action(std::uintptr_t id){

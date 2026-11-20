@@ -4,7 +4,7 @@ Based on experimental/module-host-first-person-body commit 73c6dc8aefc7a0fedaed8
 
 Implemented together:
 1. Native IClientMode OverrideView[19] replacement of camera origin/angles.
-2. WASD, mouse, Space/Ctrl, Shift camera movement with independent world coordinates.
+2. WASD, mouse, Space (ascend) and Shift (descend) camera movement with independent world coordinates.
 3. IClientMode CreateMove[27] input suppression for movement, attacks, and player aim.
 Additional: F6, HUD toggle/status/emergency off/speed, map-reset and first-person-body gating.
 
@@ -55,3 +55,11 @@ The locator uses exact build RVAs and checks registration opcode, object
 identity and original vtable slots before installing the experimental hooks.
 It no longer relies on a large code-section scan or a wrong extra pointer read.
 The camera/menu integration still requires an offline game test.
+
+
+## Source-only input adjustment (no build requested)
+
+- FreeCamera input now uses WASD for planar flight, Space to rise, Shift to descend and mouse to aim. Ctrl is no longer assigned. The previous Shift 3x-speed modifier is removed; flight speed remains adjustable in the FreeCamera menu.
+- The native HUD uses number/navigation keys and is configured not to capture the mouse. Opening the FreeCamera panel no longer pauses camera movement or mouse-look; pressing Esc and loss of game focus still pause it. F6 toggles even while the HUD is open.
+- Source's native right basis at yaw=0 is -Y (not +Y). The former +Y strafe direction has been corrected. Horizontal mouse delta now uses negative yaw for rightward mouse movement, matching Source conventions.
+- Updated the standalone camera math tests to assert D/right and mouse/right signs. Per request, **no build, CI or runtime test** was started for this change.
