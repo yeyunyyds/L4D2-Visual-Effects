@@ -122,3 +122,28 @@ the downloaded `L4D2Visual-FreeCamera-x86.zip` contains `bin/` and
 checks the exact file set before upload and includes no separate license files.
 Previous workflow artifacts are unaffected; the change applies to subsequent
 builds. No build is triggered by this documentation/workflow commit.
+
+
+## FreeCamera + first-person body: world-anchored rendering (Scheme A)
+
+When F6 enables FreeCamera while the first-person body option remains enabled,
+the native local-player DrawModel path stays eligible. This is the **existing
+CTerrorPlayer entity**, not a spawned body, dummy, or server-side object.
+
+- The local-player handle, serial, alive/team/model checks and client.dll
+  fingerprints are still required. On failure, the original draw suppression
+  is restored; nothing is forcibly drawn from invalid entity data.
+- While FreeCamera is requested, the player-to-camera distance must NOT be
+  interpreted as a third-person view. The existing camera-distance latch is
+  reset on both F6 transitions; normal third-person behavior resumes after F6.
+- If the explicitly verified native shoulder-thirdperson ConVar is enabled
+  with compatibility on, native third-person rendering retains ownership.
+- In the FreeCamera Studio callback, forward the ORIGINAL matrices and
+  original draw origin. No camera-follow dynamic body anchor, manual offset,
+  yaw alignment, or head/arm changes are applied. No extra DrawModel call.
+- The game engine still owns entity state, animation, draw order, visibility,
+  culling and lifetime. This feature does not write any server entity state.
+- Diagnostics expose "FreeCamera world-anchored body". This is an experimental
+  visual-only integration, not a fix for a suspected server.dll crash.
+- Unit tests cover normal vs detached policy, the native shoulder case,
+  bone pass-through, and both F6 transitions. No binary build/CI was requested.

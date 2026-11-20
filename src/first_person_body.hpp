@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include "first_person_body_config.hpp"
+#include "free_camera_body_policy.hpp"
 #include "first_person_native_gate.hpp"
 #include "view_compat_runtime.hpp"
 #include "local_player.hpp"
@@ -14,6 +15,9 @@ inline std::shared_ptr<const Settings> options=std::make_shared<const Settings>(
 inline std::atomic<const char*> status{u8"关闭：原生可见性保持不变"};
 inline std::atomic<std::uint32_t> currentHandle{0xffffffffu},currentEpoch{0},localBase{0};
 inline std::atomic<std::uint64_t> localTick{0};
+inline std::atomic<bool> worldBodyActive{false};
+// Post-render game-frame callback owns the transition marker.
+inline freecamerabody::Transition cameraTransition;
 inline std::atomic<bool> validatedLocal{false},probeBound{false},nativeVisibilityHook{false};
 inline std::atomic<unsigned long> localCalls{0},nativeTrue{0},nativeFalse{0};
 using ShouldDraw=bool(__thiscall*)(void*);
@@ -48,7 +52,7 @@ inline bool __fastcall probe(void* self,void*) {
  return result;
 }
 inline void clear() noexcept {
- validatedLocal=false;currentHandle=0xffffffffu;currentEpoch=0;localBase=0;localTick=0;
+ worldBodyActive=false;validatedLocal=false;currentHandle=0xffffffffu;currentEpoch=0;localBase=0;localTick=0;
 }
 inline bool swap(void** table,void* expected,void* replacement) {
  if(!table||GetModuleHandleW(L"client.dll")!=source_camera::clientModule)return false;
@@ -113,7 +117,10 @@ inline bool install(std::uint32_t base) {
  source_camera::log("FirstPersonBody: verified ShouldDraw[3] observation hook installed; original result preserved");
  return true;
 }
-inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
+inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequested=false) noexcept {
+ // Reset the first-/third-person evidence on BOTH F6 edges. The detached
+ // camera's distance is not a valid hint after returning to normal view.
+ if(cameraTransition.update(freeCameraRequested))viewcompat::reset();
  struct RestoreOnFailure {bool succeeded=false;~RestoreOnFailure(){if(!succeeded)native::disable();}} gate;
  if(!std::atomic_load(&options)->enabled){
   clear();detach();status=u8"关闭：原生可见性保持不变";return;
@@ -146,12 +153,26 @@ inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
     !entry.entity||entry.serial!=(handle>>12)){
   clear();detach();status=u8"实体 handle/serial 未通过";return;
  }
- // Compatibility is opt-in. Do not force native local DrawModel in a
- // confirmed third-person view or when the current mode is unverified.
+ // FreeCamera moves only the camera. The verified local player remains a
+ // real networked CTerrorPlayer at its original position. Do not classify
+ // detached camera distance as third-person view.
  const auto cfg=std::atomic_load(&options);
- if(cfg->thirdPersonCompatibility){
-  // Prefer a fresh verified networked position; the full inventory snapshot
-  // is 200ms old and can falsely change XY camera separation while moving.
+ const auto shoulder=(freeCameraRequested&&cfg->thirdPersonCompatibility)?
+    viewcompat::readShoulder():std::optional<bool>{};
+ const auto bodyMode=freecamerabody::choose(freeCameraRequested,
+                                            cfg->thirdPersonCompatibility,shoulder);
+ if(bodyMode!=freecamerabody::Mode::NormalView){
+  viewcompat::shoulderValue=shoulder?(*shoulder?1:0):-1;
+  viewcompat::horizontalUnits=-1;viewcompat::eyeHeightUnits=-1;
+  if(bodyMode==freecamerabody::Mode::NativeThirdPerson){
+   // An actual native third-person camera already controls local player
+   // visibility. Do not force an extra first-person DrawModel branch.
+   viewcompat::status="FreeCamera: native third-person drawing preserved";
+   clear();detach();status=u8"FreeCamera：原生第三人称绘制";return;
+  }
+  viewcompat::status="FreeCamera: world-anchored local player, no camera distance test";
+ }else if(cfg->thirdPersonCompatibility){
+  // Normal game view retains all existing compatibility behavior.
   auto origin=viewcompat::freshLocalOrigin(entry.entity);
   if(!origin && frame->tick+75>=camera.tick)origin=actor->networkOrigin;
   const auto viewed=viewcompat::detectAndCommit(camera,origin);
@@ -170,12 +191,14 @@ inline void onFrame(const dango::GameCameraFrame& camera) noexcept {
  if(!install(entry.entity)){clear();return;}
  currentHandle=handle;currentEpoch=camera.epoch;localBase=entry.entity;localTick=camera.tick;
  validatedLocal=true;
- if(!native::enable(entry.entity)){status=native::state.load();return;}
+ if(!native::enable(entry.entity)){worldBodyActive=false;status=native::state.load();return;}
+ worldBodyActive=bodyMode==freecamerabody::Mode::WorldAnchored;
  gate.succeeded=true;
- status=u8"本机原生 DrawModel 分支已放行";
+ status=worldBodyActive.load()?u8"FreeCamera：本机模型保留世界原位（原生骨骼）":
+                              u8"本机原生 DrawModel 分支已放行";
 }
 inline void stop() noexcept {
- native::disable();clear();detach();viewcompat::reset();status=u8"插件退出；原生可见性未修改";
+ native::disable();clear();detach();viewcompat::reset();cameraTransition.reset();status=u8"插件退出；原生可见性未修改";
 }
 inline bool isDrawing() noexcept {return false;}
 }

@@ -56,6 +56,7 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
       " shoulder="+std::to_string(visual::viewcompat::shoulderValue.load())+
       " xy="+std::to_string(visual::viewcompat::horizontalUnits.load())+
       " eyeZ="+std::to_string(visual::viewcompat::eyeHeightUnits.load()))+
+  row("FreeCamera world-anchored body: "+std::to_string(visual::firstperson::worldBodyActive.load()))+
   row("Native gate active/enables/restores/failures: "+std::to_string(visual::firstperson::native::active.load())+"/"+std::to_string(visual::firstperson::native::enables.load())+"/"+std::to_string(visual::firstperson::native::restores.load())+"/"+std::to_string(visual::firstperson::native::failures.load()))+
   row("Body Studio matches/shifts/rejects: "+std::to_string(visual::firstperson::effects::matched.load())+"/"+std::to_string(visual::firstperson::effects::shifted.load())+"/"+std::to_string(visual::firstperson::effects::shiftRejected.load()))+
   row("Head branch applied/rejected: "+std::to_string(visual::firstperson::effects::headHidden.load())+"/"+std::to_string(visual::firstperson::effects::headRejected.load()))+
@@ -113,14 +114,21 @@ inline modules::Module create(){
  };
  m.needsEntities=[] {return std::atomic_load(&firstperson::options)->enabled;};
  m.frame=[](const dango::GameCameraFrame& frame) {
-  if(freecamera::requested.load()){firstperson::native::disable();return;}
-  firstperson::onFrame(frame);
+  // Keep the real player entity rendered while FreeCamera observes it.
+  // onFrame still verifies the local handle/model/life state before opening
+  // the original DrawModel gate; no extra entities or render calls are made.
+  firstperson::onFrame(frame,freecamera::requested.load(std::memory_order_acquire));
  };
  // At this point the shared Studio pipeline has already applied any entity
  // deformation. First-person effects decorate the FINAL draw only.
  m.studioDraw=[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,
                   void* context,modules::StudioNext next){
-  if(freecamera::requested.load()){next(context,bones,origin);return;}
+  if(firstperson::freecamerabody::passOriginalStudio(
+        freecamera::requested.load(std::memory_order_acquire))){
+   // Scheme A: do not move, rotate or hide the native player skeleton to
+   // match the detached camera. Keep the model at its true game-world pose.
+   next(context,bones,origin);return;
+  }
   firstperson::effects::draw(info,bones,origin,[&](Matrix3x4* transformed,const dango::Vec3& adjusted){
    next(context,transformed,adjusted);
   });
@@ -128,6 +136,7 @@ inline modules::Module create(){
  m.diagnostics=[] {return "body="+std::to_string(std::atomic_load(&firstperson::options)->enabled)+
   " view="+std::string(viewcompat::label(viewcompat::mode.load()))+
   " native="+std::to_string(firstperson::native::active.load())+
+  " worldBody="+std::to_string(firstperson::worldBodyActive.load())+
   " aligned="+std::to_string(firstperson::effects::dynamicApplied.load())+
   " rejected="+std::to_string(firstperson::effects::dynamicRejected.load());};
  m.quiesce=[] {firstperson::native::disable();};
