@@ -16,7 +16,8 @@ jobs:
           ASAN_OPTIONS: detect_leaks=0
         run: bash scripts/test.sh
   windows-x86:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - name: Install 32-bit Windows cross-compiler
