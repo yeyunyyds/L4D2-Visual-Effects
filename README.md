@@ -1,87 +1,53 @@
 # L4D2 Visual Effects
 
-求生之路 2 的客户端视觉效果插件，基于 **Windows x86 / L4N v2**。项目及 DLL 标识为 `L4D2Visual`。
+面向《Left 4 Dead 2》的 **Windows x86 / L4N v2** 客户端视觉效果插件。插件及 DLL 名称均为 `L4D2Visual`。
 
-当前正式版为 **0.8.0**，基于已通过用户验收的整合测试版发布，包含实体形变、共用准星识别修复、Tank 范围提醒和石头预测。
+**当前 `main`：v1.0.0 待发布候选源码。** 已完成主要功能的游戏内验收，正在验证正式版本构建；**尚未创建 v1.0.0 标签或 Release**。现有公开正式版仍是 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0)。候选编译包可在 [GitHub Actions](https://github.com/yeyunyyds/L4D2-Visual-Effects/actions) 中对应 `main` 提交的 Artifact 获取。
 
-[下载正式版](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) · [安装说明](docs/INSTALL.md) · [更新说明](docs/releases/v0.8.0.md) · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip)
+## 功能
 
-## 功能与入口
-
-| 主菜单入口 | 内容 | 总开关默认 |
+| 菜单入口 | 功能 | 默认 |
 | --- | --- | --- |
-| 实体缩放与拉伸 | 整体大小、XYZ 比例、实体分类与准星识别；子菜单包含「邦友的酒」周期拉伸 | 形变关 |
-| 第一人称身体 | 本机身体显示、头部与手臂骨骼隐藏、动态定位及逐模型校准 | 关 |
-| Tank 行为预测 | 朝向、估算攻击扇区、动作计时、样式与位置、范围内提醒 | 关 |
-| Tank 石头预测 | 绿色轨迹、静态世界落点标记及显示外观 | 关 |
-| 菜单 | 外观设置、Info / Debug 日志级别 | Info |
+| 实体缩放与拉伸 | 实体分类、准星识别、整体/XYZ 形变、「邦友的酒」周期拉伸与范围触发 | 关闭 |
+| 第一人称身体（FPB） | 原生角色身体显示、头/手臂骨骼隐藏、动态锚点、逐模型校准和可选第三人称兼容 | 关闭 |
+| FreeCamera | WASD/鼠标自由飞行、Space 上升、Shift 下降、速度设置、第一人称武器隐藏 | 关闭，F6 绑定默认关闭 |
+| Tank 行为预测 | 朝向、攻击范围、动作计时、红色 HUD 范围提醒、建筑遮挡修复 | 关闭 |
+| Tank 石头预测 | 轨迹与静态世界落点、绘制样式配置 | 关闭 |
+| 菜单与诊断 | F10 菜单、外观、Info/Debug 日志与各模块状态 | Info 日志 |
 
-手动识别在「实体缩放与拉伸 → 邦友的酒 → 实体分类」和「实体缩放与拉伸」中使用同一套目标身份：默认优先角色本体，可切换候选或「本机手持」，再独立调整武器/附件。使用已校验的客户端射线和身体范围；切图、失败、角色资料不足时不沿用旧识别。类别开关作用于同类型/角色的全部实体，不是临时实体实例。
+**FPB** 使用经过验证的原生 `C_TerrorPlayer::DrawModel` 路径，启用时只修改本地人物绘制门控中的一字节跳转位移，关闭时检查原始字节恢复；异常时报告 `Unknown`，不会盲目覆盖第三方修改。已移除纯诊断型 `ShouldDraw` Hook。FPB 关闭时不会再额外读取 Studio 模型数据。
 
-Tank 范围提醒位于「Tank 行为预测 → 显示内容 → 攻击范围内提醒」。新配置中红线默认开，红色计时条/填充/描边默认关，Tank 总开关仍默认关；原有条、方向及范围样式保留用户提供的默认值。旧配置的显式设置继续保留。
+**FreeCamera** 可通过菜单直接切换；F6 绑定需要在菜单中单独开启，默认不占用 F6。三个 ClientMode Hook 在第一次实际请求 FreeCamera 时才安装，以后关闭时透传原生调用。第一人称武器隐藏与人物世界位置保持相互独立。菜单中的「运行数据与诊断」用于查看 Hook、运行阶段与计数。
 
-石头预测独立于 Tank 行为总开关：本功能关闭时不采样石头、不调用落点查询。开启后子项默认显示轨迹和落点，预测窗口500 ms。采用固定重力320和半尺寸16的假定碰撞箱，落点圆表示估算接触位置，不表示伤害范围；动态实体碰撞和网络延迟不保证准确。未包含刀石、自动攻击或 JSONL 采集。
+**Tank 遮挡修复** 使用只读的世界几何 `TraceRay` 判断。建筑遮住 Tank 时，预测 HUD 的计时条、方向箭头、范围线和红色填充同步隐藏；目标连线沿用原行为。三点射线是近似判断，不是逐像素深度测试，动态物体及半遮挡结果可能不同。**本版本不修改任何 Tank 或特感的原生 Glow 属性，也不包含特感独立描边功能。** 旧配置 `tankPrediction.warnOutline` 被忽略，不再保存。
 
+石头落点使用静态世界碰撞估算：固定重力 320，假定碰撞箱半尺寸 16；不代表实际命中区域，不保证动态实体碰撞或网络时序。实体分类、模型形变、HUD 等原有功能仍复用共享 Source / Studio / D3D9 接口。
 
-## 第一人称身体与日志设置
+## 安装与更新
 
-第一人称身体由本项目独立实现，使用游戏原生模型绘制路径，在不改变角色碰撞、
-游戏逻辑和网络实体的前提下，对本机角色的绘制骨骼进行调整。
+参见 [安装说明](docs/INSTALL.md)。下载候选 Artifact 后，解压得到 `bin/` 和 `README.md`，将 `bin/` 合并到游戏目录。**更新前完全退出游戏，备份 `L4D2Visual.dll` 和 `bin/neko/plugins/L4D2Visual/hud.json`**；不要替换游戏自带的 `studiorender.dll`。可保留旧配置；旧版 Glow 和喷漆键不再生效。
 
-**首次安装默认关闭第一人称身体。** 用户可在「第一人称身体」菜单中手动开启，
-并分别设置头部隐藏、手臂隐藏、动态定位、视角朝向跟随及逐模型校准。
-开启后使用已调试的显示参数：前后 / 左右 / 高度偏移为 `-13 / -1 / -1`。
-渲染效果仍取决于具体模型的骨骼和动画，不能保证所有姿态都完全避免穿模。
+只支持明确校验过的 Windows x86 游戏模块；指纹不匹配时相关原生功能会拒绝执行。对于第三方插件、特殊模型、不同 DXVK/D3D9 环境，不承诺全面兼容。客户端 HUD 的射线/计时预测也不代表服务器的真实判定。**不对联机或 VAC 安全作保证**，请先在离线环境验收。
 
-「第一人称身体 → 第三人称视角兼容」是**默认关闭的可选功能**。
-开启后会根据视角状态在第一人称身体处理与原生人物显示之间切换；
-不包含第三人称摄像机功能，也不对其他插件的行为或兼容性作承诺。
+## 构建及发布状态
 
-日志默认为 Info，仅保存事件和错误信息。需要周期性接口、绘制统计或模块状态快照时，
-可以在「菜单 → 日志级别」切换到 Debug 并保存设置。
-相关设计见[第一人称身体](docs/FIRST-PERSON-BODY-ANATOMY.md)与[日志说明](docs/LOGGING.md)。
-
-模块由 `feature_composition.hpp` 注册，公共 Studio 绘制路径仅使用中立回调，
-不直接依赖第一人称功能。当前分支的改动尚未独立发布新版本；
-已发布版本仍以仓库的 Release 与正式标签为准。
-
-## 安装与测试
-
-参见 [安装说明](docs/INSTALL.md) 与 [本次整合及验收项目](docs/MAIN-INTEGRATION.md)。安装包根目录仅 `bin/` 和 `README.md`，不再额外打包 LICENSE 文件或 `licenses/` 安装目录；完整 GPL-3.0 和第三方许可声明附在随包 README.md 中。配套源码单独提供，也可从 v0.8.0 标签获取。更新前完全退出游戏，备份已有 DLL 和 `hud.json`，保留图片目录。
-
-只需替换插件，不能替换游戏自带 `studiorender.dll`。原版与此前验证版本的 Studio 接入继续共用。首次启用原生形变、描边或场景射线后 DLL 可能固定到游戏进程结束，更新需要彻底退出游戏。
-
-- [实体缩放与拉伸](docs/ENTITY-TRANSFORM.md)
-- [共用准星识别修复](docs/AIM-IDENTIFICATION.md)
-- [Tank 范围提醒](docs/TANK-WARNINGS.md)
-- [Tank 石头预测设计及整合说明](docs/design/tank-rock-prediction.md)
-
-客户端显示和预测均不代表服务器真实命中/安全窗口。BSP 地图刷子、光束、粒子或不在网络实体目录的静态道具，不保证支持骨骼形变。
-
-## 构建
-
-正式版由 GitHub Actions 在 v0.8.0 标签触发后运行测试、构建 x86 DLL、打包、更新 zip 分支并发布 Release。下面命令用于开发环境；正式发布不依赖本地二进制。
+`main` 的候选工作流运行回归测试、构建 Windows x86 DLL、检查单层安装包并上传 Artifact，**不会创建标签或 Release**。用户完成此候选构建的实机验收后，才会另行决定是否发布 `v1.0.0`。
 
 ```sh
 ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
-CXX_X86=i686-w64-mingw32-g++ bash scripts/build-mingw.sh
+CXX_X86=i686-w64-mingw32-g++-posix bash scripts/build-mingw.sh
 python3 scripts/package.py
 ```
 
-测试使用原生 C++17 编译器和 ASan/UBSan；DLL 使用 Windows x86 MinGW，安装包需要已构建的 DLL。main 保留源码与文档；安装包和校验文件通过 zip 分支与 Release 提供，不放入 main。
+构建产物为 `build/L4D2Visual-1.0.0.zip`。源码、依赖许可与署名见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md) 和 [版本说明草案](docs/releases/v1.0.0.md)。安装包内的 README 附有完整许可内容。
 
-## 许可
+## 设计与说明
 
-GPL-3.0，见 [LICENSE](LICENSE)。DangoMusic、Skeeto 及第三方来源见 [NOTICE.md](NOTICE.md) 和 vendor 内许可证。不捆绑游戏 DLL、原版模型或第三方插件二进制。
+- [FreeCamera 与第一人称武器隐藏](docs/FREE-CAMERA.md)
+- [第一人称身体和骨骼处理](docs/FIRST-PERSON-BODY-ANATOMY.md)
+- [Tank 范围提醒与建筑遮挡](docs/TANK-WARNINGS.md)
+- [模块组成和运行时生命周期](docs/MODULE-ARCHITECTURE.md)
+- [石头预测](docs/design/tank-rock-prediction.md)
+- [日志说明](docs/LOGGING.md)
 
-自定义喷漆功能已移除：不再提供图片加载、T 键绑定、P2P 同步或自动发现。旧配置中的 `wallPictures` 与 `sprayP2P` 被忽略，下次保存设置时不再写出；已有图片与缓存文件不会自动删除。
-
-## 开发结构
-
-功能通过模块协议注册，菜单、配置、采集需求、生命周期和覆盖层调度与插件入口分离。
-注册点为 `src/feature_composition.hpp`，依赖边界与线程/恢复顺序见 [模块结构](docs/MODULE-ARCHITECTURE.md)。
-
-
-## FreeCamera 实验分支
-
-`experimental/free-camera-73c6dc8a` 基于第一人称身体更新版 `73c6dc8a`。新增默认关闭的自由摄像机，修复原原型菜单 930 未注册、ClientMode 指针层级和 L4D2 视角偏移差异。仅供离线测试，仍需实机验证。详见 `docs/FREE-CAMERA-PROTOTYPE.md`。
+本项目基于 GPL-3.0 发布，不捆绑游戏 DLL、游戏模型或其他插件二进制。

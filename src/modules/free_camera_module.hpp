@@ -56,14 +56,14 @@ inline bool action(std::uintptr_t id){
  if(id==937){freecamera::f6Binding=!freecamera::f6Binding.load();saveMessage=u8"F6 绑定已更新，保存设置后持久化";return true;}
  if(id==935){
   freecamera::hideViewmodel=!freecamera::hideViewmodel.load();
-  saveMessage=u8"已更改F6手臂/武器隐藏选项；保存设置后持久化";
+  saveMessage=u8"已更改第一人称手臂/武器隐藏选项；保存设置后持久化";
   return true;
  }
  return false;
 }
 inline modules::Module create(){
  modules::Module m;m.id="free-camera";m.menuOrder=2;
- m.rootItem=[] {return item(freecamera::enabled()?u8"FreeCamera [运行中] · 实验":u8"FreeCamera [关] · 实验",930);};
+ m.rootItem=[] {return item(freecamera::enabled()?u8"FreeCamera [运行中]":u8"FreeCamera [关]",930);};
  m.page=page;m.action=action;
  m.frame=freecamera::frame;
  m.load=[](const nlohmann::json& j){

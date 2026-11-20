@@ -20,7 +20,7 @@ inline void toggle(){bool value=!requested.load();requested=value;visual::render
 visual::EntityMenuState entityMenus;
 inline void storeProximity(visual::ProximitySettings settings){
  std::atomic_store(&visual::render::proximity,std::make_shared<const visual::ProximitySettings>(std::move(settings)));
- saveMessage=u8"范围实验设置未保存";
+ saveMessage=u8"范围触发设置未保存";
 }
 inline bool entityAction(uintptr_t id){
  auto frame=std::atomic_load(&source_entities::snapshot);entityMenus.observe(*frame,*std::atomic_load(&visual::render::selection));visual::aimruntime::poll(entityMenus,frame->epoch);
@@ -95,7 +95,7 @@ inline std::optional<std::string> page(uintptr_t id){
  if(id==109)return entityMenus.triggers();
  if(id==107)return "\"性能与兼容\" {"+
   item(u8"骨骼上限："+std::to_string(visual::render::boneLimit.load())+u8"（切换128/256）",118)+
-  item(visual::render::compatibility.load()?u8"渲染模式：完整兼容":u8"渲染模式：保留快速路径（实验）",119)+
+  item(visual::render::compatibility.load()?u8"渲染模式：完整兼容":u8"渲染模式：保留快速路径",119)+
   row(u8"快速模式可能漏掉部分主模型")+item(u8"保存设置",101)+"}";
  if(id==102){return "\"动画细调\" {"+
  item(u8"动画预设："+std::string(visual::presetName(parameters->preset)),116)+
@@ -106,10 +106,10 @@ inline std::optional<std::string> page(uintptr_t id){
  item(u8"恢复动画默认：0.5秒 / 0.5～1.1",117)+item(u8"保存设置",101)+"}";}
  if(id==24){std::string body=row(visual::render::status.load());body+=row(std::string(u8"Studio配置：")+visual::render::studioProfile.load());body+=row("Camera: "+std::string(source_camera::status()));body+=row("Entities: "+f->status);body+=row("Identify: "+std::string(visual::render::identifyReason.load()));body+=row("Pose: "+std::string(visual::render::poseReason.load()));body+=row("Engine/Studio: "+std::to_string(visual::render::engineCalls.load())+" / "+std::to_string(visual::render::studioCalls.load()));body+=row("Matched/Drawn: "+std::to_string(visual::render::identified.load())+" / "+std::to_string(visual::render::drawn.load()));body+=row(visual::diagnostics::writable?u8"日志已写入 L4D2Visual/L4D2Visual.log":u8"日志写入失败，请检查目录权限");return "\"L4D2Visual · 诊断\" {"+body+"}";}
  auto proximity=std::atomic_load(&visual::render::proximity);
- std::string experimental=!proximity->enabled?u8"范围实验：关":visual::render::proximityActive.load()?u8"范围实验：已触发":u8"范围实验：待机";
+ std::string proximityLabel=!proximity->enabled?u8"范围触发：关":visual::render::proximityActive.load()?u8"范围触发：已触发":u8"范围触发：待机";
  if(id==300)return "\"邦友的酒\" {"+item(requested?u8"邦友的酒：开":u8"邦友的酒：关",100)+
  item(u8"实体分类",103)+item(u8"手动识别与开关",104)+item(u8"动画预设与细调",102)+item(u8"性能与兼容",107)+
- item(experimental,108)+item(u8"接口与运行诊断",24)+item(u8"保存设置",101)+"}";
+ item(proximityLabel,108)+item(u8"接口与运行诊断",24)+item(u8"保存设置",101)+"}";
  return {};
 }
 inline bool action(uintptr_t id){if(entityAction(id))return true;if(id==100)toggle();if(id>=110&&id<=117){auto a=*std::atomic_load(&visual::render::animation);a=visual::adjustAnimation(a,unsigned(id));std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(a));visual::render::startedAt=GetTickCount64();saveMessage=u8"动画设置未保存";}if(id==119){visual::render::compatibility=!visual::render::compatibility.load();saveMessage=u8"渲染模式未保存";}if(id==118){visual::render::boneLimit=visual::nextBoneLimit(visual::render::boneLimit.load());saveMessage=u8"骨骼上限未保存";}return id==100||(id>=110&&id<=119);}
@@ -123,9 +123,9 @@ inline void onFrame(const dango::GameCameraFrame& frame){
   std::atomic_store(&visual::render::proximityTargets,std::shared_ptr<const visual::ProximityResult>(std::move(targets)));
  }
  auto targets=std::atomic_load(&visual::render::proximityTargets);
- bool experimental=requested&&frame.active&&targets->epoch==frame.epoch&&frame.tick>=targets->tick&&frame.tick-targets->tick<=250&&proximity->enabled&&targets->active;
- bool wasSpatial=visual::render::proximityActive.exchange(experimental,std::memory_order_relaxed);
- if(experimental&&!wasSpatial)visual::render::startedAt=GetTickCount64();
+ bool proximityTriggered=requested&&frame.active&&targets->epoch==frame.epoch&&frame.tick>=targets->tick&&frame.tick-targets->tick<=250&&proximity->enabled&&targets->active;
+ bool wasSpatial=visual::render::proximityActive.exchange(proximityTriggered,std::memory_order_relaxed);
+ if(proximityTriggered&&!wasSpatial)visual::render::startedAt=GetTickCount64();
  visual::render::proximityCount.store(unsigned(targets->inRange.size()),std::memory_order_relaxed);
  visual::render::proximitySources.store(targets->sources,std::memory_order_relaxed);
  if(previous!=inventory||previousSelection!=selection||previousProximity!=proximity||previousEpoch!=frame.epoch||previousGameActive!=bool(frame.active)){

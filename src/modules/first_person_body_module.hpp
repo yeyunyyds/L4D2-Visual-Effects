@@ -69,7 +69,7 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
   row(visual::firstperson::effects::dynamicStatus.load())+row(visual::firstperson::effects::dynamicSource.load())+
   row(visual::firstperson::effects::headStatus.load())+row(visual::firstperson::effects::armStatus.load())+
   row(visual::firstperson::effects::offsetStatus.load())+
-  row(u8"渲染效果与第三方MOD仍需实机确认")+"}";}
+  row(u8"模型MOD与游戏版本的兼容性取决于实际环境")+"}";}
 
  return std::nullopt;
 }
