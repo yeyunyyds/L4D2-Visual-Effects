@@ -1,11 +1,14 @@
 #include "special_glow_settings.hpp"
 #include "entity_occlusion.hpp"
 #include "json.hpp"
+#include "dango/hud_menu_policy.hpp"
 #include <stdexcept>
 #include <iostream>
 using namespace visual;
 static void check(bool good){if(!good)throw std::runtime_error("special glow / occlusion regression");}
 int main(){
+ check(dango::hud::opensChild(940)&&dango::hud::opensChild(950)&&dango::hud::opensChild(957));
+ check(!dango::hud::opensChild(4000)&&!dango::hud::opensChild(4017)&&!dango::hud::opensChild(4147));
  specialglow::Settings cfg;
  check(!cfg.any()&&!cfg.usesVisibility());
  for(unsigned i=0;i<SpecialCount;++i)check(!cfg.types[i].enabled&&!cfg.types[i].occlude&&cfg.types[i].color==specialglow::defaults[i]);
