@@ -1,0 +1,99 @@
+name: L4D2Visual v1.0.0 candidate build (no release)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mingw-x86:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: FreeCamera movement smoke test
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror tests/free_camera_core_test.cpp -o /tmp/freecam_test
+          /tmp/freecam_test
+      - name: Run all regression tests
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: bash scripts/test.sh
+      - name: Build Windows x86 DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: bash scripts/build-mingw.sh
+      - name: Package candidate and verify native version
+        run: |
+          python3 scripts/package.py
+          python3 - <<'PY'
+          import json, struct
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive=Path("build/L4D2Visual-1.0.0.zip")
+          expected={"README.md","bin/neko/plugins/L4D2Visual.dll",
+                    "bin/neko/plugins/L4D2Visual/hud.json"}
+          with ZipFile(archive) as z:
+              assert z.testzip() is None
+              assert set(z.namelist())==expected
+              dll=z.read("bin/neko/plugins/L4D2Visual.dll")
+              offset=struct.unpack_from("<I",dll,0x3c)[0]
+              assert dll[offset:offset+4]==b"PE\x00\x00"
+              assert struct.unpack_from("<H",dll,offset+4)[0]==0x14c
+              assert b"L4D2Visual 1.0.0" in dll
+              cfg=json.loads(z.read("bin/neko/plugins/L4D2Visual/hud.json"))
+              assert cfg["firstPersonBody"]["enabled"] is False
+              assert cfg["tankPrediction"]["enabled"] is False
+              assert cfg["tankPrediction"]["occludeHud"] is True
+              assert "warnOutline" not in cfg["tankPrediction"]
+              assert cfg["freeCamera"]["f6Binding"] is False
+              assert "v1.0.0" in z.read("README.md").decode("utf-8")
+          stage=Path("build/candidate-install")
+          with ZipFile(archive) as z:z.extractall(stage)
+          assert {p.relative_to(stage).as_posix() for p in stage.rglob("*") if p.is_file()}==expected
+          assert not any(stage.rglob("*.zip")),"No ZIP inside GitHub Artifact"
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-1.0.0-candidate-MinGW-x86
+          path: build/candidate-install/
+          if-no-files-found: error
+  msvc-x86:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run native state, menu and module regression tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
+          if not exist build mkdir build
+          for %%T in (view_compat log_settings first_person_body_patch first_person_native_gate_policy first_person_body_math first_person_body_parts first_person_dynamic_alignment first_person_body_config module_host native_menu free_camera_activation_policy tank_occlusion) do (
+            cl /nologo /utf-8 /std:c++17 /EHsc /MT /I src /I vendor /I vendor\dango tests\%%T_test.cpp /Fe:build\%%T_test.exe
+            if errorlevel 1 exit /b 1
+            build\%%T_test.exe
+            if errorlevel 1 exit /b 1
+          )
+      - name: Build Windows x86 DLL with MSVC
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
+          cl /nologo /utf-8 /std:c++17 /EHsc /O2 /MT /DNOMINMAX /DWIN32_LEAN_AND_MEAN /LD /I src /I vendor /I vendor\imgui src\plugin.cpp vendor\imgui\imgui.cpp vendor\imgui\imgui_draw.cpp vendor\imgui\imgui_tables.cpp vendor\imgui\imgui_widgets.cpp vendor\imgui\backends\imgui_impl_dx9.cpp /link /OUT:build\L4D2Visual.dll /DEF:src\L4D2Visual.def user32.lib d3d9.lib comctl32.lib gdi32.lib uuid.lib advapi32.lib ole32.lib windowscodecs.lib
+          if errorlevel 1 exit /b 1
+      - name: Package standalone x86 candidate
+        shell: pwsh
+        run: |
+          python scripts/package.py
+          $archive = "build/L4D2Visual-1.0.0.zip"
+          if (!(Test-Path $archive)) { throw "Candidate installer missing" }
+          Expand-Archive -Path $archive -DestinationPath "build/candidate-install" -Force
+          $files = @(Get-ChildItem build/candidate-install -Recurse -File | ForEach-Object { $_.FullName.Substring((Resolve-Path build/candidate-install).Path.Length + 1).Replace('\','/') })
+          $expected = @("README.md","bin/neko/plugins/L4D2Visual.dll","bin/neko/plugins/L4D2Visual/hud.json")
+          if (@(Compare-Object $files $expected).Count -ne 0) { throw "Unexpected artifact contents" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-1.0.0-candidate-MSVC-x86
+          path: build/candidate-install/
+          if-no-files-found: error
