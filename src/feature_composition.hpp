@@ -9,6 +9,11 @@ namespace visual::features {
 inline modules::Host& host(){static modules::Host instance;return instance;}
 inline void prepareRender(){
  auto& h=host();h.prepare();
+ // Enabled-only Studio decoration; no FPB route in the off state.
+ render::studioDecorator=std::atomic_load(&firstperson::options)->enabled?
+  +[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,void* data,render::StudioNext next){
+    host().decorateStudio(info,bones,origin,data,next);
+  }:nullptr;
  render::modelObserver=h.observing()?+[](std::uint32_t header,int index,const dango::Vec3& origin){host().observeModel(header,index,origin);}:nullptr;
  render::studioObserver=h.observing()?+[](std::uint32_t header,std::uint32_t entity,const dango::Vec3& origin){host().observeStudio(header,entity,origin);}:nullptr;
 }
@@ -26,9 +31,7 @@ inline void install(){
  h.add(freecamerafeature::create());
  h.freeze();
  // Source Studio remains shared infrastructure, with a generic render callback.
- render::studioDecorator=+[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,void* data,render::StudioNext next){
-  host().decorateStudio(info,bones,origin,data,next);
- };
+ render::studioDecorator=nullptr; // FPB default off.
  hudruntime::configureModules(h);
  hudruntime::hud.configureOverlay([] {return host().needsNativeOverlay();},[](float w,float h){host().drawNativeOverlay(w,h);});
  hudruntime::hud.configureAddon([](std::uintptr_t page,float w,float h,bool focused){host().preview(page,w,h,focused);},[](std::uintptr_t page){return host().previewKeys(page);});

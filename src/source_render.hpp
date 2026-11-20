@@ -223,6 +223,10 @@ inline void studioPass(void* self,void* results,const void* info,Matrix3x4* bone
  else continuation(&context,bones,origin);
 }
 inline void __fastcall engineHook(void* self,void*,const DrawState& state,const ModelInfo& info,Matrix3x4* bones) {
+    if(!enabled.load(std::memory_order_acquire)&&
+       !modelObserver.load(std::memory_order_acquire)){
+        engineOriginal(self,state,info,bones);return;
+    }
     engineCalls.fetch_add(1,std::memory_order_relaxed);
     if(auto observe=modelObserver.load(std::memory_order_acquire))try{observe(state.header,info.index,info.origin);}catch(...){}
     Context current;
@@ -306,6 +310,12 @@ template<unsigned Capacity> __declspec(noinline) void studioCompose(void* self,v
  studioCore(self,nullptr,results,info,bones,flex,delayed,origin,flags);
 }
 inline void __fastcall studioHook(void* self,void*,void* results,const void* info,Matrix3x4* bones,float* flex,float* delayed,const Vec3& origin,int flags){
+ if(!enabled.load(std::memory_order_acquire)&&
+    !poseModifier.load(std::memory_order_acquire)&&
+    !studioObserver.load(std::memory_order_acquire)&&
+    !studioDecorator.load(std::memory_order_acquire)){
+  studioOriginal(self,results,info,bones,flex,delayed,origin,flags);return;
+ }
  auto modifier=poseModifier.load(std::memory_order_acquire);if(!modifier){studioCore(self,nullptr,results,info,bones,flex,delayed,origin,flags);return;}
  if(boneLimit.load()==256)studioCompose<256>(self,results,info,bones,flex,delayed,origin,flags,modifier);else studioCompose<128>(self,results,info,bones,flex,delayed,origin,flags,modifier);
 }

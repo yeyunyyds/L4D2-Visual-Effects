@@ -58,6 +58,7 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
       " eyeZ="+std::to_string(visual::viewcompat::eyeHeightUnits.load()))+
   row("FreeCamera world-anchored body: "+std::to_string(visual::firstperson::worldBodyActive.load()))+
   row("Native gate active/enables/restores/failures: "+std::to_string(visual::firstperson::native::active.load())+"/"+std::to_string(visual::firstperson::native::enables.load())+"/"+std::to_string(visual::firstperson::native::restores.load())+"/"+std::to_string(visual::firstperson::native::failures.load()))+
+  row("Native gate restoration verified: "+std::to_string(visual::firstperson::native::restoredVerified.load()))+
   row("Body Studio matches/shifts/rejects: "+std::to_string(visual::firstperson::effects::matched.load())+"/"+std::to_string(visual::firstperson::effects::shifted.load())+"/"+std::to_string(visual::firstperson::effects::shiftRejected.load()))+
   row("Head branch applied/rejected: "+std::to_string(visual::firstperson::effects::headHidden.load())+"/"+std::to_string(visual::firstperson::effects::headRejected.load()))+
   row("Arm branch applied/rejected: "+std::to_string(visual::firstperson::effects::armsHidden.load())+"/"+std::to_string(visual::firstperson::effects::armsRejected.load()))+
@@ -66,7 +67,6 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
   row(visual::firstperson::effects::dynamicStatus.load())+row(visual::firstperson::effects::dynamicSource.load())+
   row(visual::firstperson::effects::headStatus.load())+row(visual::firstperson::effects::armStatus.load())+
   row(visual::firstperson::effects::offsetStatus.load())+
-  row("ShouldDraw local/true/false: "+std::to_string(visual::firstperson::localCalls.load())+"/"+std::to_string(visual::firstperson::nativeTrue.load())+"/"+std::to_string(visual::firstperson::nativeFalse.load()))+
   row(u8"渲染效果与第三方MOD仍需实机确认")+"}";}
 
  return std::nullopt;
@@ -123,6 +123,11 @@ inline modules::Module create(){
  // deformation. First-person effects decorate the FINAL draw only.
  m.studioDraw=[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,
                   void* context,modules::StudioNext next){
+  // No model metadata, pointer reads or pose processing while FPB is off.
+  if(!std::atomic_load(&firstperson::options)->enabled||
+     !firstperson::native::active.load(std::memory_order_acquire)){
+   next(context,bones,origin);return;
+  }
   if(firstperson::freecamerabody::passOriginalStudio(
         freecamera::requested.load(std::memory_order_acquire))){
    // Scheme A: do not move, rotate or hide the native player skeleton to

@@ -8,7 +8,7 @@
 #include "first_person_body_patch.hpp"
 #include "module_verification.hpp"
 namespace visual::firstperson::native {
-inline std::atomic<bool> active{false},faulted{false};
+inline std::atomic<bool> active{false},faulted{false},restoredVerified{true};
 inline std::atomic<unsigned long> enables{0},restores{0},failures{0};
 inline std::atomic<const char*> state{u8"等待本机存活求生者"};
 inline std::mutex mutex;
@@ -39,9 +39,19 @@ inline bool patch(bool enable) noexcept {
  *reinterpret_cast<volatile unsigned char*>(target)=enable?branch::PassThrough:branch::Original;
  FlushInstructionCache(GetCurrentProcess(),target,1);
  bool restoredProtection=VirtualProtect(target,1,old,&ignored)!=FALSE;
- active=enable;
+ unsigned char confirmed=0;
+ const bool readback=source_entities::reader.read(
+  std::uint32_t(base+branch::DisplacementRva),&confirmed,1)&&
+  confirmed==(enable?branch::PassThrough:branch::Original);
+ if(!readback){
+  // Keep the gate in a pending-restoration state rather than report clean.
+  active=true;owner=module;restoredVerified=false;
+  fail(u8"DrawModel 补丁字节未验证；恢复状态未知");return false;
+ }
+ active=enable;restoredVerified=!enable;
  if(enable){owner=module;++enables;}else{owner=nullptr;++restores;}
  if(!restoredProtection){fail(u8"代码保护恢复失败；请退出游戏");return false;}
+ state=enable?u8"原生 DrawModel 分支已放行":u8"原生 DrawModel 字节已验证恢复";
  source_camera::log(enable?"FPB: native local draw gate opened (+0)":"FPB: native local draw gate restored (+0x13)");
  return true;
 }
