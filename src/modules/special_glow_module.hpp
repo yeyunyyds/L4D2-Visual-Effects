@@ -32,7 +32,7 @@ inline std::string page(std::uintptr_t id){
  const auto& current=settings->types[role];
  std::string out=ui::item(current.enabled?u8"描边：[开]":u8"描边：[关]",4000+role);
  out+=ui::item(current.occlude?u8"建筑遮挡：[开] · 不透视":u8"建筑遮挡：[关] · 穿墙",4010+role);
- out+=ui::item(u8"颜色预设 · 选择（"+specialglow::colorText(current.color)+")",960+role);
+ out+=ui::item(u8"颜色预设 · 选择（"+specialglow::colorText(current.color)+u8"）",960+role);
  for(unsigned component=0;component<3;++component){
   std::string name=component==0?"R":component==1?"G":"B";
   unsigned idBase=4100+role*6+component*2;
