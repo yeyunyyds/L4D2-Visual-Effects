@@ -23,6 +23,7 @@ struct Settings {
  std::array<Rule,SpecialCount> types{};
  Settings(){for(unsigned i=0;i<SpecialCount;++i)types[i].color=defaults[i];}
  bool any()const{for(const auto& r:types)if(r.enabled)return true;return false;}
+ bool all()const{return std::all_of(types.begin(),types.end(),[](const Rule& r){return r.enabled;});}
  bool usesVisibility()const{for(const auto& r:types)if(r.enabled&&r.occlude)return true;return false;}
 };
 inline std::shared_ptr<const Settings> options=std::make_shared<const Settings>();
