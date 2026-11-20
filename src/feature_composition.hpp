@@ -1,6 +1,7 @@
 #pragma once
 #include "modules/deformation_module.hpp"
 #include "modules/tank_module.hpp"
+#include "modules/special_glow_module.hpp"
 #include "modules/rock_module.hpp"
 #include "modules/animation_module.hpp"
 #include "modules/first_person_body_module.hpp"
@@ -20,6 +21,7 @@ inline void install(){
  h.add(std::move(aim));
  h.add(deformationfeature::create());
  h.add(tankfeature::create());
+ h.add(specialglowfeature::create());
  h.add(rockfeature::create());
  h.add(animationfeature::create());
  h.add(firstpersonfeature::create());
