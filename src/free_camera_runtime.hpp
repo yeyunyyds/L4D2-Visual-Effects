@@ -94,7 +94,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  if(!last||now<last||now-last>1000){
   active=false;message="Waiting for CreateMove";return;
  }
- if(!camera.ready){camera.start(origin,angles);epoch=source_camera::epoch;haveAim=false;}
+ if(!camera.ready){camera.start(origin,angles);epoch=source_camera::epoch;}
  if(!camera.ready)return;
  if(!write(setup,64,&camera.origin,12)||!write(setup,76,&camera.angles,12)){
   ++viewRejected;disable("CViewSetup write failed");return;
@@ -106,6 +106,7 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  bool result=fn?fn(self,dt,cmd):false;
  ++cmdCount;
  if(!requested){haveAim=false;return result;}
+ if(!cmd||!cmd->command_number)return result; // Source may issue empty sample commands.
  if(!validCmd(cmd)){++cmdRejected;disable("CUserCmd layout mismatch; disabled");return result;}
  if(!haveAim){lockedAim=cmd->viewangles;haveAim=true;}
  lastInput=GetTickCount64();
