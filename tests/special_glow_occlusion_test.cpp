@@ -10,11 +10,13 @@ int main(){
  check(dango::hud::opensChild(940)&&dango::hud::opensChild(950)&&dango::hud::opensChild(957));
  check(!dango::hud::opensChild(4000)&&!dango::hud::opensChild(4017)&&!dango::hud::opensChild(4147));
  specialglow::Settings cfg;
- check(!cfg.any()&&!cfg.usesVisibility());
+ check(!cfg.any()&&!cfg.all()&&!cfg.usesVisibility());
  for(unsigned i=0;i<SpecialCount;++i)check(!cfg.types[i].enabled&&!cfg.types[i].occlude&&cfg.types[i].color==specialglow::defaults[i]);
  cfg.types[0].enabled=true;cfg.types[0].occlude=true;cfg.types[0].color=specialglow::rgb(17,150,255);
  cfg.types[7].enabled=true;cfg.types[7].color=specialglow::rgb(100,20,1);
- check(cfg.any()&&cfg.usesVisibility());
+ check(cfg.any()&&!cfg.all()&&cfg.usesVisibility());
+ auto all=cfg;for(auto& role:all.types)role.enabled=true;
+ check(all.any()&&all.all());all.types[4].enabled=false;check(all.any()&&!all.all());
  nlohmann::json saved;specialglow::writeSettings(saved,cfg);
  auto decoded=specialglow::readSettings(saved);
  check(decoded.types[0].enabled&&decoded.types[0].occlude&&decoded.types[0].color==specialglow::rgb(17,150,255));
