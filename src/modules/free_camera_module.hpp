@@ -7,32 +7,45 @@
 namespace visual::freecamerafeature {
 using namespace visual::ui;
 inline std::optional<std::string> page(std::uintptr_t id){
- if(id!=930)return std::nullopt;
- return "\"FreeCamera · 实验\" {"+
- item(freecamera::enabled()?u8"自由摄像机：[运行中]":freecamera::requested.load()?u8"自由摄像机：[启动中]":u8"自由摄像机：[关闭]",931)+
- item(freecamera::hideViewmodel.load()?u8"F6 隐藏第一人称手臂和武器：[开]":u8"F6 隐藏第一人称手臂和武器：[关]",935)+
- row(std::string("ViewModel: ")+freecamera::viewModelHookStatus.load())+
- row("ViewModel checks/native-visible/hidden: "+
-     std::to_string(freecamera::viewModelCalls.load())+"/"+
-     std::to_string(freecamera::viewModelNativeTrue.load())+"/"+
-     std::to_string(freecamera::viewModelHidden.load()))+
- row(std::string("Hook: ")+(freecamera::bound?"ready":"unavailable"))+
- row(std::string("State: ")+freecamera::message.load())+
- row(std::string("Locator: ")+freecamera::locateDetail.load())+
- row("Camera layout: "+std::string(freecamera::detectedLayout.load()))+
- row("Menu/F6 poll/F6 edge: "+std::to_string(freecamera::menuToggles.load())+"/"+std::to_string(freecamera::keyPolls.load())+"/"+std::to_string(freecamera::keyToggles.load()))+
- row("View/Move: "+std::to_string(freecamera::viewCount.load())+"/"+std::to_string(freecamera::cmdCount.load()))+
- row("Rejected view/cmd: "+std::to_string(freecamera::viewRejected.load())+"/"+std::to_string(freecamera::cmdRejected.load()))+
- row(u8"F6 切换；WASD 移动；鼠标转向")+row(u8"Space 上升；Shift 下降；菜单开启仍可飞行")+
- row("Render steps/repeats/gaps: "+std::to_string(freecamera::renderSteps.load())+"/"+
-     std::to_string(freecamera::renderRepeats.load())+"/"+
-     std::to_string(freecamera::renderGaps.load()))+
- row("Render dt (ms): "+std::to_string(freecamera::renderDeltaMs.load()))+
- row("Speed current / max: "+std::to_string(int(freecamera::currentMovementSpeed.load()))+
-     " / "+std::to_string(int(freecamera::movementSpeed.load())))+
- row(u8"按渲染帧更新；平滑加减速；最高速度可调")+
- item(u8"最高速度 +50",932)+item(u8"最高速度 -50",933)+
- item(u8"紧急关闭",934)+item(u8"保存设置",101)+"}";
+ if(id!=930&&id!=936)return std::nullopt;
+ if(id==930){
+  // Keep the frequently adjusted options on one small page.
+  return "\"FreeCamera · 设置\" {"+
+   item(freecamera::enabled()?u8"自由摄像机：[运行中]":freecamera::requested.load()?u8"自由摄像机：[启动中]":u8"自由摄像机：[关闭]",931)+
+   item(freecamera::hideViewmodel.load()?u8"F6 隐藏第一人称手臂和武器：[开]":u8"F6 隐藏第一人称手臂和武器：[关]",935)+
+   row(u8"最高飞行速度："+std::to_string(int(freecamera::movementSpeed.load())))+
+   item(u8"最高速度 +50",932)+item(u8"最高速度 -50",933)+
+   item(u8"运行数据与诊断",936)+
+   row(u8"F6 切换；WASD 移动；鼠标转向")+
+   row(u8"Space 上升；Shift 下降；菜单开启仍可飞行")+
+   item(u8"紧急关闭",934)+item(u8"保存设置",101)+"}";
+ }
+ // Observational data is collected by existing camera/render callbacks,
+ // independent of which native HUD page is open; only its display moves.
+ return "\"FreeCamera · 运行数据与诊断\" {"+
+  row(std::string("ViewModel: ")+freecamera::viewModelHookStatus.load())+
+  row("ViewModel checks/native-visible/hidden: "+
+      std::to_string(freecamera::viewModelCalls.load())+"/"+
+      std::to_string(freecamera::viewModelNativeTrue.load())+"/"+
+      std::to_string(freecamera::viewModelHidden.load()))+
+  row(std::string("Hook: ")+(freecamera::bound?"ready":"unavailable"))+
+  row(std::string("State: ")+freecamera::message.load())+
+  row(std::string("Locator: ")+freecamera::locateDetail.load())+
+  row("Camera layout: "+std::string(freecamera::detectedLayout.load()))+
+  row("Menu/F6 poll/F6 edge: "+std::to_string(freecamera::menuToggles.load())+"/"+
+      std::to_string(freecamera::keyPolls.load())+"/"+
+      std::to_string(freecamera::keyToggles.load()))+
+  row("View/Move: "+std::to_string(freecamera::viewCount.load())+"/"+
+      std::to_string(freecamera::cmdCount.load()))+
+  row("Rejected view/cmd: "+std::to_string(freecamera::viewRejected.load())+"/"+
+      std::to_string(freecamera::cmdRejected.load()))+
+  row("Render steps/repeats/gaps: "+std::to_string(freecamera::renderSteps.load())+"/"+
+      std::to_string(freecamera::renderRepeats.load())+"/"+
+      std::to_string(freecamera::renderGaps.load()))+
+  row("Render dt (ms): "+std::to_string(freecamera::renderDeltaMs.load()))+
+  row("Speed current / max: "+std::to_string(int(freecamera::currentMovementSpeed.load()))+
+      " / "+std::to_string(int(freecamera::movementSpeed.load())))+
+  item(u8"返回 FreeCamera 设置",930)+"}";
 }
 inline bool action(std::uintptr_t id){
  if(id==931){++freecamera::menuToggles;freecamera::toggle();saveMessage=u8"FreeCamera 菜单开关已执行；请核对本页状态";return true;}

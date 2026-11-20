@@ -183,3 +183,18 @@ suppression, and it never changes the world-anchored FPB model.
 Unit tests cover native-result passthrough on F6 off or option off
 and forced false only when both are on. In-game efficacy and compatibility
 with other ClientMode patches remain to be tested.
+
+
+## FreeCamera compact settings page and diagnostics submenu
+
+FreeCamera settings page (930) now contains only action controls, the
+maximum-flight-speed summary, key guidance and an entry "运行数据与诊断"
+(page 936). Detailed ViewModel, hook, ClientMode locator, layout, input,
+render timing and movement statistics have moved to page 936 with a return
+entry to FreeCamera settings.
+
+All counters and runtime collection continue without change when the
+diagnostics page is not open. This is a presentation-only reorganization;
+F6 behavior, ViewModel hiding, camera hooks, configuration, saved settings
+and diagnostics logging are unaffected. No binary build or CI run was
+requested for this commit.
