@@ -58,7 +58,9 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
       " eyeZ="+std::to_string(visual::viewcompat::eyeHeightUnits.load()))+
   row("FreeCamera world-anchored body: "+std::to_string(visual::firstperson::worldBodyActive.load()))+
   row("Native gate active/enables/restores/failures: "+std::to_string(visual::firstperson::native::active.load())+"/"+std::to_string(visual::firstperson::native::enables.load())+"/"+std::to_string(visual::firstperson::native::restores.load())+"/"+std::to_string(visual::firstperson::native::failures.load()))+
+  row("Native gate phase: "+std::string(visual::firstperson::gatepolicy::label(visual::firstperson::native::phase.load())))+
   row("Native gate restoration verified: "+std::to_string(visual::firstperson::native::restoredVerified.load()))+
+  row(std::string("Native gate detail: ")+visual::firstperson::native::state.load())+
   row("Body Studio matches/shifts/rejects: "+std::to_string(visual::firstperson::effects::matched.load())+"/"+std::to_string(visual::firstperson::effects::shifted.load())+"/"+std::to_string(visual::firstperson::effects::shiftRejected.load()))+
   row("Head branch applied/rejected: "+std::to_string(visual::firstperson::effects::headHidden.load())+"/"+std::to_string(visual::firstperson::effects::headRejected.load()))+
   row("Arm branch applied/rejected: "+std::to_string(visual::firstperson::effects::armsHidden.load())+"/"+std::to_string(visual::firstperson::effects::armsRejected.load()))+
@@ -94,7 +96,14 @@ inline bool action(std::uintptr_t id){
    return true;
   }
  }
- if(id==861){auto s=*std::atomic_load(&visual::firstperson::options);s.enabled=!s.enabled;std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(s));if(!s.enabled)visual::firstperson::native::disable();saveMessage=s.enabled?u8"第一人称身体已请求开启，正在验证本机玩家；可通过诊断查看状态":u8"第一人称身体已关闭，原生可见性恢复";note(s.enabled?"FirstPersonBody menu toggle: ON requested":"FirstPersonBody menu toggle: OFF requested");return true;}
+ if(id==861){auto s=*std::atomic_load(&visual::firstperson::options);s.enabled=!s.enabled;
+  std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(s));
+  bool restored=true;if(!s.enabled)restored=visual::firstperson::native::disable();
+  saveMessage=s.enabled?u8"第一人称身体已请求开启，正在验证本机玩家":
+    restored?u8"第一人称身体已关闭，原生绘制状态已恢复":
+    u8"身体功能已关闭，但原生补丁恢复未确认；请查看诊断并完全退出游戏";
+  note(s.enabled?"FirstPersonBody menu toggle: ON requested":"FirstPersonBody menu toggle: OFF requested");return true;
+ }
  return false;
 }
 inline modules::Module create(){

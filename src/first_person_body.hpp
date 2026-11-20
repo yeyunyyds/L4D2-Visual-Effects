@@ -100,7 +100,10 @@ inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequeste
                               u8"本机原生 DrawModel 分支已放行";
 }
 inline void stop() noexcept {
- native::disable();clear();viewcompat::reset();cameraTransition.reset();status=u8"插件退出；原生可见性未修改";
+ const bool restored=native::disable();clear();viewcompat::reset();cameraTransition.reset();
+  status=restored&&native::restoredVerified.load()?
+     u8"插件退出：原生 DrawModel 字节已恢复":
+     u8"插件退出：DrawModel 恢复未确认，请完全退出游戏";
 }
 inline bool isDrawing() noexcept {return false;}
 }
