@@ -150,39 +150,63 @@ inline bool changeSlot(void** vt,unsigned index,void* expected,void* replacement
  DWORD ignored=0;VirtualProtect(vt+index,4,before,&ignored);
  return actual==expected;
 }
+// Verified exact 2026 client.dll SHA256 c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f
+// Disassembly: client+0x22854e stores EAX DIRECTLY into client+0x7b1b8c[esi].
+// ClientMode object = client+0x7c3240+index*0x148, vt = client+0x5bd4fc.
+// OverrideView[19] at client+0x26ff40; CreateMove[27] at client+0xc2d70.
+// The previous two-level read was incorrect.
+inline std::atomic<const char*> locateDetail{"not attempted"};
+inline std::atomic<int> locatedMode{-1};
+constexpr std::uintptr_t globalRva=0x7b1b8c,registerInsnRva=0x22854e;
+constexpr std::uintptr_t objectBaseRva=0x7c3240,objectStride=0x148;
+constexpr std::uintptr_t vtableRva=0x5bd4fc;
+constexpr std::uintptr_t originalViewRva=0x26ff40,originalMoveRva=0x0c2d70;
 inline void* locate(HMODULE dll){
- auto base=reinterpret_cast<std::uintptr_t>(dll);
- auto dos=reinterpret_cast<const IMAGE_DOS_HEADER*>(dll);
- if(!source_camera::readable(dos,sizeof(*dos))||dos->e_magic!=IMAGE_DOS_SIGNATURE)return nullptr;
- auto nt=reinterpret_cast<const IMAGE_NT_HEADERS*>(base+dos->e_lfanew);
- if(!source_camera::readable(nt,sizeof(*nt))||nt->Signature!=IMAGE_NT_SIGNATURE)return nullptr;
- auto sections=IMAGE_FIRST_SECTION(nt);
- unsigned matches=0;std::uintptr_t address=0;
- for(unsigned s=0;s<nt->FileHeader.NumberOfSections;s++){
-  if(!(sections[s].Characteristics&IMAGE_SCN_MEM_EXECUTE))continue;
-  auto start=base+sections[s].VirtualAddress;
-  auto size=std::min<std::size_t>(sections[s].Misc.VirtualSize,sections[s].SizeOfRawData);
-  if(size<8||!source_camera::readable(reinterpret_cast<void*>(start),size))continue;
-  auto b=reinterpret_cast<const std::uint8_t*>(start);
-  for(std::size_t n=0;n+8<=size;n++){
-   if(b[n]!=0x89||b[n+1]!=0x04||b[n+2]!=0xb5||b[n+7]!=0xe8)continue;
-   std::uint32_t ptr=0;std::memcpy(&ptr,b+n+3,4);
-   if(ptr>=base&&ptr+4<base+nt->OptionalHeader.SizeOfImage){if(!matches){matches=1;address=ptr;}else if(address!=ptr)matches=2;}
-  }
+ locateDetail="checking exact-build client mode profile";
+ locatedMode=-1;
+ if(sizeof(void*)!=4){locateDetail="x86 client required";return nullptr;}
+ const auto base=reinterpret_cast<std::uintptr_t>(dll);
+ if(!base){locateDetail="client.dll not loaded";return nullptr;}
+ unsigned char opcode[8]{};
+ if(!read(reinterpret_cast<void*>(base+registerInsnRva),0,opcode,sizeof(opcode))){
+  locateDetail="ClientMode registration opcode unreadable";return nullptr;
  }
- if(matches!=1)return nullptr; // old L4D2 ClientMode array signature
- // g_pClientMode references a slot array, then the first mode instance.
- // Old prototype dereferenced only once and interpreted the array as an object.
- void* modeSlots=nullptr;
- if(!read(reinterpret_cast<void*>(address),0,&modeSlots,4)||
-    !source_camera::readable(modeSlots,4))return nullptr;
- void* instance=nullptr;
- if(!read(modeSlots,0,&instance,4)||!source_camera::readable(instance,4))return nullptr;
- auto vt=*reinterpret_cast<void***>(instance);
- if(!vt||!source_camera::owns(vt,dll)||!source_camera::readable(vt,(moveSlot+1)*4)||
-    !source_camera::executable(vt[viewSlot])||!source_camera::executable(vt[moveSlot]))return nullptr;
- return instance;
+ std::uint32_t global=0;std::memcpy(&global,opcode+3,4);
+ if(opcode[0]!=0x89||opcode[1]!=0x04||opcode[2]!=0xb5||opcode[7]!=0xe8||
+    global!=std::uint32_t(base+globalRva)){
+  locateDetail="ClientMode registration opcode mismatch";return nullptr;
+ }
+ void* expectedVtable=reinterpret_cast<void*>(base+vtableRva);
+ void* expectedView=nullptr;void* expectedMove=nullptr;
+ if(!source_camera::readable(expectedVtable,(moveSlot+1)*4)||
+    !read(expectedVtable,viewSlot*4,&expectedView,4)||
+    !read(expectedVtable,moveSlot*4,&expectedMove,4)||
+    expectedView!=reinterpret_cast<void*>(base+originalViewRva)||
+    expectedMove!=reinterpret_cast<void*>(base+originalMoveRva)){
+  locateDetail="ClientMode vtable slot fingerprint mismatch";return nullptr;
+ }
+ bool anyRegistered=false;
+ for(int i=0;i<2;++i){
+  void* instance=nullptr;
+  if(!read(reinterpret_cast<void*>(base+globalRva+i*4),0,&instance,4)){
+   locateDetail="ClientMode global array unreadable";return nullptr;
+  }
+  if(!instance)continue;
+  anyRegistered=true;
+  if(instance!=reinterpret_cast<void*>(base+objectBaseRva+i*objectStride))continue;
+  void* vtable=nullptr;
+  if(!read(instance,0,&vtable,4))continue;
+  if(vtable!=expectedVtable||!source_camera::owns(vtable,dll))continue;
+  if(!source_camera::executable(expectedView)||!source_camera::executable(expectedMove))continue;
+  locatedMode=i;
+  locateDetail=i==0?"Verified ClientMode slot 0":"Verified ClientMode slot 1";
+  return instance;
+ }
+ locateDetail=anyRegistered?"ClientMode registered object identity mismatch":
+                             "ClientMode slots not yet initialized";
+ return nullptr;
 }
+
 inline void tryBind(){
  if(bound)return;
  auto now=GetTickCount64();if(now<nextProbe)return;nextProbe=now+2000;
@@ -194,7 +218,7 @@ inline void tryBind(){
   message="FreeCamera game build mismatch";return;
  }
  auto instance=locate(dll);
- if(!instance){message="ClientMode signature not found/ambiguous";return;}
+ if(!instance){message=locateDetail.load();return;}
  auto vt=*reinterpret_cast<void***>(instance);
  auto v=vt[viewSlot],m=vt[moveSlot];
  if(v==reinterpret_cast<void*>(&overrideView)||m==reinterpret_cast<void*>(&createMove)){
@@ -212,7 +236,7 @@ inline void tryBind(){
   message="CreateMove hook conflict";return;
  }
  bound=true;message="FreeCamera hooks ready; press F6";
- source_camera::log("FreeCamera: experimental ClientMode view[19] move[27] installed");
+ source_camera::log(std::string("FreeCamera: verified 2026 ClientMode bound index=")+std::to_string(locatedMode.load())+" view[19] move[27]");
 }
 inline void frame(const dango::GameCameraFrame& f){
  if(!f.active){disable("FreeCamera reset on map exit");camera.ready=false;haveAim=false;lastInput=0;return;}
