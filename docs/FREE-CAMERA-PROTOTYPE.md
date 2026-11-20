@@ -149,22 +149,37 @@ CTerrorPlayer entity**, not a spawned body, dummy, or server-side object.
   bone pass-through, and both F6 transitions. No binary build/CI was requested.
 
 
-## F6 first-person viewmodel hide (default ON)
+## F6 first-person viewmodel hide: ClientMode predicate (default ON)
 
-The FreeCamera menu now offers "F6 隐藏第一人称手臂和武器", default
-enabled and saved to hud.json as the boolean freeCamera.hideViewmodel.
+The initial entity-inventory/DrawModelExecute filter did not hide the
+first-person hands and weapon in an in-game test. It has been removed.
 
-The shared DrawModelExecute[19] renderer applies an optional draw-only
-filter to the local player's validated CBaseViewModel renderable. The
-selection comes from the local player's linked viewmodel handle or the
-viewmodel's owner, plus validated handle/serial and live entity address.
-It is not based on the model name, so ordinary world weapons and the
-Scheme A world-anchored player body are unaffected. Filtering is active
-only while FreeCamera is running. If the viewmodel is unidentified,
-normal drawing is preserved rather than hiding unrelated models.
+The replacement uses **ClientMode::ShouldDrawViewModel[30]** as a narrow
+visibility decision, leaving the game's first-/third-person camera mode
+unchanged. This is not a third-person toggle: it only mimics the model
+visibility result while FreeCamera is requested and hideViewmodel=true.
 
-No r_drawviewmodel, sv_cheats, server.dll, gameplay entity or global HUD
-state is modified. The menu shows hidden draw calls and identification
-diagnostics. Standalone tests verify conservative class/identity matching,
-option-off and F6-off passthrough and stale/recycled entity rejection.
-Some mod-specific arms/attachments may require additional validation in game.
+The exact supported client.dll has SHA256
+c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f.
+Its known ClientMode vtable at client+0x5bd4fc contains:
+- OverrideView[19] at client+0x26ff40
+- CreateMove[27] at client+0x0c2d70
+- ShouldDrawViewModel[30] at client+0x2286b0
+
+Disassembly shows a no-argument, boolean-return function at slot 30.
+The runtime validates the on-disk DLL SHA256, PE profile and method
+machine-code prefix before replacing the vtable slot. Existing executable
+hooks on that slot are chained: the original visibility decision is called
+exactly once, then masked to false only when F6+hideViewmodel are both on.
+If binding fails, the camera continues but native ViewModel display is
+retained; this is visible in the menu diagnostics.
+
+The menu flag remains default ON, persistent under
+\`freeCamera.hideViewmodel\` in hud.json. Counters show
+ViewModel checks/native-visible/hidden. It does not use r_drawviewmodel,
+sv_cheats, server.dll, the viewmodel entity list, or DrawModelExecute
+suppression, and it never changes the world-anchored FPB model.
+
+Unit tests cover native-result passthrough on F6 off or option off
+and forced false only when both are on. In-game efficacy and compatibility
+with other ClientMode patches remain to be tested.

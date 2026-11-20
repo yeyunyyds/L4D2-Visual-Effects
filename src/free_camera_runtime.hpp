@@ -3,6 +3,7 @@
 // Indexes and field offsets below are SDK-derived hypotheses; actual 2026
 // target DLL must be validated in-game before use outside offline tests.
 #include "free_camera_core.hpp"
+#include "free_camera_viewmodel_policy.hpp"
 #include "module_verification.hpp"
 #include "dango/source_camera.hpp"
 #include <windows.h>
@@ -16,6 +17,10 @@
 namespace visual::freecamera {
 using core::Vec;
 inline std::atomic<bool> requested{false},bound{false},active{false},paused{false};
+inline std::atomic<bool> viewModelHookBound{false};
+inline std::atomic<const char*> viewModelHookStatus{"ViewModel predicate hook not installed"};
+inline std::atomic<unsigned long> viewModelCalls{0},viewModelHidden{0},viewModelNativeTrue{0};
+inline std::atomic<ULONGLONG> nextViewModelProbe{0};
 inline std::atomic<const char*> message{"FreeCamera off"};
 inline std::atomic<unsigned long> viewCount{0},cmdCount{0},viewRejected{0},cmdRejected{0};
 inline std::atomic<unsigned long> menuToggles{0},keyToggles{0},keyPolls{0};
@@ -34,9 +39,15 @@ inline std::atomic<unsigned long> renderSteps{0},renderRepeats{0},renderGaps{0};
 inline std::atomic<float> renderDeltaMs{0.f};
 inline Vec lockedAim{};inline bool haveAim=false;
 inline std::uint32_t epoch=0;
-inline void** table=nullptr;inline void* originalView=nullptr;inline void* originalMove=nullptr;
+inline void** table=nullptr;
+inline void* originalView=nullptr;inline void* originalMove=nullptr;
+using ViewModelCallback=bool(__thiscall*)(void*);
+inline ViewModelCallback originalViewModel=nullptr;
 inline ULONGLONG nextProbe=0;
-constexpr unsigned viewSlot=19,moveSlot=27;
+// Verified against SHA256 c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f.
+// IClientMode::ShouldDrawViewModel follows LevelShutdown in the vtable.
+constexpr unsigned viewSlot=19,moveSlot=27,viewModelSlot=30;
+constexpr std::uintptr_t originalViewModelRva=0x2286b0;
 struct Cmd {
  void* vptr;int command_number,tick_count;Vec viewangles;
  float forwardmove,sidemove,upmove;int buttons;unsigned char impulse,pad[3];
@@ -187,6 +198,20 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  }
  active=true;message="FreeCamera ACTIVE";
 }
+// Preserve the original client-mode decision and any upstream hook in the
+// chain. In F6 mode, override ONLY the viewmodel visibility result.
+inline bool __fastcall shouldDrawViewModel(void* self,void*) {
+ const auto original=originalViewModel;
+ if(!original)return true; // Fail open if unexpectedly not initialized.
+ const bool native=original(self);
+ ++viewModelCalls;
+ if(native)++viewModelNativeTrue;
+ const bool visible=viewmodel::policy::visible(requested.load(std::memory_order_acquire),
+                                               hideViewmodel.load(std::memory_order_acquire),
+                                               native);
+ if(native&&!visible)++viewModelHidden;
+ return visible;
+}
 inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  auto fn=reinterpret_cast<MoveCallback>(originalMove);
  bool result=fn?fn(self,dt,cmd):false;
@@ -284,8 +309,57 @@ inline void* locate(HMODULE dll){
  return nullptr;
 }
 
+// Bind the actual ClientMode::ShouldDrawViewModel[30], not an SDK guess.
+// Disassembly of the exact supported client.dll establishes the RVA and
+// no-argument BOOL return. Other ClientMode hooks still own their slots.
+inline void tryBindViewModel(){
+ if(viewModelHookBound.load(std::memory_order_acquire)||!bound||!table)return;
+ const auto now=GetTickCount64();
+ if(now<nextViewModelProbe.load(std::memory_order_relaxed))return;
+ nextViewModelProbe=now+2000;
+ const auto dll=source_camera::clientModule;
+ if(!dll||GetModuleHandleW(L"client.dll")!=dll){
+  viewModelHookStatus="client.dll changed; ViewModel hook declined";return;
+ }
+ const auto base=reinterpret_cast<std::uintptr_t>(dll);
+ // Checked against the source DLL with SHA256
+ // c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f.
+ constexpr unsigned char signature[]={
+  0x55,0x8b,0xec,0x83,0xec,0x08,0x53,0x56,
+  0x8b,0xd9,0xe8,0x71,0x9a,0xff,0xff
+ };
+ const auto expected=reinterpret_cast<const void*>(base+originalViewModelRva);
+ if(!source_camera::matchesImage(dll,source_camera::ClientTimestamp,
+       source_camera::ClientImageSize,"FreeCamera ViewModel client")||
+    !verifiedModuleFile(dll,"c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f")||
+    !source_camera::readable(expected,sizeof(signature))||
+    std::memcmp(expected,signature,sizeof(signature))!=0||
+    !source_camera::executable(expected)||
+    !source_camera::readable(table,(viewModelSlot+1)*sizeof(void*))){
+  viewModelHookStatus="ViewModel slot30 build/signature rejected; native drawing retained";
+  return;
+ }
+ auto upstream=table[viewModelSlot];
+ if(upstream==reinterpret_cast<void*>(&shouldDrawViewModel)||
+    !source_camera::executable(upstream)){
+  viewModelHookStatus="ViewModel slot30 hook conflict; native drawing retained";
+  return;
+ }
+ // Chaining a pre-existing executable hook matches the other ClientMode
+ // hooks; all original decisions are evaluated exactly once.
+ originalViewModel=reinterpret_cast<ViewModelCallback>(upstream);
+ if(!changeSlot(table,viewModelSlot,upstream,
+                reinterpret_cast<void*>(&shouldDrawViewModel))){
+  viewModelHookStatus="ViewModel slot30 compare-exchange conflict";
+  return;
+ }
+ viewModelHookBound=true;
+ viewModelHookStatus="ClientMode ShouldDrawViewModel[30] installed";
+ source_camera::log("FreeCamera: verified ClientMode ShouldDrawViewModel[30] hook installed");
+}
+
 inline void tryBind(){
- if(bound)return;
+ if(bound){tryBindViewModel();return;}
  auto now=GetTickCount64();if(now<nextProbe)return;nextProbe=now+2000;
  auto dll=source_camera::clientModule;
  if(!dll||!source_camera::hooked){message="Waiting for Source camera initialization";return;}
@@ -314,6 +388,7 @@ inline void tryBind(){
  }
  bound=true;message="FreeCamera hooks ready; press F6";
  source_camera::log(std::string("FreeCamera: verified 2026 ClientMode bound index=")+std::to_string(locatedMode.load())+" view[19] move[27]");
+ tryBindViewModel();
 }
 inline void frame(const dango::GameCameraFrame& f){
  if(!f.active){disable("FreeCamera reset on map exit");return;}
@@ -336,6 +411,13 @@ inline void poll(bool escape,bool /*menu*/,bool gameForeground){
 }
 inline void stop(){
  disable("FreeCamera stopped");
+ if(viewModelHookBound.exchange(false,std::memory_order_acq_rel)&&table){
+  if(!changeSlot(table,viewModelSlot,
+       reinterpret_cast<void*>(&shouldDrawViewModel),
+       reinterpret_cast<void*>(originalViewModel)))
+    source_camera::log("FreeCamera: downstream ViewModel hook owns slot; pinned thunk retained");
+ }
+ viewModelHookStatus="ViewModel predicate hook stopped";
  if(bound&&table){
   if(!changeSlot(table,moveSlot,reinterpret_cast<void*>(&createMove),originalMove))
    source_camera::log("FreeCamera: move hook downstream owns slot; pinned thunk retained");

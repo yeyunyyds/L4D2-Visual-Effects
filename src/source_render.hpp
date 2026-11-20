@@ -56,9 +56,6 @@ inline std::atomic<PoseModifier> poseModifier{nullptr};
 using StudioNext=void(*)(void*,Matrix3x4*,const Vec3&);
 using StudioDecorator=void(*)(const void*,Matrix3x4*,const Vec3&,void*,StudioNext);
 inline std::atomic<StudioDecorator> studioDecorator{nullptr};
-// Optional generic draw-only filter. Feature code lives in composition.
-using DrawSuppressor=bool(*)(std::uint32_t);
-inline std::atomic<DrawSuppressor> drawSuppressor{nullptr};
 inline HMODULE studioModule=nullptr;
 inline std::atomic<const char*> studioProfile{u8"尚未匹配"};
 struct Context {bool valid=false;DrawIdentity identity{};std::uint32_t header{},renderable{};std::uint64_t age{};int classId=-1;};
@@ -227,10 +224,6 @@ inline void studioPass(void* self,void* results,const void* info,Matrix3x4* bone
 }
 inline void __fastcall engineHook(void* self,void*,const DrawState& state,const ModelInfo& info,Matrix3x4* bones) {
     engineCalls.fetch_add(1,std::memory_order_relaxed);
-    // Skip only a separately verified first-person viewmodel renderable.
-    if(state.renderable==info.renderable)
-        if(auto filter=drawSuppressor.load(std::memory_order_acquire))
-            if(filter(info.renderable))return;
     if(auto observe=modelObserver.load(std::memory_order_acquire))try{observe(state.header,info.index,info.origin);}catch(...){}
     Context current;
     if(enabled.load())try{current=identify(state,info);}catch(...){rejected.fetch_add(1,std::memory_order_relaxed);}
@@ -368,7 +361,7 @@ inline void connect() {
     log("Visual DrawModelExecute[19] + Studio DrawModel[25] installed (offline-verified ABI; game test pending)");
 }
 inline void stop() {
-    enabled=false;drawSuppressor=nullptr;
+    enabled=false;
     if(engineTable && source_camera::readable(engineTable,20*4))
         patch(engineTable,19,reinterpret_cast<void*>(&engineHook),reinterpret_cast<void*>(engineOriginal));
     if(studioTable && source_camera::readable(studioTable,26*4))
