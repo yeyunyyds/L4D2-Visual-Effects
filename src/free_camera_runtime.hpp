@@ -48,16 +48,16 @@ inline bool write(void* object,unsigned offset,const void* in,unsigned size){
 inline bool viewFields(void* setup,Vec& p,Vec& a){
  // Source 2013 CViewSetup prefix: fov +56, viewmodel fov +60,
  // origin +64, angles +76, near +88, far +92. NO blind write.
- int w=0,h=0;float f=0,vf=0,near=0,far=0;
+ int w=0,h=0;float f=0,vf=0,nearPlane=0,farPlane=0;
  return read(setup,16,&w,4)&&read(setup,24,&h,4)&&
   read(setup,56,&f,4)&&read(setup,60,&vf,4)&&
   read(setup,64,&p,12)&&read(setup,76,&a,12)&&
-  read(setup,88,&near,4)&&read(setup,92,&far,4)&&
+  read(setup,88,&nearPlane,4)&&read(setup,92,&farPlane,4)&&
   w>=64&&w<=32768&&h>=64&&h<=32768&&
   std::isfinite(f)&&f>=35&&f<=160&&std::isfinite(vf)&&vf>20&&vf<180&&
   core::valid(p)&&core::valid(a)&&std::abs(a.x)<1000&&std::abs(a.y)<1000&&
-  std::isfinite(near)&&near>0&&near<100&&
-  std::isfinite(far)&&far>near+100&&far<2000000;
+  std::isfinite(nearPlane)&&nearPlane>0&&nearPlane<100&&
+  std::isfinite(farPlane)&&farPlane>nearPlane+100&&farPlane<2000000;
 }
 inline bool validCmd(const Cmd* c){
  return source_camera::readable(c,offsetof(Cmd,predicted)+1)&&
