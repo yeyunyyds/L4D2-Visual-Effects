@@ -17,12 +17,12 @@ inline std::string page(std::uintptr_t id){
  unsigned role=unsigned(id-950);
  if(id<950||role>=SpecialCount)return {};
  const auto& s=settings->types[role];
- std::string out=ui::item(s.enabled?u8"描边：[开]":u8"描边：[关]",1000+role);
- out+=ui::item(s.occlude?u8"建筑遮挡：[开] · 不透视":u8"建筑遮挡：[关] · 穿墙",1010+role);
- out+=ui::item(u8"轮换预设颜色："+specialglow::colorText(s.color),1020+role);
+ std::string out=ui::item(s.enabled?u8"描边：[开]":u8"描边：[关]",4000+role);
+ out+=ui::item(s.occlude?u8"建筑遮挡：[开] · 不透视":u8"建筑遮挡：[关] · 穿墙",4010+role);
+ out+=ui::item(u8"轮换预设颜色："+specialglow::colorText(s.color),4020+role);
  for(unsigned component=0;component<3;++component){
   std::string name=component==0?"R":component==1?"G":"B";
-  unsigned idBase=1300+role*6+component*2;
+  unsigned idBase=4100+role*6+component*2;
   out+=ui::item(name+" +16",idBase);
   out+=ui::item(name+" -16",idBase+1);
  }
@@ -32,10 +32,10 @@ inline std::string page(std::uintptr_t id){
 }
 inline bool action(std::uintptr_t id){
  unsigned role=SpecialCount,kind=0,component=0;int step=0;
- if(id>=1000&&id<1000+SpecialCount){role=unsigned(id-1000);kind=1;}
- else if(id>=1010&&id<1010+SpecialCount){role=unsigned(id-1010);kind=2;}
- else if(id>=1020&&id<1020+SpecialCount){role=unsigned(id-1020);kind=3;}
- else if(id>=1300&&id<1300+SpecialCount*6){role=unsigned(id-1300)/6;auto change=unsigned(id-1300)%6;kind=4;component=change/2;step=(change%2)?-16:16;}
+ if(id>=4000&&id<4000+SpecialCount){role=unsigned(id-4000);kind=1;}
+ else if(id>=4010&&id<4010+SpecialCount){role=unsigned(id-4010);kind=2;}
+ else if(id>=4020&&id<4020+SpecialCount){role=unsigned(id-4020);kind=3;}
+ else if(id>=4100&&id<4100+SpecialCount*6){role=unsigned(id-4100)/6;auto change=unsigned(id-4100)%6;kind=4;component=change/2;step=(change%2)?-16:16;}
  if(role>=SpecialCount)return false;
  auto updated=*std::atomic_load(&specialglow::options);auto& current=updated.types[role];
  if(kind==1)current.enabled=!current.enabled;
