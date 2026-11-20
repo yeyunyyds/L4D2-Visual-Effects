@@ -22,6 +22,8 @@ inline std::atomic<unsigned long> menuToggles{0},keyToggles{0},keyPolls{0};
 inline std::atomic<ULONGLONG> lastInput{0};
 // Highest velocity; not an instantaneous constant step.
 inline std::atomic<float> movementSpeed{1000.f};
+// F6 hides the first-person weapon and arms by default, not the world body.
+inline std::atomic<bool> hideViewmodel{true};
 inline std::atomic<float> currentMovementSpeed{0.f};
 inline core::Camera camera;
 inline std::mutex motionMutex;

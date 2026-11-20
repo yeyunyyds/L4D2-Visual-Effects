@@ -147,3 +147,24 @@ CTerrorPlayer entity**, not a spawned body, dummy, or server-side object.
   visual-only integration, not a fix for a suspected server.dll crash.
 - Unit tests cover normal vs detached policy, the native shoulder case,
   bone pass-through, and both F6 transitions. No binary build/CI was requested.
+
+
+## F6 first-person viewmodel hide (default ON)
+
+The FreeCamera menu now offers "F6 隐藏第一人称手臂和武器", default
+enabled and saved to hud.json as the boolean freeCamera.hideViewmodel.
+
+The shared DrawModelExecute[19] renderer applies an optional draw-only
+filter to the local player's validated CBaseViewModel renderable. The
+selection comes from the local player's linked viewmodel handle or the
+viewmodel's owner, plus validated handle/serial and live entity address.
+It is not based on the model name, so ordinary world weapons and the
+Scheme A world-anchored player body are unaffected. Filtering is active
+only while FreeCamera is running. If the viewmodel is unidentified,
+normal drawing is preserved rather than hiding unrelated models.
+
+No r_drawviewmodel, sv_cheats, server.dll, gameplay entity or global HUD
+state is modified. The menu shows hidden draw calls and identification
+diagnostics. Standalone tests verify conservative class/identity matching,
+option-off and F6-off passthrough and stale/recycled entity rejection.
+Some mod-specific arms/attachments may require additional validation in game.
