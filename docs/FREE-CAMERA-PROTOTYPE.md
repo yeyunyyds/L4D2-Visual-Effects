@@ -31,7 +31,7 @@ than forcing a vtable index.
 ## Why the first prototype was completely inactive
 
 - Main menu ID 930 was missing from the NativeHud opensChild allowlist, so the menu entry never navigated.
-- ClientMode was reached through only one pointer read, while L4D2's g_pClientMode signature points to a slot array (two pointer reads).
+- A subsequent attempted fix incorrectly used TWO pointer reads for g_pClientMode. Disassembly of this exact client.dll confirms its global array directly holds each object's pointer; a single read is correct.
 - Camera setup offsets matched generic SDK2013, not the alternative L4D2 CViewSetup layout: fov 0x34, origin 0x3c, angles 0x48. We now validate both and refuse ambiguous cases.
 - Added in-menu counts for toggle, F6 polling and F6 edges, and a camera layout label to separate UI errors from hooking/ABI errors.
 
