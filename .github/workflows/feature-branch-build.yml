@@ -1,8 +1,5 @@
 name: Feature branch build verification
 on:
-  push:
-    branches:
-      - feature/tank-occlusion-special-glow
   workflow_dispatch:
 permissions:
   contents: read
