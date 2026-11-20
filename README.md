@@ -47,7 +47,7 @@ Tank 范围提醒位于「Tank 行为预测 → 显示内容 → 攻击范围内
 
 ## 安装与测试
 
-参见 [安装说明](docs/INSTALL.md) 与 [本次整合及验收项目](docs/MAIN-INTEGRATION.md)。安装包根目录仅 `bin/` 和 `README.md`，许可证位于 bin 内；配套源码单独提供，也可从 v0.8.0 标签获取。更新前完全退出游戏，备份已有 DLL 和 `hud.json`，保留图片目录。
+参见 [安装说明](docs/INSTALL.md) 与 [本次整合及验收项目](docs/MAIN-INTEGRATION.md)。安装包根目录仅 `bin/` 和 `README.md`，不再额外打包 LICENSE 文件或 `licenses/` 安装目录；完整 GPL-3.0 和第三方许可声明附在随包 README.md 中。配套源码单独提供，也可从 v0.8.0 标签获取。更新前完全退出游戏，备份已有 DLL 和 `hud.json`，保留图片目录。
 
 只需替换插件，不能替换游戏自带 `studiorender.dll`。原版与此前验证版本的 Studio 接入继续共用。首次启用原生形变、描边或场景射线后 DLL 可能固定到游戏进程结束，更新需要彻底退出游戏。
 

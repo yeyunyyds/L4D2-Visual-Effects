@@ -34,6 +34,6 @@
 已验收的已有功能保持原设置；更新后可逐项检查识别、形变、Tank 提醒和石头，以及同时开启、Esc/恢复、切图和关闭还原。不同地图、MOD 或第三方插件的组合仍可能影响效果。
 
 
-安装包根目录仅有 bin/ 和 README.md。许可证在 `bin/neko/plugins/L4D2Visual/licenses/`。GPL-3.0，第三方出处见随包 NOTICE.md 和另附完整源码。
+安装包根目录仅有 `bin/` 和 `README.md`，不会生成独立的 `LICENSE`、`NOTICE` 文件或 `licenses/` 安装目录。GPL-3.0 全文和第三方 MIT 许可、署名信息统一附在随包 README.md 后半部分；仓库源码仍保留原始许可证文件。
 
 自定义喷漆功能已移除：不再提供图片加载、T 键绑定、P2P 同步或自动发现。旧配置中的 `wallPictures` 与 `sprayP2P` 被忽略，下次保存设置时不再写出；已有图片与缓存文件不会自动删除。
