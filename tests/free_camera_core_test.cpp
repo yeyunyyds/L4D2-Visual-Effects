@@ -1,4 +1,5 @@
 #include "../src/free_camera_core.hpp"
+#include "../src/free_camera_command_policy.hpp"
 #include <cassert>
 #include <cmath>
 using namespace visual::freecamera::core;
@@ -118,5 +119,37 @@ int main(){
  const auto discarded=queue.drop();
  assert(discarded.x==70&&discarded.y==5);
  assert(queue.peek().x==0&&queue.peek().y==0);
+
+
+ // Source's ExtraMouseSample CUserCmd has command_number == 0.
+ using visual::freecamera::commandpolicy::Kind;
+ using visual::freecamera::commandpolicy::classify;
+ assert(classify(-1)==Kind::Invalid);
+ assert(classify(0)==Kind::ExtraMouseSample);
+ assert(classify(1)==Kind::ServerCommand);
+ assert(classify(98765)==Kind::ServerCommand);
+ assert(!visual::freecamera::commandpolicy::shouldSample(-1));
+ assert(visual::freecamera::commandpolicy::shouldSample(0));
+
+ // 120 view/input frames with only 30 network CUserCmd updates.
+ // Extra samples must contribute the other 90 frames' mouse rotation.
+ MouseQueue combinedQueue;
+ Camera combinedCamera;combinedCamera.start({0,0,0},{0,0,0});
+ unsigned extraCalls=0,serverCalls=0;
+ std::int64_t inputTotal=0,appliedTotal=0;
+ for(int frame=0;frame<120;++frame){
+  const int num=frame%4==3?1+frame/4:0;
+  const auto type=classify(num);
+  assert(type!=Kind::Invalid);
+  if(type==Kind::ExtraMouseSample)++extraCalls;else ++serverCalls;
+  combinedQueue.push(2,0);inputTotal+=2;
+  const auto consumed=combinedQueue.take();
+  combinedCamera.look(float(consumed.x),float(consumed.y));
+  appliedTotal+=consumed.x;
+ }
+ assert(extraCalls==90&&serverCalls==30);
+ assert(inputTotal==240&&appliedTotal==inputTotal);
+ assert(combinedQueue.peek().x==0);
+ near(combinedCamera.angles.y,-5.28f,.001f);
 
 }

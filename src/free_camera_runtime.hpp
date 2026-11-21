@@ -5,6 +5,7 @@
 #include "free_camera_core.hpp"
 #include "free_camera_viewmodel_policy.hpp"
 #include "free_camera_activation_policy.hpp"
+#include "free_camera_command_policy.hpp"
 #include "module_verification.hpp"
 #include "dango/source_camera.hpp"
 #include <windows.h>
@@ -40,6 +41,7 @@ inline std::atomic<std::int64_t> mouseReceivedX{0},mouseReceivedY{0};
 inline std::atomic<std::int64_t> mouseAppliedX{0},mouseAppliedY{0};
 inline std::atomic<std::int64_t> mouseDroppedX{0},mouseDroppedY{0};
 inline std::atomic<std::uint64_t> mouseSamples{0},mouseZeroSamples{0};
+inline std::atomic<std::uint64_t> serverCmdSamples{0},extraMouseSamples{0},extraMouseNonzero{0};
 inline core::FrameClock renderClock;
 inline std::atomic<unsigned long> renderSteps{0},renderRepeats{0},renderGaps{0};
 inline std::atomic<float> renderDeltaMs{0.f};
@@ -104,7 +106,7 @@ inline bool viewFields(void* setup,Vec& p,Vec& a,ViewLayout& layout){
 }
 inline bool validCmd(const Cmd* c){
  return source_camera::readable(c,offsetof(Cmd,predicted)+1)&&
-  c->command_number>0&&core::valid(c->viewangles)&&
+  commandpolicy::shouldSample(c->command_number)&&core::valid(c->viewangles)&&
   std::abs(c->viewangles.x)<1000&&std::abs(c->viewangles.y)<1000&&
   std::isfinite(c->forwardmove)&&std::isfinite(c->sidemove);
 }
@@ -240,7 +242,18 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  bool result=fn?fn(self,dt,cmd):false;
  ++cmdCount;
  if(!requested)return result;
- if(!cmd||!cmd->command_number)return result;
+ if(!cmd)return result;
+ // Source's extra render-frame mouse sampler uses command_number == 0.
+ // These are valid camera inputs, even though no server command is sent.
+ const auto kind=commandpolicy::classify(cmd->command_number);
+ if(kind==commandpolicy::Kind::Invalid)return result;
+ if(kind==commandpolicy::Kind::ExtraMouseSample){
+  extraMouseSamples.fetch_add(1,std::memory_order_relaxed);
+  if(cmd->mousedx||cmd->mousedy)
+   extraMouseNonzero.fetch_add(1,std::memory_order_relaxed);
+ }else{
+  serverCmdSamples.fetch_add(1,std::memory_order_relaxed);
+ }
  // Preserve native commands until the camera is actually Active.
  // A fresh input timestamp allows OverrideView to complete startup.
  if(!active.load(std::memory_order_acquire)){
@@ -271,6 +284,8 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
    mouseDroppedX.fetch_add(cmd->mousedx,std::memory_order_relaxed);
    mouseDroppedY.fetch_add(cmd->mousedy,std::memory_order_relaxed);
   }
+  // The engine also calls SetViewAngles after ExtraMouseSample.
+  // Keep the world's player body locked while the free view rotates.
   cmd->viewangles=lockedAim;
   cmd->forwardmove=cmd->sidemove=cmd->upmove=0;
   cmd->buttons=0;cmd->impulse=0;cmd->weaponselect=0;

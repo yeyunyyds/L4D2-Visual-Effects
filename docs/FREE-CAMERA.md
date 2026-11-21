@@ -33,3 +33,9 @@ FreeCamera 不切换游戏的第三人称模式。FPB 若同时开启，会保�
 发生长渲染 Gap 时不再丢弃此前积累的鼠标角度，Gap 只停止移动速度。CreateMove 的鼠标增量放入有符号整数队列，积累不截断，每次真实渲染最多应用每轴 4096 计数，余量保留。暂停、切出游戏窗口或手动关闭时仍丢弃待处理输入，以避免恢复后突然转头。
 
 运行诊断新增 X/Y received/applied/dropped、pending、鼠标采样总数和零增量样本数。这些计数从 CreateMove 开始，不能证明 Windows 设备端是否出现输入丢失。无新增 Hook 或鼠标插值，不改飞行速度积分；修复仍须在服务器复验。
+
+## Source 额外鼠标采样（待联机实测）
+
+在游戏渲染帧率高于网络模拟 tick 时，Source 可调用 `CInput::ExtraMouseSample`，该函数生成 `command_number == 0` 的临时用户命令并走 `ClientMode::CreateMove`。旧版 FreeCamera 将零编号命令整体跳过，漏采渲染帧间的鼠标位移，并且未锁定额外采样后的世界人物视角。
+
+目前在同一现有 CreateMove Hook 中识别并处理这些临时命令，将鼠标 X/Y 增量纳入队列，同时照常锁定人物方向；正常网络命令也继续工作。不增加 Hook 或额外鼠标插值。诊断页列出 `Server cmds / extra mouse samples / extra with input`，用于检查当前 L4D2 版本是否走该采样路径。包含 120 个采样帧、30 个网络命令和 90 个额外采样的回归测试。此修复仍需在原服务器实机确认。

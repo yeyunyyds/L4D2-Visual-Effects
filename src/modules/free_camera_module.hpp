@@ -45,6 +45,10 @@ inline std::optional<std::string> page(std::uintptr_t id){
       std::to_string(freecamera::renderGaps.load()))+
   row("Render dt (ms): "+std::to_string(freecamera::renderDeltaMs.load()))+
   row("Mouse samples/zero: "+std::to_string(freecamera::mouseSamples.load())+"/"+std::to_string(freecamera::mouseZeroSamples.load()))+
+  row("Server cmds / extra mouse samples / extra with input: "+
+      std::to_string(freecamera::serverCmdSamples.load())+"/"+
+      std::to_string(freecamera::extraMouseSamples.load())+"/"+
+      std::to_string(freecamera::extraMouseNonzero.load()))+
   row("Mouse X received/applied/dropped: "+std::to_string(freecamera::mouseReceivedX.load())+"/"+std::to_string(freecamera::mouseAppliedX.load())+"/"+std::to_string(freecamera::mouseDroppedX.load()))+
   row("Mouse Y received/applied/dropped: "+std::to_string(freecamera::mouseReceivedY.load())+"/"+std::to_string(freecamera::mouseAppliedY.load())+"/"+std::to_string(freecamera::mouseDroppedY.load()))+
   row("Mouse pending X/Y: "+std::to_string(freecamera::queuedMouse().x)+"/"+std::to_string(freecamera::queuedMouse().y))+
@@ -94,6 +98,9 @@ inline modules::Module create(){
   " hideVM="+std::to_string(freecamera::hideViewmodel.load())+
   " f6Binding="+std::to_string(freecamera::f6Binding.load())+
   " vmHook="+std::to_string(freecamera::viewModelHookBound.load())+
+  " extraSamples="+std::to_string(freecamera::extraMouseSamples.load())+
+  " extraNonzero="+std::to_string(freecamera::extraMouseNonzero.load())+
+  " serverCmd="+std::to_string(freecamera::serverCmdSamples.load())+
   " mouseRX="+std::to_string(freecamera::mouseReceivedX.load())+
   " mouseAX="+std::to_string(freecamera::mouseAppliedX.load())+
   " mouseDX="+std::to_string(freecamera::mouseDroppedX.load())+
