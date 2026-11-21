@@ -70,7 +70,7 @@ inline bool action(std::uintptr_t id){
  return false;
 }
 inline modules::Module create(){
- modules::Module m;m.id="free-camera";m.menuOrder=2;
+ modules::Module m;m.id="free-camera";m.menuOrder=4;
  m.rootItem=[] {return item(freecamera::enabled()?u8"FreeCamera [运行中]":u8"FreeCamera [关]",930);};
  m.page=page;m.action=action;
  m.frame=freecamera::frame;
