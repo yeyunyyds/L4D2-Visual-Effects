@@ -1,0 +1,122 @@
+name: Finalize verified L4D2Visual v1.0.0
+on:
+  push:
+    branches: [main]
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: finalize-l4d2visual-v1.0.0
+  cancel-in-progress: false
+jobs:
+  finalize:
+    if: github.event.head_commit.message == 'publish v1.0.0 verified-artifacts'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download previously tested release assets from the exact source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p build
+          gh run download 44883504349 --repo "$GH_REPO" -n L4D2Visual-1.0.0-publish-assets --dir build
+      - name: Reverify CRC, SHA-256 and pinned source commit
+        run: |
+          cd build
+          sha256sum -c L4D2Visual-1.0.0.zip.sha256
+          sha256sum -c L4D2Visual-1.0.0-source.zip.sha256
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import json,struct
+          source="e4aaf424bc8980c256fe2eee952de00d226fb302"
+          expected={"README.md","bin/neko/plugins/L4D2Visual.dll","bin/neko/plugins/L4D2Visual/hud.json"}
+          with ZipFile("L4D2Visual-1.0.0.zip") as z:
+              assert z.testzip() is None
+              assert set(z.namelist())==expected
+              dll=z.read("bin/neko/plugins/L4D2Visual.dll")
+              pe=struct.unpack_from("<I",dll,0x3c)[0]
+              assert dll[pe:pe+4]==b"PE\x00\x00"
+              assert struct.unpack_from("<H",dll,pe+4)[0]==0x14c
+              assert b"L4D2Visual 1.0.0" in dll
+              readme=z.read("README.md").decode("utf-8")
+              assert "Source commit: "+source in readme
+              assert "正式版本" in readme
+              config=json.loads(z.read("bin/neko/plugins/L4D2Visual/hud.json"))
+              assert config["firstPersonBody"]["enabled"] is False
+              assert config["tankPrediction"]["enabled"] is False
+              assert config["freeCamera"]["f6Binding"] is False
+          with ZipFile("L4D2Visual-1.0.0-source.zip") as z:
+              assert z.testzip() is None
+              assert "docs/releases/v1.0.0.md" in z.namelist()
+              assert "src/free_camera_command_policy.hpp" in z.namelist()
+              assert "src/modules/free_camera_module.hpp" in z.namelist()
+          print("Verified original e4aaf424 release source, installer, CRC and SHA-256")
+          PY
+      - name: Verify existing draft has the same source target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          release_id="$(gh api "repos/$GH_REPO/releases?per_page=100" --jq '.[] | select(.tag_name=="v1.0.0" and .draft == true) | .id' | head -n 1)"
+          test -n "$release_id"
+          target="$(gh api "repos/$GH_REPO/releases/$release_id" --jq '.target_commitish')"
+          test "$target" = "e4aaf424bc8980c256fe2eee952de00d226fb302"
+          echo "Existing unpublished draft release $release_id has the exact original source commit."
+      - uses: actions/checkout@v4
+        with:
+          ref: zip
+          path: downloads
+          persist-credentials: true
+      - name: Update zip branch with verified installer and source assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          src,dst=Path("build"),Path("downloads")
+          names=("L4D2Visual-1.0.0.zip","L4D2Visual-1.0.0.zip.sha256",
+                 "L4D2Visual-1.0.0-source.zip","L4D2Visual-1.0.0-source.zip.sha256")
+          for name in names:shutil.copy2(src/name,dst/name)
+          readme=dst/"README.md"
+          lines=readme.read_text(encoding="utf-8").splitlines()
+          lines=[x for x in lines if not x.startswith("正式版：[1.0.0 安装包]")]
+          paragraph=("正式版：[1.0.0 安装包](L4D2Visual-1.0.0.zip) · "
+                     "[配套源码](L4D2Visual-1.0.0-source.zip) · "
+                     "[安装包 SHA-256](L4D2Visual-1.0.0.zip.sha256) · "
+                     "[源码 SHA-256](L4D2Visual-1.0.0-source.zip.sha256)。"
+                     "包含 FPB、FreeCamera 与 Tank 建筑遮挡。"
+                     "FreeCamera 的服务器鼠标兼容性仍待实机复验。"
+                     "更新前请完全退出游戏，备份 DLL 和 hud.json。")
+          lines.insert(2,paragraph)
+          lines=[x.replace("当前正式版：[0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0)",
+                           "当前正式版：[1.0.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0)") for x in lines]
+          readme.write_text("\n".join(lines)+"\n",encoding="utf-8")
+          PY
+          cd downloads
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md L4D2Visual-1.0.0.zip L4D2Visual-1.0.0.zip.sha256 L4D2Visual-1.0.0-source.zip L4D2Visual-1.0.0-source.zip.sha256
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish verified L4D2Visual 1.0.0 release assets'
+            git pull --rebase origin zip
+            git push origin HEAD:zip
+          fi
+      - name: Upload exactly four verified assets to the existing draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload v1.0.0 build/L4D2Visual-1.0.0.zip build/L4D2Visual-1.0.0.zip.sha256 build/L4D2Visual-1.0.0-source.zip build/L4D2Visual-1.0.0-source.zip.sha256 --clobber
+          gh release view v1.0.0 --json assets --jq '.assets[].name' | sort > /tmp/actual-assets
+          printf '%s\n' L4D2Visual-1.0.0-source.zip L4D2Visual-1.0.0-source.zip.sha256 L4D2Visual-1.0.0.zip L4D2Visual-1.0.0.zip.sha256 | sort > /tmp/expected-assets
+          diff -u /tmp/expected-assets /tmp/actual-assets
+      - name: Publish the verified draft; GitHub creates tag from draft target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release edit v1.0.0 --title 'L4D2Visual 1.0.0' --notes-file docs/releases/v1.0.0.md --draft=false --prerelease=false --latest
+          tag_sha="$(gh api "repos/$GH_REPO/git/ref/tags/v1.0.0" --jq '.object.sha')"
+          test "$tag_sha" = "e4aaf424bc8980c256fe2eee952de00d226fb302"
+          gh release view v1.0.0 --json isDraft,isPrerelease,tagName --jq '[.isDraft,.isPrerelease,.tagName]' 
