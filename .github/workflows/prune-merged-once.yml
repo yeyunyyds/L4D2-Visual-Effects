@@ -1,0 +1,85 @@
+name: One-time merged branch cleanup
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  remove-merged:
+    if: github.event.head_commit.message == 'maintenance: prune exactly 8 merged branches'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Preflight verify exact refs and ancestry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          targets=(
+            'compat/studio-tank|dc7d58d7c190709f10f4efe1b37e9ed8f324ee5d'
+            'experiment/tank-cooldown|049ddc8d741441cbb959090544e70c32dfc24bd5'
+            'experiment/tank-threat|d59dfc1ec884e61c6aab36c556f2009e396d492c'
+            'experimental/free-camera-73c6dc8a|eb4f26bae2f34788403ac86b31702c177b8d6e61'
+            'experimental/module-host-first-person-body|73c6dc8aefc7a0fedaed8c1826ab27aada1f2bd7'
+            'feature/entity-transform|31b01529f34461604eb657a84fa8a022b4bac928'
+            'feature/tank-rock-prediction|03543e0db569ee150d8c82d1f950ed8469675353'
+            'refactor/module-boundaries-remove-sprays|8107a7cb2c8843f1a4cf3d33aa82c2b42bd8b6eb'
+          )
+          test "${#targets[@]}" -eq 8
+          git cat-file -e "$GITHUB_SHA^{commit}"
+          for entry in "${targets[@]}"; do
+            branch="${entry%%|*}"
+            expected="${entry#*|}"
+            actual="$(gh api "repos/$GH_REPO/git/ref/heads/$branch" --jq '.object.sha')"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "::error::Ref changed for $branch"
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$expected" "$GITHUB_SHA"; then
+              echo "::error::Unmerged branch $branch"
+              exit 1
+            fi
+            echo "Verified merged: $branch at $expected"
+          done
+      - name: Delete only the eight verified branch refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          targets=(
+            'compat/studio-tank|dc7d58d7c190709f10f4efe1b37e9ed8f324ee5d'
+            'experiment/tank-cooldown|049ddc8d741441cbb959090544e70c32dfc24bd5'
+            'experiment/tank-threat|d59dfc1ec884e61c6aab36c556f2009e396d492c'
+            'experimental/free-camera-73c6dc8a|eb4f26bae2f34788403ac86b31702c177b8d6e61'
+            'experimental/module-host-first-person-body|73c6dc8aefc7a0fedaed8c1826ab27aada1f2bd7'
+            'feature/entity-transform|31b01529f34461604eb657a84fa8a022b4bac928'
+            'feature/tank-rock-prediction|03543e0db569ee150d8c82d1f950ed8469675353'
+            'refactor/module-boundaries-remove-sprays|8107a7cb2c8843f1a4cf3d33aa82c2b42bd8b6eb'
+          )
+          for entry in "${targets[@]}"; do
+            branch="${entry%%|*}"
+            expected="${entry#*|}"
+            actual="$(gh api "repos/$GH_REPO/git/ref/heads/$branch" --jq '.object.sha')"
+            test "$actual" = "$expected"
+            gh api --method DELETE "repos/$GH_REPO/git/refs/heads/$branch"
+            echo "Deleted: $branch"
+          done
+      - name: Verify all target refs are gone
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for branch in 'compat/studio-tank' 'experiment/tank-cooldown' 'experiment/tank-threat' 'experimental/free-camera-73c6dc8a' 'experimental/module-host-first-person-body' 'feature/entity-transform' 'feature/tank-rock-prediction' 'refactor/module-boundaries-remove-sprays'; do
+            if gh api "repos/$GH_REPO/git/ref/heads/$branch" >/dev/null 2>&1; then
+              echo "::error::Still exists: $branch"; exit 1
+            fi
+            echo "Absent: $branch"
+          done
