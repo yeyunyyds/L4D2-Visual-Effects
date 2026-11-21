@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.event.head_commit.message == 'release v1.0.0'
+    if: github.event.head_commit.message == 'release v1.0.0 retry'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
         run: |
           test "$GITHUB_REF" = "refs/heads/main"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git show -s --format=%s HEAD)" = "release v1.0.0"
+          test "$(git show -s --format=%s HEAD)" = "release v1.0.0 retry"
       - name: Install Windows x86 compiler
         run: |
           sudo apt-get update
@@ -92,16 +92,25 @@ jobs:
           name: L4D2Visual-1.0.0-publish-assets
           path: build/release-files/
           if-no-files-found: error
-      - name: Create draft release and matching v1.0.0 tag
+      - name: Create and verify the explicit v1.0.0 git tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag_sha="$(gh api "repos/$GH_REPO/git/ref/tags/v1.0.0" --jq '.object.sha' 2>/dev/null || true)"
+          if [ -z "$tag_sha" ]; then
+            gh api "repos/$GH_REPO/git/refs" -f ref='refs/tags/v1.0.0' -f sha="$GITHUB_SHA" >/dev/null
+            tag_sha="$(gh api "repos/$GH_REPO/git/ref/tags/v1.0.0" --jq '.object.sha')"
+          fi
+          test "$tag_sha" = "$GITHUB_SHA"
+      - name: Create or reuse the draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           if ! gh release view v1.0.0 >/dev/null 2>&1; then
-            gh release create v1.0.0 --target "$GITHUB_SHA" --draft --title 'L4D2Visual 1.0.0' --notes-file docs/releases/v1.0.0.md
+            gh release create v1.0.0 --verify-tag --draft --title 'L4D2Visual 1.0.0' --notes-file docs/releases/v1.0.0.md
           fi
-          tag_sha="$(gh api "repos/$GH_REPO/git/ref/tags/v1.0.0" --jq '.object.sha')"
-          test "$tag_sha" = "$GITHUB_SHA"
       - uses: actions/checkout@v4
         with:
           ref: zip
