@@ -39,3 +39,19 @@ FreeCamera 不切换游戏的第三人称模式。FPB 若同时开启，会保�
 在游戏渲染帧率高于网络模拟 tick 时，Source 可调用 `CInput::ExtraMouseSample`，该函数生成 `command_number == 0` 的临时用户命令并走 `ClientMode::CreateMove`。旧版 FreeCamera 将零编号命令整体跳过，漏采渲染帧间的鼠标位移，并且未锁定额外采样后的世界人物视角。
 
 目前在同一现有 CreateMove Hook 中识别并处理这些临时命令，将鼠标 X/Y 增量纳入队列，同时照常锁定人物方向；正常网络命令也继续工作。不增加 Hook 或额外鼠标插值。诊断页列出 `Server cmds / extra mouse samples / extra with input`，用于检查当前 L4D2 版本是否走该采样路径。包含 120 个采样帧、30 个网络命令和 90 个额外采样的回归测试。此修复仍需在原服务器实机确认。
+
+## 开发版：通过 hud.json 自由绑定快捷键（尚未发布）
+
+不需要游戏内录制按键。编辑 `bin/neko/plugins/L4D2Visual/hud.json` 中的 `freeCamera`：
+
+```json
+"freeCamera": {
+  "hideViewmodel": true,
+  "f6Binding": true,
+  "hotkey": "f6"
+}
+```
+
+将 `hotkey` 改成 `f7`、`f8`、`p`、`mouse4` 等即可；支持 F1–F24（F10 除外）、字母、数字、数字键盘、方向键、Tab、Enter、Insert、Delete、Home、End、PageUp/PageDown、空格、常见修饰键和鼠标中键/侧键。键名忽略大小写与前后空格。F10 已被 HUD 占用，Esc 用于菜单关闭，故不允许绑定。绑定到 WASD、Space、Shift 等游戏操作键会同时触发原有操作，不推荐。
+
+**`f6Binding` 仍是快捷键总开关**：可在 FreeCamera 设置菜单中开启，也可直接设为 `true`。现有旧配置未写 `hotkey` 时继续默认 F6。错误键名或非字符串类型会禁用快捷键触发，并在诊断中显示无效（不会悄悄切回 F6 造成误触）。为避免热键和数字菜单互相冲突，HUD 菜单打开时不触发快捷键。编辑后重启游戏加载配置；仅在 HUD 菜单内“保存设置”不会重读磁盘文件。

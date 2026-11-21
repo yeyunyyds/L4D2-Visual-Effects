@@ -6,6 +6,7 @@
 #include "free_camera_viewmodel_policy.hpp"
 #include "free_camera_activation_policy.hpp"
 #include "free_camera_command_policy.hpp"
+#include "free_camera_hotkey.hpp"
 #include "module_verification.hpp"
 #include "dango/source_camera.hpp"
 #include <windows.h>
@@ -20,6 +21,9 @@ namespace visual::freecamera {
 using core::Vec;
 inline std::atomic<bool> requested{false},bound{false},active{false},paused{false};
 inline std::atomic<bool> f6Binding{false};
+// Key is configured by hud.json freeCamera.hotkey; existing enable flag retained.
+inline std::atomic<int> hotkeyVk{hotkey::defaultVk};
+inline std::atomic<bool> hotkeyConfigValid{true};
 inline std::atomic<bool> viewModelHookBound{false};
 inline std::atomic<const char*> viewModelHookStatus{"ViewModel predicate hook not installed"};
 inline std::atomic<unsigned long> viewModelCalls{0},viewModelHidden{0},viewModelNativeTrue{0};
@@ -30,7 +34,7 @@ inline std::atomic<unsigned long> menuToggles{0},keyToggles{0},keyPolls{0};
 inline std::atomic<ULONGLONG> lastInput{0};
 // Highest velocity; not an instantaneous constant step.
 inline std::atomic<float> movementSpeed{1000.f};
-// F6 hides the first-person weapon and arms by default, not the world body.
+// FreeCamera may hide the first-person weapon and arms, not the world body.
 inline std::atomic<bool> hideViewmodel{true};
 inline std::atomic<float> currentMovementSpeed{0.f};
 inline core::Camera camera;
@@ -224,7 +228,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  active=true;message="FreeCamera ACTIVE";
 }
 // Preserve the original client-mode decision and any upstream hook in the
-// chain. In F6 mode, override ONLY the viewmodel visibility result.
+// chain. In FreeCamera mode, override ONLY the viewmodel visibility result.
 inline bool __fastcall shouldDrawViewModel(void* self,void*) {
  const auto original=originalViewModel;
  if(!original)return true; // Fail open if unexpectedly not initialized.
@@ -436,7 +440,7 @@ inline void tryBind(){
   changeSlot(vt,viewSlot,reinterpret_cast<void*>(&overrideView),v);
   message="CreateMove hook conflict";return;
  }
- bound=true;message="FreeCamera hooks ready; press F6";
+ bound=true;message="FreeCamera hooks ready";
  source_camera::log(std::string("FreeCamera: verified 2026 ClientMode bound index=")+std::to_string(locatedMode.load())+" view[19] move[27]");
  tryBindViewModel();
 }
@@ -446,11 +450,19 @@ inline void frame(const dango::GameCameraFrame& f){
  if(requested.load(std::memory_order_acquire))tryBind();
  if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");}
 }
-inline void poll(bool escape,bool /*menu*/,bool gameForeground){
+inline void poll(bool escape,bool menu,bool gameForeground){
  ++keyPolls;
- static bool held=false;bool now=key(VK_F6);bool edge=now&&!held;held=now;
- // Native HUD uses digit/navigation keys and does not capture the mouse.
- // Keep FreeCamera input active with its panel open. Esc and focus loss still pause.
+ static bool held=false;
+ static int previousVk=0;
+ const int vk=hotkeyVk.load(std::memory_order_acquire);
+ const bool now=vk>0&&key(vk);
+ // A new config key may already be down. Arm only after its first release.
+ const bool edge=(vk==previousVk)&&now&&!held;
+ held=now;
+ previousVk=vk;
+ // Do not toggle via hotkey while the native menu is open: digit/navigation
+ // key choices may otherwise trigger both a menu action and FreeCamera.
+ // Keep camera movement active with the menu open as before.
  const bool shouldPause=escape||!gameForeground;
  const bool previouslyPaused=paused.exchange(shouldPause);
  if(shouldPause&&!previouslyPaused){
@@ -458,7 +470,7 @@ inline void poll(bool escape,bool /*menu*/,bool gameForeground){
   camera.halt();latestInput={};dropMouseLocked();
   renderClock.reset();currentMovementSpeed=0.f;
  }
- if(edge&&f6Binding.load(std::memory_order_acquire)&&gameForeground&&!escape){++keyToggles;toggle();}
+ if(edge&&f6Binding.load(std::memory_order_acquire)&&hotkeyConfigValid.load(std::memory_order_acquire)&&gameForeground&&!escape&&!menu){++keyToggles;toggle();}
 }
 inline void stop(){
  disable("FreeCamera stopped");

@@ -18,6 +18,8 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror tests/free_camera_core_test.cpp -o /tmp/freecam_test
           /tmp/freecam_test
+          g++ -std=c++17 -Wall -Wextra -Werror tests/free_camera_hotkey_test.cpp -o /tmp/freecam_hotkey_test
+          /tmp/freecam_hotkey_test
       - name: Run all regression tests
         env:
           ASAN_OPTIONS: detect_leaks=0
