@@ -6,7 +6,7 @@ permissions:
   contents: write
 jobs:
   remove-merged:
-    if: github.event.head_commit.message == 'maintenance: prune exactly 8 merged branches'
+    if: github.event.head_commit.message == 'maintenance prune exactly 8 merged branches retry'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
