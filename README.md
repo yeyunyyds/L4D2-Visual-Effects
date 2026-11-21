@@ -1,5 +1,6 @@
 # L4D2 Visual Effects 下载
 
+正式版：[1.0.0 安装包](L4D2Visual-1.0.0.zip) · [配套源码](L4D2Visual-1.0.0-source.zip) · [安装包 SHA-256](L4D2Visual-1.0.0.zip.sha256) · [源码 SHA-256](L4D2Visual-1.0.0-source.zip.sha256)。包含 FPB、FreeCamera 与 Tank 建筑遮挡。FreeCamera 的服务器鼠标兼容性仍待实机复验。更新前请完全退出游戏，备份 DLL 和 hud.json。
 修复测试版：[0.8.1-fix-test1 安装包](L4D2Visual-0.8.1-fix-test1.zip) · [对应源码](L4D2Visual-0.8.1-fix-test1-source.zip) · [安装包校验](L4D2Visual-0.8.1-fix-test1.zip.sha256) · [源码校验](L4D2Visual-0.8.1-fix-test1-source.zip.sha256)。修复准星识别类别应用、Gnome/求生者/道具统一缩放、原生路径回退和形变菜单自动开启逻辑。用于实机验收，尚未替代 0.8.0 正式版；更新前请完全退出游戏并备份 DLL 与 hud.json。
 
 正式版：[0.8.0 安装包](L4D2Visual-0.8.0.zip) · [配套完整源码](L4D2Visual-0.8.0-source.zip) · [安装包校验](L4D2Visual-0.8.0.zip.sha256)。基于用户验收通过的整合版，由 GitHub CI 构建与发布。所有功能总开关默认关闭；新配置范围红线提醒默认开，其余提醒默认关。请完全退出游戏并备份 DLL、hud.json 后更新。
@@ -8,7 +9,7 @@
 
 Tank 石头实验（基于 0.7.2）：[demo4 安装包](L4D2Visual-0.7.2-tank-rock-demo4.zip) · [匹配源码](L4D2Visual-0.7.2-tank-rock-demo4-source.zip)。新增可调假定 AABB 扫掠和手动刀石几何提示：准星有限射线与预知位置的假定箱相交时记录候选；距离、提前量、前摇假定与偏移可手调。**仅只读实验提示，不自动攻击，不证明实际刀中；新扫掠与提示仍待实机验证。** 功能开关默认关闭，参数可保存。子菜单标题“Tank 石头实验 demo4”，包内附模型、测试步骤与限制说明。不包含后续 0.7.4 / 0.8.0 的变更。[demo3 历史包](L4D2Visual-0.7.2-tank-rock-demo3.zip)。
 
-当前正式版：[0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0)。本分支仅提供安装包与校验文件；源码在默认 main 分支。
+当前正式版：[1.0.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0)。本分支仅提供安装包与校验文件；源码在默认 main 分支。
 
 功能预览：[0.8.0-transform-preview3](L4D2Visual-0.8.0-transform-preview3.zip)，新增 Tank 范围内提醒：计时条红底、范围红线/填充、实验性原生描边，均默认关闭；保留实体形变和准星识别。源码见 [v0.8.0-transform-preview3](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v0.8.0-transform-preview3)。
 
