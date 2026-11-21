@@ -97,10 +97,10 @@ int main(){
  queue.push(200,-75);
  assert(stalled.next(1001,1.4).kind==FrameKind::Gap);
  const auto gap=queue.take();
- Camera slow;slow.start({0,0,0},{0,0,0});
- slow.look(float(gap.x),float(gap.y));slow.halt();
+ Camera gapCamera;gapCamera.start({0,0,0},{0,0,0});
+ gapCamera.look(float(gap.x),float(gap.y));gapCamera.halt();
  assert(gap.x==200&&gap.y==-75);
- near(slow.angles.y,-4.4f,.001f);
+ near(gapCamera.angles.y,-4.4f,.001f);
  assert(queue.peek().x==0&&queue.peek().y==0);
 
  // No clip-on-add: large counts survive in successive render frames.
@@ -113,7 +113,7 @@ int main(){
 
  // Signed input reversals are separate from deliberate focus-loss drops.
  queue.push(120,0);queue.push(-150,3);
- const auto reverse=queue.take();assert(reverse.x==-30&&reverse.y==3);
+ const auto reversedCounts=queue.take();assert(reversedCounts.x==-30&&reversedCounts.y==3);
  queue.push(70,5);
  const auto discarded=queue.drop();
  assert(discarded.x==70&&discarded.y==5);
