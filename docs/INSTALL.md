@@ -1,18 +1,18 @@
 # L4D2Visual 安装说明
 
-## v1.0.0 候选构建（尚未发布 Release）
+## 正式版本：v1.0.0
 
-本页随 `main` 的 **v1.0.0 待验收安装包** 一同打包。当前已公开的正式版仍为 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0)。只有最终实机验收通过后才会创建 `v1.0.0` 标签和正式 Release；本次候选编译**不会自动发布**。
+下载：[L4D2Visual v1.0.0 正式 Release](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0)。正式安装包为 `L4D2Visual-1.0.0.zip`；配套提供相同源码提交的源码包与两个 SHA-256 校验文件。历史 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留。
 
 支持：**Left 4 Dead 2，Windows x86，L4N v2，以及符合插件 PE/SHA-256 校验的游戏模块版本**。其他游戏 DLL 版本将因安全检查拒绝对应 Hook 或补丁，不能通过强制关闭校验来解决。
 
 ## 安装
 
 1. **完全退出游戏**，备份现有 `bin/neko/plugins/L4D2Visual.dll` 和 `bin/neko/plugins/L4D2Visual/hud.json`。
-2. 从 GitHub Actions 的 `main` 候选构建下载 Artifact；解压后包含 `bin/` 和 `README.md`，没有第二层安装 ZIP。
+2. 从上述正式 Release 下载 `L4D2Visual-1.0.0.zip`；解压后包含 `bin/` 和 `README.md`，没有第二层安装 ZIP。
 3. 把 `bin/` 合并到游戏目录。安装包内的默认配置位于 `bin/neko/plugins/L4D2Visual/hud.json`。
 4. 老用户可以保留自己原有的 `hud.json`，新功能缺失的设置使用默认值。不要用新默认配置覆盖旧版自定义样式，除非你希望全部重置。
-5. 在 L4N 插件菜单中打开 L4D2Visual。候选 DLL 版本字符串为 `1.0.0`；以日志和菜单显示的实际 DLL 版本为准。
+5. 在 L4N 插件菜单中打开 L4D2Visual。正式 DLL 版本字符串为 `1.0.0`；以日志和菜单显示的实际 DLL 版本为准。
 
 **不要替换游戏自带的 `studiorender.dll`。** 若使用过 Hook/原生补丁，更新 DLL 前必须完全退出游戏，不能仅返回主菜单。
 
@@ -37,4 +37,4 @@ Tank 与石头位置/攻击范围都是客户端估算，不表示真实伤害�
 
 安装包根目录仅有 `bin/` 与 `README.md`，不含独立的许可证安装文件。完整 GPL-3.0 及第三方许可原文会追加到包内 README。源代码仓库保留 `LICENSE`、`NOTICE.md` 与第三方许可证文件。
 
-Source commit 和版本可在包内 README 末尾及构建记录中核对。此候选构建不会创建 Release，待验收通过再进入正式发布流程。
+Source commit 和版本可在包内 README 末尾、配套源码 ZIP 及 GitHub Release 构建记录中核对。服务器中 FreeCamera 鼠标转向问题尚未取得最新补丁的完整实机复验，仍应留意兼容性。

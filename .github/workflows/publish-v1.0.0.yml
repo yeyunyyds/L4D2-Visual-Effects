@@ -1,0 +1,155 @@
+name: Publish L4D2Visual v1.0.0
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+concurrency:
+  group: publish-l4d2visual-v1.0.0
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event.head_commit.message == 'release v1.0.0'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Confirm the exact release commit
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git show -s --format=%s HEAD)" = "release v1.0.0"
+      - name: Install Windows x86 compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: FreeCamera smoke regression
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror tests/free_camera_core_test.cpp -o /tmp/free-camera-test
+          /tmp/free-camera-test
+      - name: Run full regression suite
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: bash scripts/test.sh
+      - name: Build Windows x86 DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: bash scripts/build-mingw.sh
+      - name: Package install ZIP, full source, and SHA-256
+        run: |
+          python3 scripts/package.py
+          git archive --format=zip --output=build/L4D2Visual-1.0.0-source.zip HEAD
+          cd build
+          sha256sum L4D2Visual-1.0.0.zip > L4D2Visual-1.0.0.zip.sha256
+          sha256sum L4D2Visual-1.0.0-source.zip > L4D2Visual-1.0.0-source.zip.sha256
+      - name: Verify all release assets
+        run: |
+          cd build
+          sha256sum -c L4D2Visual-1.0.0.zip.sha256
+          sha256sum -c L4D2Visual-1.0.0-source.zip.sha256
+          python3 - <<'PY'
+          import json, os, struct
+          from pathlib import Path
+          from zipfile import ZipFile
+          revision=os.environ["GITHUB_SHA"]
+          expected={"README.md","bin/neko/plugins/L4D2Visual.dll",
+                    "bin/neko/plugins/L4D2Visual/hud.json"}
+          with ZipFile("L4D2Visual-1.0.0.zip") as z:
+              assert z.testzip() is None
+              assert set(z.namelist()) == expected
+              dll=z.read("bin/neko/plugins/L4D2Visual.dll")
+              pe=struct.unpack_from("<I",dll,0x3c)[0]
+              assert dll[pe:pe+4]==b"PE\x00\x00"
+              assert struct.unpack_from("<H",dll,pe+4)[0]==0x14c
+              assert b"L4D2Visual 1.0.0" in dll
+              readme=z.read("README.md").decode("utf-8")
+              assert revision in readme
+              assert "正式版本" in readme
+              assert "GNU General Public License v3" in readme
+              config=json.loads(z.read("bin/neko/plugins/L4D2Visual/hud.json"))
+              for name in ("entityTransform","firstPersonBody","freeCamera","tankPrediction","tankRockPrediction"):
+                  assert config[name]["enabled"] is False if "enabled" in config[name] else name=="freeCamera"
+              assert config["tankPrediction"]["occludeHud"] is True
+              assert "warnOutline" not in config["tankPrediction"]
+              assert config["freeCamera"]["f6Binding"] is False
+              assert "wallPictures" not in config and "sprayP2P" not in config
+          with ZipFile("L4D2Visual-1.0.0-source.zip") as z:
+              assert z.testzip() is None
+              names=set(z.namelist())
+              assert {"src/plugin.cpp","docs/INSTALL.md","docs/releases/v1.0.0.md",
+                      "src/free_camera_command_policy.hpp",
+                      ".github/workflows/publish-v1.0.0.yml"}.issubset(names)
+              assert z.read("docs/releases/v1.0.0.md").startswith(b"# L4D2Visual v1.0.0")
+          stage=Path("release-files")
+          stage.mkdir(exist_ok=True)
+          for name in ("L4D2Visual-1.0.0.zip","L4D2Visual-1.0.0.zip.sha256",
+                       "L4D2Visual-1.0.0-source.zip","L4D2Visual-1.0.0-source.zip.sha256"):
+              (stage/name).write_bytes(Path(name).read_bytes())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-1.0.0-publish-assets
+          path: build/release-files/
+          if-no-files-found: error
+      - name: Create draft release and matching v1.0.0 tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view v1.0.0 >/dev/null 2>&1; then
+            gh release create v1.0.0 --target "$GITHUB_SHA" --draft --title 'L4D2Visual 1.0.0' --notes-file docs/releases/v1.0.0.md
+          fi
+          tag_sha="$(gh api "repos/$GH_REPO/git/ref/tags/v1.0.0" --jq '.object.sha')"
+          test "$tag_sha" = "$GITHUB_SHA"
+      - uses: actions/checkout@v4
+        with:
+          ref: zip
+          path: downloads
+          persist-credentials: true
+      - name: Update zip download branch, preserve historical packages
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          source,target=Path("build"),Path("downloads")
+          files=("L4D2Visual-1.0.0.zip","L4D2Visual-1.0.0.zip.sha256",
+                 "L4D2Visual-1.0.0-source.zip","L4D2Visual-1.0.0-source.zip.sha256")
+          for name in files:shutil.copy2(source/name,target/name)
+          readme=target/"README.md"
+          lines=readme.read_text(encoding="utf-8").splitlines()
+          lines=[x for x in lines if not x.startswith("正式版：[1.0.0 安装包]")]
+          new=("正式版：[1.0.0 安装包](L4D2Visual-1.0.0.zip) · "
+               "[对应完整源码](L4D2Visual-1.0.0-source.zip) · "
+               "[安装包 SHA-256](L4D2Visual-1.0.0.zip.sha256) · "
+               "[源码 SHA-256](L4D2Visual-1.0.0-source.zip.sha256)。"
+               "包含 FPB、FreeCamera 和 Tank 建筑遮挡；"
+               "FreeCamera 的服务器鼠标兼容性仍有待复验。"
+               "请完全退出游戏并备份 DLL、hud.json 后更新。")
+          lines.insert(2,new)
+          lines=[x.replace("当前正式版：[0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0)",
+                          "当前正式版：[1.0.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0)")
+                 for x in lines]
+          readme.write_text("\n".join(lines)+"\n",encoding="utf-8")
+          PY
+          cd downloads
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md L4D2Visual-1.0.0.zip L4D2Visual-1.0.0.zip.sha256 L4D2Visual-1.0.0-source.zip L4D2Visual-1.0.0-source.zip.sha256
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish verified L4D2Visual 1.0.0 download assets'
+            git pull --rebase origin zip
+            git push origin HEAD:zip
+          fi
+      - name: Upload Release files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload v1.0.0 build/L4D2Visual-1.0.0.zip build/L4D2Visual-1.0.0.zip.sha256 build/L4D2Visual-1.0.0-source.zip build/L4D2Visual-1.0.0-source.zip.sha256 --clobber
+      - name: Publish v1.0.0 publicly
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release edit v1.0.0 --title 'L4D2Visual 1.0.0' --notes-file docs/releases/v1.0.0.md --draft=false --prerelease=false --latest
