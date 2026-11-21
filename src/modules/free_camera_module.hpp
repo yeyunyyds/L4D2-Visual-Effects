@@ -44,6 +44,10 @@ inline std::optional<std::string> page(std::uintptr_t id){
       std::to_string(freecamera::renderRepeats.load())+"/"+
       std::to_string(freecamera::renderGaps.load()))+
   row("Render dt (ms): "+std::to_string(freecamera::renderDeltaMs.load()))+
+  row("Mouse samples/zero: "+std::to_string(freecamera::mouseSamples.load())+"/"+std::to_string(freecamera::mouseZeroSamples.load()))+
+  row("Mouse X received/applied/dropped: "+std::to_string(freecamera::mouseReceivedX.load())+"/"+std::to_string(freecamera::mouseAppliedX.load())+"/"+std::to_string(freecamera::mouseDroppedX.load()))+
+  row("Mouse Y received/applied/dropped: "+std::to_string(freecamera::mouseReceivedY.load())+"/"+std::to_string(freecamera::mouseAppliedY.load())+"/"+std::to_string(freecamera::mouseDroppedY.load()))+
+  row("Mouse pending X/Y: "+std::to_string(freecamera::queuedMouse().x)+"/"+std::to_string(freecamera::queuedMouse().y))+
   row("Speed current / max: "+std::to_string(int(freecamera::currentMovementSpeed.load()))+
       " / "+std::to_string(int(freecamera::movementSpeed.load())))+
   item(u8"返回 FreeCamera 设置",930)+"}";
@@ -90,6 +94,12 @@ inline modules::Module create(){
   " hideVM="+std::to_string(freecamera::hideViewmodel.load())+
   " f6Binding="+std::to_string(freecamera::f6Binding.load())+
   " vmHook="+std::to_string(freecamera::viewModelHookBound.load())+
+  " mouseRX="+std::to_string(freecamera::mouseReceivedX.load())+
+  " mouseAX="+std::to_string(freecamera::mouseAppliedX.load())+
+  " mouseDX="+std::to_string(freecamera::mouseDroppedX.load())+
+  " mouseRY="+std::to_string(freecamera::mouseReceivedY.load())+
+  " mouseAY="+std::to_string(freecamera::mouseAppliedY.load())+
+  " mouseDY="+std::to_string(freecamera::mouseDroppedY.load())+
   " vmCalls="+std::to_string(freecamera::viewModelCalls.load())+
   " vmHidden="+std::to_string(freecamera::viewModelHidden.load())+
   " view="+std::to_string(freecamera::viewCount.load())+

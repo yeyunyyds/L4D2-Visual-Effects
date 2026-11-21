@@ -78,4 +78,45 @@ int main(){
  step(slow,forward,1.f,.02f);
  near(fast.origin.x,slow.origin.x,.1f);
  near(fast.currentSpeed(),slow.currentSpeed(),.01f);
+
+ // Server input 30 Hz, real rendering 120 Hz: no input is lost.
+ MouseQueue queue;Camera online;online.start({0,0,0},{0,0,0});
+ std::int64_t received=0,applied=0;
+ for(int frame=0;frame<120;++frame){
+  if(frame%4==0){queue.push(10,0);received+=10;}
+  const auto delta=queue.take();
+  online.look(float(delta.x),float(delta.y));
+  applied+=delta.x;
+ }
+ assert(received==300&&applied==received);
+ assert(queue.peek().x==0&&queue.peek().y==0);
+ near(online.angles.y,-6.6f,.001f);
+
+ // Gap: stop translation without discarding queued mouse yaw/pitch.
+ FrameClock stalled;assert(stalled.next(1000,1.).kind==FrameKind::First);
+ queue.push(200,-75);
+ assert(stalled.next(1001,1.4).kind==FrameKind::Gap);
+ const auto gap=queue.take();
+ Camera slow;slow.start({0,0,0},{0,0,0});
+ slow.look(float(gap.x),float(gap.y));slow.halt();
+ assert(gap.x==200&&gap.y==-75);
+ near(slow.angles.y,-4.4f,.001f);
+ assert(queue.peek().x==0&&queue.peek().y==0);
+
+ // No clip-on-add: large counts survive in successive render frames.
+ queue.push(9000,-9500);
+ const auto a=queue.take(),b=queue.take(),d=queue.take();
+ assert(a.x==4096&&a.y==-4096);
+ assert(b.x==4096&&b.y==-4096);
+ assert(d.x==808&&d.y==-1308);
+ assert(queue.peek().x==0&&queue.peek().y==0);
+
+ // Signed input reversals are separate from deliberate focus-loss drops.
+ queue.push(120,0);queue.push(-150,3);
+ const auto reverse=queue.take();assert(reverse.x==-30&&reverse.y==3);
+ queue.push(70,5);
+ const auto discarded=queue.drop();
+ assert(discarded.x==70&&discarded.y==5);
+ assert(queue.peek().x==0&&queue.peek().y==0);
+
 }

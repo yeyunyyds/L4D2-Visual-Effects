@@ -34,6 +34,23 @@ struct FrameClock {
 };
 
 struct Input {float forward=0,side=0,up=0,dx=0,dy=0;};
+// Discrete mouse counts must survive command/render frequency mismatches.
+// Clamp only the amount taken per render, keeping any queued remainder.
+struct MouseCounts{std::int64_t x=0,y=0;};
+struct MouseQueue{
+ MouseCounts pending{};
+ void push(std::int64_t dx,std::int64_t dy) noexcept {
+  pending.x+=dx;pending.y+=dy;
+ }
+ MouseCounts take(std::int64_t limit=4096) noexcept {
+  MouseCounts n{std::clamp(pending.x,-limit,limit),
+                std::clamp(pending.y,-limit,limit)};
+  pending.x-=n.x;pending.y-=n.y;
+  return n;
+ }
+ MouseCounts drop() noexcept {const auto n=pending;pending={};return n;}
+ MouseCounts peek()const noexcept{return pending;}
+};
 struct Camera {
  Vec origin{},angles{},velocity{};
  float speed=1000.f,sensitivity=1.f;

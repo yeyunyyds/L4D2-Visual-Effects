@@ -35,7 +35,11 @@ inline std::atomic<float> currentMovementSpeed{0.f};
 inline core::Camera camera;
 inline std::mutex motionMutex;
 inline core::Input latestInput{};
-inline float pendingMouseX=0.f,pendingMouseY=0.f;
+inline core::MouseQueue pendingMouse;
+inline std::atomic<std::int64_t> mouseReceivedX{0},mouseReceivedY{0};
+inline std::atomic<std::int64_t> mouseAppliedX{0},mouseAppliedY{0};
+inline std::atomic<std::int64_t> mouseDroppedX{0},mouseDroppedY{0};
+inline std::atomic<std::uint64_t> mouseSamples{0},mouseZeroSamples{0};
 inline core::FrameClock renderClock;
 inline std::atomic<unsigned long> renderSteps{0},renderRepeats{0},renderGaps{0};
 inline std::atomic<float> renderDeltaMs{0.f};
@@ -115,9 +119,18 @@ inline activation::Phase currentPhase(){
  return activation::phase(requested.load(),bound.load(),active.load(),paused.load());
 }
 // Must hold motionMutex; original game hooks are never called under this lock.
+inline void dropMouseLocked(){
+ const auto d=pendingMouse.drop();
+ mouseDroppedX.fetch_add(d.x,std::memory_order_relaxed);
+ mouseDroppedY.fetch_add(d.y,std::memory_order_relaxed);
+}
+inline core::MouseCounts queuedMouse(){
+ std::lock_guard<std::mutex> lock(motionMutex);
+ return pendingMouse.peek();
+}
 inline void resetMotionLocked(){
  camera.ready=false;camera.halt();
- latestInput={};pendingMouseX=pendingMouseY=0.f;
+ latestInput={};dropMouseLocked();
  renderClock.reset();haveAim=false;lastInput=0;
  currentMovementSpeed=0.f;renderDeltaMs=0.f;
 }
@@ -159,7 +172,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  if(!last||now<last||now-last>1000){
   active=false;message="Waiting for CreateMove";
   std::lock_guard<std::mutex> lock(motionMutex);
-  camera.halt();renderClock.reset();pendingMouseX=pendingMouseY=0.f;
+  camera.halt();renderClock.reset();dropMouseLocked();
   currentMovementSpeed=0.f;
   return;
  }
@@ -180,17 +193,22 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
   }else{
    ++renderSteps;
    renderDeltaMs=tick.dt*1000.f;
-   core::Input i=latestInput;
-   i.dx=pendingMouseX;i.dy=pendingMouseY;
-   pendingMouseX=pendingMouseY=0.f;
+   const core::Input i=latestInput;
    if(paused.load()||!foreground()){
-    camera.halt();
-   }else if(tick.kind==core::FrameKind::Gap){
-    ++renderGaps;
+    dropMouseLocked();
     camera.halt();
    }else{
-    camera.look(i.dx,i.dy);
-    if(tick.kind==core::FrameKind::Step)camera.advance(i,tick.dt);
+    // Every real render (including Gap) consumes available mouse movement.
+    // Gap only halts translation; it must never discard rotation.
+    const auto delta=pendingMouse.take();
+    camera.look(float(delta.x),float(delta.y));
+    mouseAppliedX.fetch_add(delta.x,std::memory_order_relaxed);
+    mouseAppliedY.fetch_add(delta.y,std::memory_order_relaxed);
+    if(tick.kind==core::FrameKind::Gap){
+     ++renderGaps;camera.halt();
+    }else if(tick.kind==core::FrameKind::Step){
+     camera.advance(i,tick.dt);
+    }
    }
    currentMovementSpeed=camera.currentSpeed();
   }
@@ -237,15 +255,21 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
   if(!requested)return result;
   if(!haveAim){lockedAim=cmd->viewangles;haveAim=true;}
   lastInput=GetTickCount64();
+  mouseReceivedX.fetch_add(cmd->mousedx,std::memory_order_relaxed);
+  mouseReceivedY.fetch_add(cmd->mousedy,std::memory_order_relaxed);
+  mouseSamples.fetch_add(1,std::memory_order_relaxed);
+  if(!cmd->mousedx&&!cmd->mousedy)
+   mouseZeroSamples.fetch_add(1,std::memory_order_relaxed);
   if(!paused.load()&&foreground()){
    latestInput.forward=float(int(key('W'))-int(key('S')));
    latestInput.side=float(int(key('D'))-int(key('A')));
    latestInput.up=float(int(key(VK_SPACE))-int(key(VK_SHIFT)));
-   pendingMouseX=std::clamp(pendingMouseX+float(cmd->mousedx),-4096.f,4096.f);
-   pendingMouseY=std::clamp(pendingMouseY+float(cmd->mousedy),-4096.f,4096.f);
+   pendingMouse.push(cmd->mousedx,cmd->mousedy);
   }else{
    latestInput={};
-   pendingMouseX=pendingMouseY=0.f;
+   dropMouseLocked();
+   mouseDroppedX.fetch_add(cmd->mousedx,std::memory_order_relaxed);
+   mouseDroppedY.fetch_add(cmd->mousedy,std::memory_order_relaxed);
   }
   cmd->viewangles=lockedAim;
   cmd->forwardmove=cmd->sidemove=cmd->upmove=0;
@@ -416,7 +440,7 @@ inline void poll(bool escape,bool /*menu*/,bool gameForeground){
  const bool previouslyPaused=paused.exchange(shouldPause);
  if(shouldPause&&!previouslyPaused){
   std::lock_guard<std::mutex> lock(motionMutex);
-  camera.halt();latestInput={};pendingMouseX=pendingMouseY=0.f;
+  camera.halt();latestInput={};dropMouseLocked();
   renderClock.reset();currentMovementSpeed=0.f;
  }
  if(edge&&f6Binding.load(std::memory_order_acquire)&&gameForeground&&!escape){++keyToggles;toggle();}
