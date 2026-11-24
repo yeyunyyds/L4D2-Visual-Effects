@@ -16,5 +16,9 @@ int main(){
  p.allow(false,28003);assert(!p.on&&!p.desired);
  p.allow(true,30000);p.request(true,30000);p.setPose(30001);p.advance(45002);assert(!p.desired&&!p.on);
  p.initialIdleSeconds=1;p.request(true,46000);p.setPose(46001);p.advance(47000);assert(p.on&&p.select(47000)==Owner::External);
+ // An older input timestamp may arrive after a fresh concurrent heartbeat.
+ p.setPose(48000);p.advance(47999);assert(p.desired&&p.on&&p.select(47999)==Owner::External);
+ p.setPose(47998);assert(p.lastPoseMs==48000);p.noteInput(48002);p.noteInput(48001);assert(p.lastInputMs==48002);
+ assert(!p.expire(63000)&&p.desired);assert(p.expire(63001)&&!p.desired&&!p.on);
  p.stop();assert(p.select(47001)==Owner::Native);
 }
