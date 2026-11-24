@@ -3,6 +3,7 @@
 namespace visual::studioabi {
 struct Profile{const char* name;std::uint32_t timestamp,imageSize;const char* sha256;std::uint32_t object=0x437018,vtable=0x7f03c,draw=0x6a150;unsigned slot=25;};
 inline constexpr Profile supported[]={
+ {"2026-11-10 Valve studio",1794274100,0x453000,"a7efe8304d0e0bb5cfa87193d234670ea59ead1323d43a10da60b2fbd6f65d14"},
  {"original studio upload",1782844886,0x453000,"3f5f5b0f539e8ad22bcfc4381be41571257c0c29e8061057682f9b8525ca7b85"},
  {"legacy studio upload",1782844886,0x653000,"03964dedcf8b7f4ebde24cd3d0738873d37c075a7a9b313dad001bb937f9d1b6"}
 };
