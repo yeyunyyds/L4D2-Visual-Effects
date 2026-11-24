@@ -11,13 +11,13 @@ inline bool value(void*& object,int& number){
  auto& reader=source_entities::reader;
  auto addr=std::uint32_t(reinterpret_cast<std::uintptr_t>(object));
  if(!source_entities::wire::load(reader,addr+0x1c,parent)||parent!=addr ||
-    !source_entities::wire::load(reader,addr,table)||table!=base+0x65af2c ||
+    !source_entities::wire::load(reader,addr,table)||table!=base+0x65af3c ||
     !source_entities::wire::load(reader,addr+12,name)||source_entities::wire::text(reader,name)!="cl_modelfastpath")return false;
  return source_entities::wire::load(reader,addr+0x30,number);
 }
 inline bool set(void* object,int number){
  auto table=*reinterpret_cast<void***>(object);
- auto expected=reinterpret_cast<std::uintptr_t>(source_camera::clientModule)+0x3d3d90;
+ auto expected=reinterpret_cast<std::uintptr_t>(source_camera::clientModule)+0x3d3e30;
  if(reinterpret_cast<std::uintptr_t>(table[14])!=expected || !source_camera::executable(table[14]))return false;
  // Statically verified native integer setter, preserving callbacks/string state.
  reinterpret_cast<void(__thiscall*)(void*,int)>(table[14])(object,number);return true;
@@ -28,7 +28,7 @@ inline void apply(bool enabled){
  void* object{};int number{};
  if(!value(object,number)){current=-1;return;}
  current=number;
- if(enabled&&!setting.owned && !verifiedModuleFile(source_camera::clientModule,"c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f"))return;
+ if(enabled&&!setting.owned && !verifiedModuleFile(source_camera::clientModule,"4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d"))return;
  static bool reportedFailure=false;
  bool wasOwned=setting.owned;
  if(!setting.update(enabled,number,[&](int v){if(!set(object,v))return false;current=v;return true;})){

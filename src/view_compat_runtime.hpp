@@ -33,12 +33,12 @@ inline std::optional<bool> readShoulder() noexcept {
   if(!source_camera::matchesImage(module,source_camera::ClientTimestamp,
         source_camera::ClientImageSize,"view-mode client")||
      !verifiedModuleFile(module,
-        "c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f"))
+        "4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d"))
    return std::nullopt;
   acceptedImage.store(base,std::memory_order_release);
  }
  // Confirmed against the provided, SHA-verified 2026 client.dll:
- // client+0x500650 registers ConVar("c_thirdpersonshoulder") at +0x7589c8;
+ // client+0x500710 registers ConVar("c_thirdpersonshoulder") at +0x7589c8;
  // the ConVar's name, parent and cached integer occupy +0x0c,+0x1c,+0x30.
  constexpr std::uintptr_t kConVarRva=0x7589c8;
  const auto location=std::uint32_t(base+kConVarRva);

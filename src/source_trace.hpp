@@ -9,15 +9,15 @@ inline bool connectBinding(Binding& binding){
  auto& object=binding.object;
  using namespace source_camera;auto module=engineModule;
  if(!hooked||!module||!matchesImage(module,EngineTimestamp,EngineImageSize,"scene trace engine"))return false;
- if(!verifiedModuleFile(module,"8a6d468059394bf4cfce32f11dcba12ef45de88da1373084d5a2916d0bf7ba86"))return false;
+ if(!verifiedModuleFile(module,"d451800729322f25bfc65d58a408edb4f4243a8ea8c26fabccbba4bc7ecc1db3"))return false;
  using Factory=void*(__cdecl*)(const char*,int*);auto factory=reinterpret_cast<Factory>(GetProcAddress(module,"CreateInterface"));if(!factory)return false;
  auto candidate=factory("EngineTraceClient003",nullptr);auto base=reinterpret_cast<std::uintptr_t>(module);
  if(candidate!=reinterpret_cast<void*>(base+0x42fa5c)||!readable(candidate,4))return false;
- auto table=*reinterpret_cast<void***>(candidate);if(table!=reinterpret_cast<void**>(base+0x387474)||!readable(table,32))return false;
- constexpr std::uint32_t methods[]={0x177630,0x177600,0x178950,0x177990,0x179ff0,0x179760,0x177d60,0x177da0};
+ auto table=*reinterpret_cast<void***>(candidate);if(table!=reinterpret_cast<void**>(base+0x3874b4)||!readable(table,32))return false;
+ constexpr std::uint32_t methods[]={0x177680,0x177650,0x178990,0x1779e0,0x17a030,0x1797a0,0x177db0,0x177df0};
  for(unsigned i=0;i<8;++i)if(table[i]!=reinterpret_cast<void*>(base+methods[i])||!executable(table[i]))return false;
  const unsigned char entry[]={0x53,0x8b,0xdc,0x83,0xec,0x08,0x83,0xe4,0xf0},clear[]={0x55,0x8b,0xec,0x56,0x8b,0x75,0x08,0x6a,0x54},tail[]={0xc2,0x10,0};
- if(!readable(table[5],sizeof(entry))||std::memcmp(table[5],entry,sizeof(entry))||!readable(reinterpret_cast<void*>(base+0x14ba10),sizeof(clear))||std::memcmp(reinterpret_cast<void*>(base+0x14ba10),clear,sizeof(clear))||!readable(reinterpret_cast<void*>(base+0x179e2b),sizeof(tail))||std::memcmp(reinterpret_cast<void*>(base+0x179e2b),tail,sizeof(tail)))return false;
+ if(!readable(table[5],sizeof(entry))||std::memcmp(table[5],entry,sizeof(entry))||!readable(reinterpret_cast<void*>(base+0x14ba30),sizeof(clear))||std::memcmp(reinterpret_cast<void*>(base+0x14ba30),clear,sizeof(clear))||!readable(reinterpret_cast<void*>(base+0x179e6b),sizeof(tail))||std::memcmp(reinterpret_cast<void*>(base+0x179e6b),tail,sizeof(tail)))return false;
  object=candidate;return true;
 }
 inline bool __fastcall reject(void*,void*,void*,int){return false;}
@@ -29,7 +29,7 @@ inline bool castShapeBinding(Binding& binding,dango::Vec3 start,dango::Vec3 end,
  if(faulted||!object||!dango::wall::finite(start)||!dango::wall::finite(end)||!dango::trace::validExtents(half))return false;
  auto ray=dango::trace::boxRay(start,end,half);dango::trace::GuardedResult guarded;Filter filter;
  using Call=void(__thiscall*)(void*,const dango::trace::Ray&,unsigned,void*,dango::trace::Result*);
- if(!source_camera::readable(object,4)){faulted=true;return false;}auto table=*reinterpret_cast<void***>(object);auto moduleBase=reinterpret_cast<uintptr_t>(source_camera::engineModule);if(!source_camera::readable(table,24)||table[5]!=reinterpret_cast<void*>(moduleBase+0x179760)||!source_camera::executable(table[5])){faulted=true;return false;}reinterpret_cast<Call>(table[5])(object,ray,0x400b,&filter,&guarded.result);
+ if(!source_camera::readable(object,4)){faulted=true;return false;}auto table=*reinterpret_cast<void***>(object);auto moduleBase=reinterpret_cast<uintptr_t>(source_camera::engineModule);if(!source_camera::readable(table,24)||table[5]!=reinterpret_cast<void*>(moduleBase+0x1797a0)||!source_camera::executable(table[5])){faulted=true;return false;}reinterpret_cast<Call>(table[5])(object,ray,0x400b,&filter,&guarded.result);
  if(!guarded.intact()||!dango::trace::validSweep(guarded.result,start,end,half)){faulted=true;return false;}
  output=guarded.result;return true;
 }
