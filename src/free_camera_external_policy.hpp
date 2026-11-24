@@ -12,11 +12,12 @@ struct Policy {
  bool desired=false;
  bool on=false;
  bool hasPose=false;
+ bool nativeOnInput=false,externalWasDriving=false;
  unsigned idleSeconds=3,initialIdleSeconds=10;
  std::uint64_t lastInputMs=0,lastPoseMs=0;
  static constexpr std::uint64_t poseLeaseMs=15000;
 
- void stop() noexcept {on=false;desired=false;hasPose=false;}
+ void stop() noexcept {on=false;desired=false;hasPose=false;externalWasDriving=false;nativeOnInput=false;}
  void allow(bool value,std::uint64_t now) noexcept {
   if(!value&&desired)stop();
   allowed=value;
@@ -30,9 +31,12 @@ struct Policy {
   return true;
  }
  void setPose(std::uint64_t now) noexcept {if(desired){hasPose=true;lastPoseMs=std::max(lastPoseMs,now);}}
- void noteInput(std::uint64_t now) noexcept {lastInputMs=std::max(lastInputMs,now);}
+ void noteInput(std::uint64_t now,bool human=false) noexcept {
+  if(human&&nativeOnInput&&externalWasDriving&&desired&&on){on=false;externalWasDriving=false;}
+  lastInputMs=std::max(lastInputMs,now);
+ }
  void toggle(std::uint64_t now) noexcept {
-  on=!on;lastInputMs=now;
+  on=!on;externalWasDriving=false;lastInputMs=now;
   // Keep a live provider heartbeat when the user returns to native view.
   // The full initial idle interval must pass before the next automatic entry.
  }
