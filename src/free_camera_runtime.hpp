@@ -250,10 +250,9 @@ inline bool statusExternal(L4D2VisualCameraStatusV1* output){
  return true;
 }
 inline bool hasHumanInput(const Cmd* cmd){
- // Some Source game commands (e.g. toggle-crouch) can stay asserted without
- // physical keyboard activity. Only changed command buttons count as an edge.
- const bool buttonEdge=lastObservedButtons.exchange(cmd->buttons,std::memory_order_relaxed)!=cmd->buttons;
- if(cmd->mousedx||cmd->mousedy||buttonEdge)return true;
+ // Only physical input counts as activity. AI/server model movement
+ // and toggled command bits must not reset the AFK timer.
+ if(cmd->mousedx||cmd->mousedy)return true;
  // Detect held keyboard/mouse buttons while the L4D2 window has focus.
  for(int vk=VK_LBUTTON;vk<=VK_OEM_CLEAR;++vk){
   if(vk==VK_PACKET||vk==VK_PROCESSKEY)continue;
