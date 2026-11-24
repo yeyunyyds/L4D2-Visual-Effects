@@ -123,3 +123,7 @@ extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraSetPose(const L4D2VisualCa
 extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraGetStatus(L4D2VisualCameraStatusV1* output){
  return visual::freecamera::statusExternal(output)?1:0;
 }
+
+extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraGetPose(L4D2VisualCameraPoseV1* output){
+ return visual::freecamera::getExternalPose(output)?1:0;
+}
