@@ -11,7 +11,7 @@ inline std::optional<std::string> page(std::uintptr_t id){
  if(id==930){
   // Keep the frequently adjusted options on one small page.
   return "\"FreeCamera · 设置\" {"+
-   item(freecamera::requested.load()?u8"FreeCamera：[开启]":u8"FreeCamera：[关闭]",931)+
+   item(freecamera::requested.load()?u8"FreeCamera：[开启]":freecamera::externalSession.load()?"FreeCamera: AFK pending (cancel)":u8"FreeCamera：[关闭]",931)+
    item(std::string(u8"快捷键启用：[")+(freecamera::f6Binding.load()?u8"开]":u8"关]（默认）")+"  "+freecamera::hotkey::label(freecamera::hotkeyVk.load()),937)+
    row(freecamera::hotkeyConfigValid.load()?u8"按键可在 hud.json 修改；外部会话中允许快捷键退出":u8"快捷键配置无效：已禁用，请检查 hud.json")+
    item(freecamera::hideViewmodel.load()?u8"隐藏第一人称手臂和武器：[开]":u8"隐藏第一人称手臂和武器：[关]",935)+
