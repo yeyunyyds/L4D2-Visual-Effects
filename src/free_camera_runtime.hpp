@@ -52,6 +52,7 @@ inline std::atomic<std::int64_t> mouseAppliedX{0},mouseAppliedY{0};
 inline std::atomic<std::int64_t> mouseDroppedX{0},mouseDroppedY{0};
 inline std::atomic<std::uint64_t> mouseSamples{0},mouseZeroSamples{0};
 inline std::atomic<std::uint64_t> serverCmdSamples{0},extraMouseSamples{0},extraMouseNonzero{0};
+inline std::atomic<int> lastObservedButtons{0};
 inline core::FrameClock renderClock;
 inline std::atomic<unsigned long> renderSteps{0},renderRepeats{0},renderGaps{0};
 inline std::atomic<float> renderDeltaMs{0.f};
@@ -218,10 +219,11 @@ inline bool statusExternal(L4D2VisualCameraStatusV1* output){
  return true;
 }
 inline bool hasHumanInput(const Cmd* cmd){
- if(cmd->mousedx||cmd->mousedy||cmd->buttons||
-    std::abs(cmd->forwardmove)>.01f||std::abs(cmd->sidemove)>.01f||
-    std::abs(cmd->upmove)>.01f)return true;
- // Detect all keyboard and mouse buttons while the L4D2 window has focus.
+ // Some Source game commands (e.g. toggle-crouch) can stay asserted without
+ // physical keyboard activity. Only changed command buttons count as an edge.
+ const bool buttonEdge=lastObservedButtons.exchange(cmd->buttons,std::memory_order_relaxed)!=cmd->buttons;
+ if(cmd->mousedx||cmd->mousedy||buttonEdge)return true;
+ // Detect held keyboard/mouse buttons while the L4D2 window has focus.
  for(int vk=VK_LBUTTON;vk<=VK_OEM_CLEAR;++vk){
   if(vk==VK_PACKET||vk==VK_PROCESSKEY)continue;
   if(GetAsyncKeyState(vk)&0x8000)return true;
