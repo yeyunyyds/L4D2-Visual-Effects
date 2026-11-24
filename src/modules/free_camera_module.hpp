@@ -11,14 +11,14 @@ inline std::optional<std::string> page(std::uintptr_t id){
  if(id==930){
   // Keep the frequently adjusted options on one small page.
   return "\"FreeCamera · 设置\" {"+
-   item(freecamera::manualRequested.load()?u8"手动 FreeCamera：[开启]":u8"手动 FreeCamera：[关闭]",931)+
+   item(freecamera::requested.load()?u8"FreeCamera：[开启]":u8"FreeCamera：[关闭]",931)+
    item(std::string(u8"快捷键启用：[")+(freecamera::f6Binding.load()?u8"开]":u8"关]（默认）")+"  "+freecamera::hotkey::label(freecamera::hotkeyVk.load()),937)+
-   row(freecamera::hotkeyConfigValid.load()?u8"按键在 hud.json 的 freeCamera.hotkey 中修改":u8"快捷键配置无效：已禁用，请检查 hud.json")+
+   row(freecamera::hotkeyConfigValid.load()?u8"按键可在 hud.json 修改；外部会话中允许快捷键退出":u8"快捷键配置无效：已禁用，请检查 hud.json")+
    item(freecamera::hideViewmodel.load()?u8"隐藏第一人称手臂和武器：[开]":u8"隐藏第一人称手臂和武器：[关]",935)+
    item(freecamera::externalPermission.load()?u8"外部接口（ABI）：[允许]":u8"外部接口（ABI）：[关闭]（默认）",938)+
    row(u8"放开键鼠后交还外部（1-30秒）："+std::to_string(freecamera::externalIdleSeconds())+"s")+
    item(u8"交还等待 +1 秒",939)+item(u8"交还等待 -1 秒",940)+
-   row(u8"外部控制需单独授权；玩家键鼠操作始终优先")+
+   row(u8"同一相机：快捷键或菜单关闭即取消外部请求；键鼠优先")+
    row(std::string(u8"当前控制权：")+
        (freecamera::currentOwner.load()==freecamera::external::Owner::External?u8"Dango/外部":
         freecamera::currentOwner.load()==freecamera::external::Owner::User?u8"用户 FreeCamera":u8"原生游戏"))+
