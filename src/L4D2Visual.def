@@ -5,3 +5,4 @@ EXPORTS
     L4D2VisualCameraSetExternalActive
     L4D2VisualCameraSetPose
     L4D2VisualCameraGetStatus
+    L4D2VisualCameraGetPose
