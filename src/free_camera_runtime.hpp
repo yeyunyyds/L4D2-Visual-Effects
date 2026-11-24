@@ -560,8 +560,9 @@ inline void tryBind(){
 }
 inline void frame(const dango::GameCameraFrame& f){
  if(!f.active){if(requested)disable("FreeCamera reset on map exit");return;}
- // Install ClientMode hooks only after a real enable request.
- if(requested.load(std::memory_order_acquire))tryBind();
+ // External permission opts in to the SAME hooks before any external request;
+ // until a valid pose and idle interval, CreateMove is native passthrough.
+ if(requested.load(std::memory_order_acquire)||externalPermission.load(std::memory_order_acquire))tryBind();
  if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");}
 }
 inline void poll(bool escape,bool menu,bool gameForeground){
@@ -578,6 +579,13 @@ inline void poll(bool escape,bool menu,bool gameForeground){
  // key choices may otherwise trigger both a menu action and FreeCamera.
  // Keep camera movement active with the menu open as before.
  const bool shouldPause=escape||!gameForeground;
+ // Menus, lost focus and Escape all interrupt the external controller.
+ // Never resume it while the menu is continuously open.
+ if((escape||menu||!gameForeground)&&externalPermission.load(std::memory_order_acquire)){
+  std::lock_guard<std::mutex> lock(motionMutex);
+  ownerPolicy.noteInput(GetTickCount64());
+  selectOwnerLocked(GetTickCount64());
+ }
  const bool previouslyPaused=paused.exchange(shouldPause);
  if(shouldPause&&!previouslyPaused){
   std::lock_guard<std::mutex> lock(motionMutex);
@@ -587,6 +595,7 @@ inline void poll(bool escape,bool menu,bool gameForeground){
  if(edge&&f6Binding.load(std::memory_order_acquire)&&hotkeyConfigValid.load(std::memory_order_acquire)&&gameForeground&&!escape&&!menu){++keyToggles;toggle();}
 }
 inline void stop(){
+ apiLive=false;
  disable("FreeCamera stopped");
  if(viewModelHookBound.exchange(false,std::memory_order_acq_rel)&&table){
   if(!changeSlot(table,viewModelSlot,
