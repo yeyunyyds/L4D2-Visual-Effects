@@ -60,4 +60,4 @@ FreeCamera 不切换游戏的第三人称模式。FPB 若同时开启，会保�
 
 FreeCamera 可以通过菜单显式授权同进程 L4N 插件（例如 L4D2DangoMusic）调用版本化的 C ABI，按世界坐标控制外部镜头。用户的鼠标/键盘输入会立即让自动控制退回手动 FreeCamera，并且**不重置摄像机坐标**；没有任何键鼠操作持续 1–30 秒（默认 3 秒）后才允许外部重新接管。接口授权默认关闭。
 
-完整结构、可调用符号、返回状态、控制权仲裁及调用示例： [FREE-CAMERA-EXTERNAL-ABI.md](FREE-CAMERA-EXTERNAL-ABI.md)。当前没有自动实现 PEAK 式镜头轨迹。
+完整结构、可调用符号、返回状态、控制权仲裁及调用示例： [FREE-CAMERA-EXTERNAL-ABI.md](FREE-CAMERA-EXTERNAL-ABI.md)。实验分支使用 ABI v2，手动和 ABI 共用同一个开关，F6/菜单关闭会取消外部会话。GetPose 返回实际视角，外部控制期间允许有效配置快捷键退出，即使普通快捷键绑定关闭。运镜轨迹由 DangoMusic 提供。
