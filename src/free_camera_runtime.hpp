@@ -56,7 +56,7 @@ inline core::FrameClock renderClock;
 inline std::atomic<unsigned long> renderSteps{0},renderRepeats{0},renderGaps{0};
 inline std::atomic<float> renderDeltaMs{0.f};
 inline Vec lockedAim{};inline bool haveAim=false;
-inline std::uint32_t epoch=0;
+inline std::uint32_t epoch=0,observedEpoch=0;
 inline void** table=nullptr;
 inline void* originalView=nullptr;inline void* originalMove=nullptr;
 using ViewModelCallback=bool(__thiscall*)(void*);
@@ -222,7 +222,7 @@ inline bool hasHumanInput(const Cmd* cmd){
     std::abs(cmd->forwardmove)>.01f||std::abs(cmd->sidemove)>.01f||
     std::abs(cmd->upmove)>.01f)return true;
  // Detect all keyboard and mouse buttons while the L4D2 window has focus.
- for(int vk=VK_BACK;vk<=VK_OEM_CLEAR;++vk){
+ for(int vk=VK_LBUTTON;vk<=VK_OEM_CLEAR;++vk){
   if(vk==VK_PACKET||vk==VK_PROCESSKEY)continue;
   if(GetAsyncKeyState(vk)&0x8000)return true;
  }
@@ -559,7 +559,20 @@ inline void tryBind(){
  tryBindViewModel();
 }
 inline void frame(const dango::GameCameraFrame& f){
- if(!f.active){if(requested)disable("FreeCamera reset on map exit");return;}
+ bool externalPending=false;
+ {
+  std::lock_guard<std::mutex> lock(motionMutex);
+  externalPending=ownerPolicy.desired;
+ }
+ if(!f.active){
+  observedEpoch=0;
+  if(requested||externalPending)disable("FreeCamera reset on map exit");
+  return;
+ }
+ // Even a pending external request must NOT carry a pose into the next map.
+ const bool mapChanged=observedEpoch!=0&&observedEpoch!=f.epoch;
+ observedEpoch=f.epoch;
+ if(mapChanged&&(requested||externalPending))disable("FreeCamera reset on map epoch");
  // External permission opts in to the SAME hooks before any external request;
  // until a valid pose and idle interval, CreateMove is native passthrough.
  if(requested.load(std::memory_order_acquire)||externalPermission.load(std::memory_order_acquire))tryBind();
