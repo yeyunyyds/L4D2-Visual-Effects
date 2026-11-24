@@ -22,7 +22,7 @@
 namespace visual::freecamera {
 using core::Vec;
 inline std::atomic<bool> requested{false},bound{false},active{false},paused{false};
-inline std::atomic<bool> externalPermission{false},manualRequested{false},apiLive{true};
+inline std::atomic<bool> externalPermission{false},externalSession{false},apiLive{true};
 inline std::atomic<external::Owner> currentOwner{external::Owner::Native};
 inline std::atomic<bool> f6Binding{false};
 // Key is configured by hud.json freeCamera.hotkey; existing enable flag retained.
@@ -44,6 +44,7 @@ inline std::atomic<float> currentMovementSpeed{0.f};
 inline core::Camera camera;
 inline external::Policy ownerPolicy;
 inline core::Vec externalOrigin{},externalAngles{};
+inline bool externalTargetReady=false; // guarded by motionMutex
 inline std::mutex motionMutex;
 inline core::Input latestInput{};
 inline core::MouseQueue pendingMouse;
@@ -150,9 +151,11 @@ inline void resetMotionLocked(){
 // The camera owner is selected under motionMutex. Never call an original
 // engine hook while holding this lock.
 inline external::Owner selectOwnerLocked(ULONGLONG at){
+ ownerPolicy.expire(at);
  const auto next=ownerPolicy.select(at);
  const auto previous=currentOwner.load(std::memory_order_relaxed);
  if(next!=previous){
+  externalTargetReady=false;
   if(next==external::Owner::Native){
    active=false;resetMotionLocked();
   }else if(previous==external::Owner::Native){
@@ -164,8 +167,10 @@ inline external::Owner selectOwnerLocked(ULONGLONG at){
    camera.halt();
   }
   currentOwner.store(next,std::memory_order_release);
+  source_camera::log("FreeCamera owner "+std::to_string(static_cast<unsigned>(previous))+" -> "+std::to_string(static_cast<unsigned>(next)));
  }
- requested.store(next!=external::Owner::Native,std::memory_order_release);
+ requested.store(ownerPolicy.on,std::memory_order_release);
+ externalSession.store(ownerPolicy.desired,std::memory_order_release);
  return next;
 }
 inline void allowExternal(bool enabled){
@@ -173,6 +178,7 @@ inline void allowExternal(bool enabled){
  ownerPolicy.allow(enabled,GetTickCount64());
  externalPermission.store(enabled,std::memory_order_release);
  selectOwnerLocked(GetTickCount64());
+ source_camera::log(enabled?"FreeCamera ABI permission ON":"FreeCamera ABI permission OFF");
 }
 inline void setExternalIdleSeconds(unsigned seconds){
  std::lock_guard<std::mutex> lock(motionMutex);
@@ -186,8 +192,10 @@ inline unsigned externalIdleSeconds(){
 inline bool requestExternal(bool enabled){
  if(!apiLive.load(std::memory_order_acquire))return false;
  std::lock_guard<std::mutex> lock(motionMutex);
- if(!ownerPolicy.request(enabled))return false;
- selectOwnerLocked(GetTickCount64());
+ const auto at=GetTickCount64();
+ if(!ownerPolicy.request(enabled,at))return false;
+ selectOwnerLocked(at);
+ source_camera::log(enabled?"FreeCamera ABI session requested":"FreeCamera ABI session released");
  return true;
 }
 inline bool publishExternalPose(const L4D2VisualCameraPoseV1* p){
@@ -198,10 +206,25 @@ inline bool publishExternalPose(const L4D2VisualCameraPoseV1* p){
     std::abs(origin.x)>2000000.f||std::abs(origin.y)>2000000.f||std::abs(origin.z)>2000000.f||
     std::abs(angles.x)>89.f||std::abs(angles.y)>720.f||std::abs(angles.z)>180.f)return false;
  std::lock_guard<std::mutex> lock(motionMutex);
- if(!ownerPolicy.allowed)return false;
- externalOrigin=origin;externalAngles=angles;
- ownerPolicy.setPose(GetTickCount64());
- selectOwnerLocked(GetTickCount64());
+ if(!ownerPolicy.allowed||!ownerPolicy.desired)return false;
+ const auto at=GetTickCount64();
+ ownerPolicy.expire(at);
+ if(!ownerPolicy.desired){selectOwnerLocked(at);return false;}
+ const auto previous=currentOwner.load(std::memory_order_relaxed);
+ ownerPolicy.setPose(at);
+ const auto next=selectOwnerLocked(at);
+ // While the user is driving, accept a heartbeat but discard its coordinates.
+ // At handoff hold the last actual camera pose until the next fresh sample.
+ if(previous==external::Owner::External&&next==external::Owner::External){
+  externalOrigin=origin;externalAngles=angles;externalTargetReady=true;
+ }
+ return true;
+}
+inline bool getExternalPose(L4D2VisualCameraPoseV1* output){
+ if(!apiLive.load(std::memory_order_acquire)||!output||output->size!=sizeof(*output))return false;
+ std::lock_guard<std::mutex> lock(motionMutex);
+ if(!ownerPolicy.allowed||!ownerPolicy.on||!active.load()||!camera.ready)return false;
+ *output=L4D2VisualCameraPoseV1{sizeof(*output),{camera.origin.x,camera.origin.y,camera.origin.z},{camera.angles.x,camera.angles.y,camera.angles.z}};
  return true;
 }
 inline bool statusExternal(L4D2VisualCameraStatusV1* output){
@@ -243,7 +266,7 @@ inline double renderTimeSeconds(){
 inline void disable(const char* reason="FreeCamera off"){
  {
   std::lock_guard<std::mutex> lock(motionMutex);
-  ownerPolicy.stop();manualRequested=false;
+  ownerPolicy.stop();
   selectOwnerLocked(GetTickCount64());
   active=false;resetMotionLocked();
  }
@@ -253,12 +276,12 @@ inline void toggle(){
  bool next=false;
  {
   std::lock_guard<std::mutex> lock(motionMutex);
-  next=!ownerPolicy.manualPinned;
-  ownerPolicy.setManual(next);manualRequested=next;
+  ownerPolicy.toggle(GetTickCount64());
+  next=ownerPolicy.on;
   selectOwnerLocked(GetTickCount64());
  }
- message=next?(bound?"FreeCamera waiting for valid view/input":"FreeCamera armed; awaiting ClientMode hook"):"FreeCamera manual off";
- source_camera::log(next?"FreeCamera: manual ON":"FreeCamera: manual OFF");
+ message=next?(bound?"FreeCamera waiting for valid view/input":"FreeCamera armed; awaiting ClientMode hook"):"FreeCamera off";
+ source_camera::log(next?"FreeCamera: ON":"FreeCamera: OFF");
 }
 inline void __fastcall overrideView(void* self,void*,void* setup){
  auto fn=reinterpret_cast<ViewCallback>(originalView);
@@ -293,7 +316,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
    renderClock.reset();
   }
   if(!camera.ready)return;
-  if(owner==external::Owner::External){
+  if(owner==external::Owner::External&&externalTargetReady){
    // Provider-supplied absolute pose. Never consume or integrate mouse input
    // while DangoMusic owns the detached camera.
    camera.origin=externalOrigin;camera.angles=externalAngles;
@@ -326,18 +349,12 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
   }
   outputOrigin=camera.origin;
   outputAngles=camera.angles;
+  if(!write(setup,layout.origin,&outputOrigin,12)||!write(setup,layout.angles,&outputAngles,12)){
+   ++viewRejected;ownerPolicy.stop();selectOwnerLocked(GetTickCount64());message="CViewSetup write failed";return;
+  }
+  active=true;
+  message=owner==external::Owner::External?"FreeCamera EXTERNAL":"FreeCamera USER";
  }
- if(!write(setup,layout.origin,&outputOrigin,12)||
-    !write(setup,layout.angles,&outputAngles,12)){
-  ++viewRejected;disable("CViewSetup write failed");return;
- }
- if(owner==external::Owner::External){
-  std::lock_guard<std::mutex> lock(motionMutex);
-  if(ownerPolicy.select(GetTickCount64())==external::Owner::External)
-   ownerPolicy.onExternalFrame();
- }
- active=true;
- message=owner==external::Owner::External?"FreeCamera EXTERNAL":"FreeCamera USER";
 }
 // Preserve the original client-mode decision and any upstream hook in the
 // chain. In FreeCamera mode, override ONLY the viewmodel visibility result.
@@ -607,7 +624,7 @@ inline void poll(bool escape,bool menu,bool gameForeground){
   camera.halt();latestInput={};dropMouseLocked();
   renderClock.reset();currentMovementSpeed=0.f;
  }
- if(edge&&f6Binding.load(std::memory_order_acquire)&&hotkeyConfigValid.load(std::memory_order_acquire)&&gameForeground&&!escape&&!menu){++keyToggles;toggle();}
+ if(edge&&(f6Binding.load(std::memory_order_acquire)||externalSession.load(std::memory_order_acquire))&&hotkeyConfigValid.load(std::memory_order_acquire)&&gameForeground&&!escape&&!menu){++keyToggles;toggle();}
 }
 inline void stop(){
  apiLive=false;
