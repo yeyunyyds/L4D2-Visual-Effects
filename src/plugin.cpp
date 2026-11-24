@@ -104,9 +104,9 @@ const char* __fastcall menu(void*,void*,bool title){return instance().RequestHud
 void* table[]={reinterpret_cast<void*>(&destroy),reinterpret_cast<void*>(&version),reinterpret_cast<void*>(&name),reinterpret_cast<void*>(&release),reinterpret_cast<void*>(&module),reinterpret_cast<void*>(&launch),reinterpret_cast<void*>(&d3d),reinterpret_cast<void*>(&device),reinterpret_cast<void*>(&menu)};
 struct Object{void** vtable;} object{table};
 }
-extern "C" IL4NPlugin* GetL4NPluginInstance(){instance();return reinterpret_cast<IL4NPlugin*>(&object);}
+extern "C" __declspec(dllexport) IL4NPlugin* GetL4NPluginInstance(){instance();return reinterpret_cast<IL4NPlugin*>(&object);}
 #else
-extern "C" IL4NPlugin* GetL4NPluginInstance(){return &instance();}
+extern "C" __declspec(dllexport) IL4NPlugin* GetL4NPluginInstance(){return &instance();}
 #endif
 
 /* Optional, versioned C ABI: DangoMusic never hooks ClientMode itself.
