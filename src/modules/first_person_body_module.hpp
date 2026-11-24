@@ -126,7 +126,7 @@ inline modules::Module create(){
   // Keep the real player entity rendered while FreeCamera observes it.
   // onFrame still verifies the local handle/model/life state before opening
   // the original DrawModel gate; no extra entities or render calls are made.
-  firstperson::onFrame(frame,freecamera::requested.load(std::memory_order_acquire),freecamera::requested.load()&&freecamera::externalSession.load());
+  firstperson::onFrame(frame,freecamera::requested.load(std::memory_order_acquire),freecamera::requested.load()&&freecamera::externalSession.load()&&freecamera::bodyClear.load());
  };
  // At this point the shared Studio pipeline has already applied any entity
  // deformation. First-person effects decorate the FINAL draw only.
