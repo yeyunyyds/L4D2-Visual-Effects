@@ -401,6 +401,7 @@ inline bool __fastcall shouldDrawViewModel(void* self,void*) {
  const auto original=originalViewModel;
  if(!original)return true; // Fail open if unexpectedly not initialized.
  const bool native=original(self);
+ visual::lifetime::Guard guard;if(!guard)return native;
  ++viewModelCalls;
  if(native)++viewModelNativeTrue;
  const bool visible=viewmodel::policy::visible(enabled(),

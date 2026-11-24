@@ -65,7 +65,7 @@ inline bool sampleDuringDraw(GameCameraFrame& f){
  CameraPose pose;return cameraPose(f,pose);
 }
 inline void __fastcall renderHook(void* self,void*,void* rect){static thread_local int depth=0;++depth;if(depth==1)renderBegins.fetch_add(1,std::memory_order_relaxed);originalRender(self,rect);if(depth==1)capture(true);--depth;}
-inline void __fastcall shutdownHook(void* self,void*){++epoch;capture(false);auto original=originalShutdown;if(auto listener=shutdownListener.exchange(nullptr))listener();original(self);}
+inline void __fastcall shutdownHook(void* self,void*){++epoch;auto original=originalShutdown;if(auto listener=shutdownListener.exchange(nullptr))listener();else capture(false);original(self);}
 inline void __fastcall levelHook(void* self,void*){++epoch;capture(false);originalLevelShutdown(self);}
 inline bool replace(size_t slot,void* expected,void* value){DWORD old=0;if(!VirtualProtect(table+slot,sizeof(void*),PAGE_READWRITE,&old))return false;void* actual=InterlockedCompareExchangePointer(table+slot,value,expected);DWORD ignored=0;VirtualProtect(table+slot,sizeof(void*),old,&ignored);return actual==expected;}
 inline bool executable(const void* address){MEMORY_BASIC_INFORMATION info{};if(!address||!VirtualQuery(address,&info,sizeof(info))||info.State!=MEM_COMMIT||(info.Protect&(PAGE_GUARD|PAGE_NOACCESS)))return false;return (info.Protect&(PAGE_EXECUTE|PAGE_EXECUTE_READ|PAGE_EXECUTE_READWRITE|PAGE_EXECUTE_WRITECOPY))!=0;}
