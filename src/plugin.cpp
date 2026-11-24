@@ -29,7 +29,7 @@ std::string buildMenu(std::uintptr_t id){
   item(visual::logging::periodicDebugEnabled()?u8"日志级别：Debug（周期详细诊断开启）":u8"日志级别：Info（周期详细诊断关闭）",896)+
   item(u8"保存设置",101)+"}";
  auto page=visual::features::host().page(id);if(page)return *page;
- return "\"L4D2Visual 1.0.0\" {"+visual::features::host().rootItems()+
+ return "\"L4D2Visual 1.1.0\" {"+visual::features::host().rootItems()+
   item(u8"菜单",9001)+item(u8"保存设置",101)+"}";
 }
 void action(std::uintptr_t id){
@@ -81,15 +81,15 @@ class Plugin final:public IL4NPlugin {
 
 static unsigned __stdcall workerMain(void*){try{diagnostics();}catch(...){}return 0;}
 public:
- Plugin(){HMODULE pinned=nullptr;if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&note),&pinned)){visual::lifetime::requestStop();return;}note("=== L4D2Visual 1.0.0 startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);visual::features::install();
+ Plugin(){HMODULE pinned=nullptr;if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&note),&pinned)){visual::lifetime::requestStop();return;}note("=== L4D2Visual 1.1.0 startup ===");note("DLL directory: "+visual::diagnostics::path.parent_path().parent_path().u8string());source_camera::logger=note;visual::hudruntime::hud.configure(buildMenu,action,closed,notice,note,appearanceChanged);visual::features::install();
   try{std::ifstream file(visual::diagnostics::path.parent_path()/L"hud.json");if(file){nlohmann::json j;file>>j;visual::logging::level.store(visual::logging::readLevel(j),std::memory_order_relaxed);visual::features::host().load(j);appearance.preset=std::min(3u,j.value("preset",0u));appearance.step=std::clamp(j.value("step",8u),1u,64u);appearance.opacity=std::clamp(j.value("opacity",.48f),.05f,1.f);appearance.font=std::clamp(j.value("font",22.f),12.f,48.f);appearance.x=j.value("x",8.f);appearance.y=j.value("y",14.f);appearance.f10=j.value("f10",false);appearance.centerY=j.value("centerY",true);visual::hudruntime::hud.loadAppearance(appearance);}}catch(const std::exception& e){note(std::string("HUD settings load failed: ")+e.what());}
   worker=reinterpret_cast<HANDLE>(_beginthreadex(nullptr,0,&workerMain,nullptr,0,nullptr));if(!worker){visual::lifetime::requestStop();note("Visual worker start failed");}}
  const char* GetName()override{return "L4D2Visual";}
- const char* GetVersion()override{return "1.0.0";}
+ const char* GetVersion()override{return "1.1.0";}
  void OnModuleLoaded(const char* name,uintptr_t handle)override{visual::lifetime::Guard guard;if(!guard||!name)return;std::string n(name);if(n=="client"||n=="client.dll")source_camera::clientModule=reinterpret_cast<HMODULE>(handle);if(n=="engine"||n=="engine.dll")source_camera::engineModule=reinterpret_cast<HMODULE>(handle);note("Module loaded: "+n);connect();}
  void OnGameLaunch()override{visual::lifetime::Guard guard;if(!guard)return;note("OnGameLaunch");connect();}
  void OnD3DDeviceCreated(void* d,bool dxvk)override{visual::lifetime::Guard guard;if(!guard)return;note(std::string("OnD3DDeviceCreated dxvk=")+(dxvk?"yes":"no"));visual::hudruntime::created(static_cast<IDirect3DDevice9*>(d));visual::features::host().deviceCreated(static_cast<IDirect3DDevice9*>(d));}
- const char* RequestHudMenu(bool title)override{visual::lifetime::Guard guard;if(!guard)return nullptr;if(title)return "L4D2Visual 1.0.0";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开视觉效果菜单\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
+ const char* RequestHudMenu(bool title)override{visual::lifetime::Guard guard;if(!guard)return nullptr;if(title)return "L4D2Visual 1.1.0";visual::hudruntime::hud.open();static std::string entry;std::ostringstream address;address<<"0x"<<std::hex<<reinterpret_cast<uintptr_t>(&openMenu);entry="\"L4D2Visual\" { \"打开视觉效果菜单\" { \"callback\" \""+address.str()+"\" } }";return entry.c_str();}
  // Destructor/host teardown can run under Loader Lock: atomics only.
  void requestStop() noexcept {visual::lifetime::requestStop();visual::freecamera::apiLive=false;source_camera::frameListener=nullptr;}
  // Called by Source Shutdown or the explicit export, not static destruction.

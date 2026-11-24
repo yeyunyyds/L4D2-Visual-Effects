@@ -1,18 +1,18 @@
 # L4D2Visual 安装说明
 
-## 正式版本：v1.0.0
+## 正式版本：v1.1.0
 
-下载：[L4D2Visual v1.0.0 正式 Release](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0)。正式安装包为 `L4D2Visual-1.0.0.zip`；配套提供相同源码提交的源码包与两个 SHA-256 校验文件。历史 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留。
+下载：[L4D2Visual v1.1.0 正式 Release](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.0)。正式安装包为 `L4D2Visual-1.1.0.zip`；配套提供相同源码提交的源码包与两个 SHA-256 校验文件。历史 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留。
 
 支持：**Left 4 Dead 2，Windows x86，L4N v2，以及符合插件 PE/SHA-256 校验的游戏模块版本**。其他游戏 DLL 版本将因安全检查拒绝对应 Hook 或补丁，不能通过强制关闭校验来解决。
 
 ## 安装
 
 1. **完全退出游戏**，备份现有 `bin/neko/plugins/L4D2Visual.dll` 和 `bin/neko/plugins/L4D2Visual/hud.json`。
-2. 从上述正式 Release 下载 `L4D2Visual-1.0.0.zip`；解压后包含 `bin/` 和 `README.md`，没有第二层安装 ZIP。
+2. 从上述正式 Release 下载 `L4D2Visual-1.1.0.zip`；解压后包含 `bin/` 和 `README.md`，没有第二层安装 ZIP。
 3. 把 `bin/` 合并到游戏目录。安装包内的默认配置位于 `bin/neko/plugins/L4D2Visual/hud.json`。
 4. 老用户可以保留自己原有的 `hud.json`，新功能缺失的设置使用默认值。不要用新默认配置覆盖旧版自定义样式，除非你希望全部重置。
-5. 在 L4N 插件菜单中打开 L4D2Visual。正式 DLL 版本字符串为 `1.0.0`；以日志和菜单显示的实际 DLL 版本为准。
+5. 在 L4N 插件菜单中打开 L4D2Visual。正式 DLL 版本字符串为 `1.1.0`；以日志和菜单显示的实际 DLL 版本为准。
 
 **不要替换游戏自带的 `studiorender.dll`。** 若使用过 Hook/原生补丁，更新 DLL 前必须完全退出游戏，不能仅返回主菜单。
 
@@ -26,6 +26,10 @@
 - **日志**：默认 Info；Debug 可查看周期性诊断信息。
 
 Tank 预测的红色范围线偏好默认开，红色进度条和填充默认关。旧版原生 Glow 描边功能已彻底移除，`tankPrediction.warnOutline` 被忽略；不再修改 Tank 或特感的 Glow 字段。已删除的自定义喷漆 / P2P 配置不会恢复。
+
+## 外部相机控制（DangoMusic 等）
+
+FreeCamera 菜单中主动开启外部接口授权，默认关闭。支持 ABI v4、首次闲置等待、键鼠优先接管、再次闲置交还。DangoMusic v1.0.0 可使用该接口。支持在 hud.json 中自定义快捷键及移动键。当前游戏 DLL 采用 2026 年 11 月的已验证版本标识，未知版本仍拒绝对应 Hook。
 
 ## 验收与注意事项
 

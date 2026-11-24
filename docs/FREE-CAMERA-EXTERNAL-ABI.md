@@ -1,6 +1,6 @@
 # FreeCamera 外部接口（C ABI v4）
 
-实验分支：`feature/external-freecamera-abi`。只支持同一 L4D2 Windows x86 进程内的 L4N 插件，不新增 ClientMode Hook，也不需要独立测试 EXE。
+正式支持：L4D2Visual v1.1.0。只支持同一 L4D2 Windows x86 进程内的 L4N 插件，不新增 ClientMode Hook，也不需要独立测试 EXE。
 
 ## 单一相机、单一开关
 
@@ -22,6 +22,7 @@
 | L4D2VisualCameraSetExternalActive | 请求开启或结束现有外部会话 |
 | L4D2VisualCameraGetStatus | 授权、请求、当前 owner、闲置时间和实际激活状态 |
 | L4D2VisualCameraGetPose | 读取当前实际生效的 FreeCamera 位置及角度；无有效视角时返回 0 |
+| L4D2VisualCameraSetNativeOnInput | 可选：用户接管时恢复第一人称 |
 | L4D2VisualCameraSetPose | 提交绝对世界坐标及角度；用户拥有控制权时仅续租，不改变视角 |
 
 调用方通过 GetModuleHandleW/GetProcAddress 动态解析，不自行 LoadLibrary。首先检查版本和授权，再请求启用，持续发送有效坐标。每次取得 EXTERNAL 控制权时，先 GetPose，再以实际姿态为起点提交连续轨迹。GetPose 返回的不是候选目标。运行会话丢失时清除旧轨迹并重新请求；不关闭调用方的 AFK 功能开关。

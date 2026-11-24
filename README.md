@@ -2,7 +2,7 @@
 
 面向《Left 4 Dead 2》的 **Windows x86 / L4N v2** 客户端视觉效果插件。插件及 DLL 名称均为 `L4D2Visual`。
 
-**当前正式版：v1.0.0。** [下载正式安装包](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0) · [安装说明](docs/INSTALL.md) · [更新日志](docs/releases/v1.0.0.md) · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v1.0.0) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip)。历史正式版 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留供回退。
+**当前正式版：v1.1.0。** [下载正式安装包](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.0) · [安装说明](docs/INSTALL.md) · [更新日志](docs/releases/v1.1.0.md) · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v1.1.0) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip)。历史正式版 [v1.0.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0) 与 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留供回退。
 
 ## 功能
 
@@ -17,11 +17,11 @@
 
 **FPB** 使用经过验证的原生 `C_TerrorPlayer::DrawModel` 路径，启用时只修改本地人物绘制门控中的一字节跳转位移，关闭时检查原始字节恢复；异常时报告 `Unknown`，不会盲目覆盖第三方修改。已移除纯诊断型 `ShouldDraw` Hook。FPB 关闭时不会再额外读取 Studio 模型数据。
 
-> **实验分支：FreeCamera ABI v4**。外部请求先等待首次 AFK 阈值（默认10秒），期间保持原生视角；手动和外部共用启停开关，键鼠优先，闲置 1–30 秒（默认 3 秒）后交还外部；支持 GetPose，F6/配置快捷键或菜单关闭即取消外部会话。见 [外部 Camera API 说明](docs/FREE-CAMERA-EXTERNAL-ABI.md)。
+> **FreeCamera 外部控制（ABI v4）**。外部请求先等待首次 AFK 阈值（默认10秒），期间保持原生视角；手动和外部共用启停开关，键鼠优先，外部调用方可选择接管后返回第一人称，闲置 1–30 秒（默认 3 秒）后交还外部；支持 GetPose，F6/配置快捷键或菜单关闭当前视角并重新等待首次闲置时间。见 [外部 Camera API 说明](docs/FREE-CAMERA-EXTERNAL-ABI.md)。
 
 **FreeCamera** 可通过菜单直接切换；F6 绑定需要在菜单中单独开启，默认不占用 F6。三个 ClientMode Hook 在第一次实际请求 FreeCamera 时才安装，以后关闭时透传原生调用。第一人称武器隐藏与人物世界位置保持相互独立。菜单中的「运行数据与诊断」用于查看 Hook、运行阶段与计数。服务器环境下的鼠标转向卡顿曾有反馈，本版包含额外鼠标采样修复，但尚未取得修复后的服务器实机复验结论。
 
-`main` 开发版新增 `freeCamera.hotkey` 字符串配置，可在 `hud.json` 中手动改为 `f7`、`p` 等；现有 `f6Binding` 继续控制是否启用快捷键，默认 F6、默认关闭。**该改动尚未包含在已发布的 v1.0.0 安装包中。** 详见 [FreeCamera 配置说明](docs/FREE-CAMERA.md)。
+本版支持 `freeCamera.hotkey` 字符串配置，可在 `hud.json` 中手动改为 `f7`、`p` 等；现有 `f6Binding` 继续控制是否启用快捷键，默认 F6、默认关闭。详见 [FreeCamera 配置说明](docs/FREE-CAMERA.md)。
 
 **Tank 遮挡修复** 使用只读的世界几何 `TraceRay` 判断。建筑遮住 Tank 时，预测 HUD 的计时条、方向箭头、范围线和红色填充同步隐藏；目标连线沿用原行为。三点射线是近似判断，不是逐像素深度测试，动态物体及半遮挡结果可能不同。**本版本不修改任何 Tank 或特感的原生 Glow 属性，也不包含特感独立描边功能。** 旧配置 `tankPrediction.warnOutline` 被忽略，不再保存。
 
@@ -29,13 +29,13 @@
 
 ## 安装与更新
 
-参见 [安装说明](docs/INSTALL.md)。从正式 Release 下载 `L4D2Visual-1.0.0.zip`，解压后得到 `bin/` 和 `README.md`，将 `bin/` 合并到游戏目录。**更新前完全退出游戏，备份 `L4D2Visual.dll` 和 `bin/neko/plugins/L4D2Visual/hud.json`**；不要替换游戏自带的 `studiorender.dll`。可保留旧配置；旧版 Glow 和喷漆键不再生效。
+参见 [安装说明](docs/INSTALL.md)。从正式 Release 下载 `L4D2Visual-1.1.0.zip`，解压后得到 `bin/` 和 `README.md`，将 `bin/` 合并到游戏目录。**更新前完全退出游戏，备份 `L4D2Visual.dll` 和 `bin/neko/plugins/L4D2Visual/hud.json`**；不要替换游戏自带的 `studiorender.dll`。可保留旧配置；旧版 Glow 和喷漆键不再生效。
 
 只支持明确校验过的 Windows x86 游戏模块；指纹不匹配时相关原生功能会拒绝执行。对于第三方插件、特殊模型、不同 DXVK/D3D9 环境，不承诺全面兼容。客户端 HUD 的射线/计时预测也不代表服务器的真实判定。**不对联机或 VAC 安全作保证**，请先在离线环境验收。
 
 ## 构建及发布状态
 
-`v1.0.0` 由 GitHub Actions 从正式版本源码构建、验证并发布 Windows x86 安装包、配套源码 ZIP 和 SHA-256 校验文件；`main` 仍保留日常候选 CI。版本标签与安装包源码对应，历史 Release 不会覆盖。
+`v1.1.0` 由 GitHub Actions 从正式版本源码构建、验证并发布 Windows x86 安装包、配套源码 ZIP 和 SHA-256 校验文件；`main` 仍保留日常候选 CI。版本标签与安装包源码对应，历史 Release 不会覆盖。
 
 ```sh
 ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
@@ -43,7 +43,7 @@ CXX_X86=i686-w64-mingw32-g++-posix bash scripts/build-mingw.sh
 python3 scripts/package.py
 ```
 
-构建产物为 `build/L4D2Visual-1.0.0.zip`。源码、依赖许可与署名见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md) 和 [v1.0.0 更新日志](docs/releases/v1.0.0.md)。安装包内的 README 附有完整许可内容。
+构建产物为 `build/L4D2Visual-1.1.0.zip`。源码、依赖许可与署名见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md) 和 [v1.1.0 更新日志](docs/releases/v1.1.0.md)。安装包内的 README 附有完整许可内容。
 
 ## 设计与说明
 

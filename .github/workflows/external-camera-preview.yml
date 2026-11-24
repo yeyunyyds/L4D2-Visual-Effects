@@ -38,7 +38,7 @@ jobs:
       - name: Package preview
         run: |
           python3 scripts/package.py
-          cp build/L4D2Visual-1.0.0.zip build/L4D2Visual-external-camera-preview.zip
+          cp build/L4D2Visual-1.1.0.zip build/L4D2Visual-external-camera-preview.zip
       - uses: actions/upload-artifact@v4
         with:
           name: L4D2Visual-external-camera-preview-MinGW-x86
