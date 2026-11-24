@@ -19,6 +19,9 @@ inline std::optional<std::string> page(std::uintptr_t id){
    row(u8"放开键鼠后交还外部（1-30秒）："+std::to_string(freecamera::externalIdleSeconds())+"s")+
    item(u8"交还等待 +1 秒",939)+item(u8"交还等待 -1 秒",940)+
    row(u8"外部控制需单独授权；玩家键鼠操作始终优先")+
+   row(std::string(u8"当前控制权：")+
+       (freecamera::currentOwner.load()==freecamera::external::Owner::External?u8"Dango/外部":
+        freecamera::currentOwner.load()==freecamera::external::Owner::User?u8"用户 FreeCamera":u8"原生游戏"))+
 
    row(u8"最高飞行速度："+std::to_string(int(freecamera::movementSpeed.load())))+
    item(u8"最高速度 +50",932)+item(u8"最高速度 -50",933)+
