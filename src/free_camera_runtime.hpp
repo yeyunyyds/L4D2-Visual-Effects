@@ -7,6 +7,8 @@
 #include "free_camera_activation_policy.hpp"
 #include "free_camera_command_policy.hpp"
 #include "free_camera_hotkey.hpp"
+#include "free_camera_external_policy.hpp"
+#include "../include/l4d2visual_camera_api.h"
 #include "module_verification.hpp"
 #include "dango/source_camera.hpp"
 #include <windows.h>
@@ -20,6 +22,8 @@
 namespace visual::freecamera {
 using core::Vec;
 inline std::atomic<bool> requested{false},bound{false},active{false},paused{false};
+inline std::atomic<bool> externalPermission{false},manualRequested{false},apiLive{true};
+inline std::atomic<external::Owner> currentOwner{external::Owner::Native};
 inline std::atomic<bool> f6Binding{false};
 // Key is configured by hud.json freeCamera.hotkey; existing enable flag retained.
 inline std::atomic<int> hotkeyVk{hotkey::defaultVk};
@@ -38,6 +42,8 @@ inline std::atomic<float> movementSpeed{1000.f};
 inline std::atomic<bool> hideViewmodel{true};
 inline std::atomic<float> currentMovementSpeed{0.f};
 inline core::Camera camera;
+inline external::Policy ownerPolicy;
+inline core::Vec externalOrigin{},externalAngles{};
 inline std::mutex motionMutex;
 inline core::Input latestInput{};
 inline core::MouseQueue pendingMouse;
@@ -140,6 +146,88 @@ inline void resetMotionLocked(){
  renderClock.reset();haveAim=false;lastInput=0;
  currentMovementSpeed=0.f;renderDeltaMs=0.f;
 }
+// The camera owner is selected under motionMutex. Never call an original
+// engine hook while holding this lock.
+inline external::Owner selectOwnerLocked(ULONGLONG at){
+ const auto next=ownerPolicy.select(at);
+ const auto previous=currentOwner.load(std::memory_order_relaxed);
+ if(next!=previous){
+  if(next==external::Owner::Native){
+   active=false;resetMotionLocked();
+  }else if(previous==external::Owner::Native){
+   active=false;resetMotionLocked();
+  }else if(next==external::Owner::External){
+   camera.halt();latestInput={};dropMouseLocked();
+  }else if(previous==external::Owner::External){
+   // External -> user: never reset the detached camera pose.
+   camera.halt();
+  }
+  currentOwner.store(next,std::memory_order_release);
+ }
+ requested.store(next!=external::Owner::Native,std::memory_order_release);
+ return next;
+}
+inline void allowExternal(bool enabled){
+ std::lock_guard<std::mutex> lock(motionMutex);
+ ownerPolicy.allow(enabled,GetTickCount64());
+ externalPermission.store(enabled,std::memory_order_release);
+ selectOwnerLocked(GetTickCount64());
+}
+inline void setExternalIdleSeconds(unsigned seconds){
+ std::lock_guard<std::mutex> lock(motionMutex);
+ ownerPolicy.setIdle(seconds);
+ selectOwnerLocked(GetTickCount64());
+}
+inline unsigned externalIdleSeconds(){
+ std::lock_guard<std::mutex> lock(motionMutex);
+ return ownerPolicy.idleSeconds;
+}
+inline bool requestExternal(bool enabled){
+ if(!apiLive.load(std::memory_order_acquire))return false;
+ std::lock_guard<std::mutex> lock(motionMutex);
+ if(!ownerPolicy.request(enabled))return false;
+ selectOwnerLocked(GetTickCount64());
+ return true;
+}
+inline bool publishExternalPose(const L4D2VisualCameraPoseV1* p){
+ if(!apiLive.load(std::memory_order_acquire)||!p||p->size!=sizeof(*p))return false;
+ core::Vec origin{p->origin[0],p->origin[1],p->origin[2]};
+ core::Vec angles{p->angles[0],p->angles[1],p->angles[2]};
+ if(!core::valid(origin)||!core::valid(angles)||
+    std::abs(origin.x)>2000000.f||std::abs(origin.y)>2000000.f||std::abs(origin.z)>2000000.f||
+    std::abs(angles.x)>89.f||std::abs(angles.y)>720.f||std::abs(angles.z)>180.f)return false;
+ std::lock_guard<std::mutex> lock(motionMutex);
+ if(!ownerPolicy.allowed)return false;
+ externalOrigin=origin;externalAngles=angles;
+ ownerPolicy.setPose(GetTickCount64());
+ selectOwnerLocked(GetTickCount64());
+ return true;
+}
+inline bool statusExternal(L4D2VisualCameraStatusV1* output){
+ if(!output||output->size!=sizeof(*output))return false;
+ std::lock_guard<std::mutex> lock(motionMutex);
+ const ULONGLONG at=GetTickCount64();
+ selectOwnerLocked(at);
+ *output=L4D2VisualCameraStatusV1{
+  sizeof(*output),L4D2VISUAL_CAMERA_ABI_VERSION,
+  ownerPolicy.allowed?1u:0u,ownerPolicy.desired?1u:0u,
+  static_cast<std::uint32_t>(currentOwner.load(std::memory_order_acquire)),
+  ownerPolicy.idleSeconds,ownerPolicy.remainingMs(at),
+  bound.load()?1u:0u,active.load()?1u:0u
+ };
+ return true;
+}
+inline bool hasHumanInput(const Cmd* cmd){
+ if(cmd->mousedx||cmd->mousedy||cmd->buttons||
+    std::abs(cmd->forwardmove)>.01f||std::abs(cmd->sidemove)>.01f||
+    std::abs(cmd->upmove)>.01f)return true;
+ // Detect all keyboard and mouse buttons while the L4D2 window has focus.
+ for(int vk=VK_BACK;vk<=VK_OEM_CLEAR;++vk){
+  if(vk==VK_PACKET||vk==VK_PROCESSKEY)continue;
+  if(GetAsyncKeyState(vk)&0x8000)return true;
+ }
+ return false;
+}
 inline double renderTimeSeconds(){
  static const double inv=[]{
   LARGE_INTEGER f{};
@@ -151,19 +239,24 @@ inline double renderTimeSeconds(){
   static_cast<double>(t.QuadPart)*inv:0.0;
 }
 inline void disable(const char* reason="FreeCamera off"){
- requested=false;active=false;
- {std::lock_guard<std::mutex> lock(motionMutex);resetMotionLocked();}
+ {
+  std::lock_guard<std::mutex> lock(motionMutex);
+  ownerPolicy.stop();manualRequested=false;
+  selectOwnerLocked(GetTickCount64());
+  active=false;resetMotionLocked();
+ }
  message=reason;
 }
 inline void toggle(){
  bool next=false;
  {
   std::lock_guard<std::mutex> lock(motionMutex);
-  next=!requested.load();
-  requested=next;active=false;resetMotionLocked();
+  next=!ownerPolicy.manualPinned;
+  ownerPolicy.setManual(next);manualRequested=next;
+  selectOwnerLocked(GetTickCount64());
  }
- message=next?(bound?"FreeCamera waiting for valid view/input":"FreeCamera armed; awaiting ClientMode hook"):"FreeCamera off";
- source_camera::log(next?"FreeCamera: request ON":"FreeCamera: request OFF");
+ message=next?(bound?"FreeCamera waiting for valid view/input":"FreeCamera armed; awaiting ClientMode hook"):"FreeCamera manual off";
+ source_camera::log(next?"FreeCamera: manual ON":"FreeCamera: manual OFF");
 }
 inline void __fastcall overrideView(void* self,void*,void* setup){
  auto fn=reinterpret_cast<ViewCallback>(originalView);
