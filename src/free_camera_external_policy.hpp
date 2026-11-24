@@ -43,7 +43,7 @@ struct Policy {
   return elapsed>=threshold?0:static_cast<std::uint32_t>(threshold-elapsed);
  }
  // Activate only on a fresh, foreground game input sample, never on status polling.
- void advance(std::uint64_t now) noexcept {expire(now);if(!on&&allowed&&desired&&hasPose&&remainingMs(now)==0)on=true;}
+ void advance(std::uint64_t now) noexcept {expire(now);if(!on&&allowed&&desired&&hasPose&&remainingMs(now)==0){on=true;const auto resume=std::uint64_t(idleSeconds)*1000;lastInputMs=now>=resume?std::min(lastInputMs,now-resume):0;}}
  Owner select(std::uint64_t now) const noexcept {
   if(!on)return Owner::Native;
   if(allowed&&desired&&hasPose&&leaseAlive(now)&&remainingMs(now)==0)return Owner::External;
