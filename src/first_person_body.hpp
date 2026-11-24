@@ -20,12 +20,12 @@ inline freecamerabody::Transition cameraTransition;
 inline void clear() noexcept{
  worldBodyActive=false;validatedLocal=false;currentHandle=0xffffffffu;currentEpoch=0;localBase=0;localTick=0;
 }
-inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequested=false) noexcept {
+inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequested=false,bool forceWorldBody=false) noexcept {
  // Reset the first-/third-person evidence on BOTH F6 edges. The detached
  // camera's distance is not a valid hint after returning to normal view.
  if(cameraTransition.update(freeCameraRequested))viewcompat::reset();
  struct RestoreOnFailure {bool succeeded=false;~RestoreOnFailure(){if(!succeeded)native::disable();}} gate;
- if(!std::atomic_load(&options)->enabled){
+ if(!std::atomic_load(&options)->enabled&&!forceWorldBody){
   clear();status=u8"关闭：原生可见性保持不变";return;
  }
  if(!camera.active||!source_camera::hooked){
