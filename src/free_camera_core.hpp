@@ -33,7 +33,7 @@ struct FrameClock {
  }
 };
 
-struct Input {float forward=0,side=0,up=0,dx=0,dy=0;};
+struct Input {float forward=0,side=0,up=0,dx=0,dy=0,speedScale=1.f;};
 // Discrete mouse counts must survive command/render frequency mismatches.
 // Clamp only the amount taken per render, keeping any queued remainder.
 struct MouseCounts{std::int64_t x=0,y=0;};
@@ -86,7 +86,8 @@ struct Camera {
   if(len>1.f)wish=wish*(1.f/len);
   const bool moving=len>.0001f;
   const float cap=std::clamp(std::isfinite(speed)?speed:1000.f,30.f,2500.f);
-  const Vec target=wish*cap;
+  const float factor=std::clamp(std::isfinite(i.speedScale)?i.speedScale:1.f,0.05f,1.f);
+  const Vec target=wish*(cap*factor);
   const float oldSpeed=currentSpeed();
   const bool sharp=moving&&oldSpeed>.001f&&dot(velocity,wish)<oldSpeed*.7f;
   const float tau=moving?(sharp?.085f:.12f):.065f;
