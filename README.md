@@ -17,7 +17,9 @@
 
 **FPB** 使用经过验证的原生 `C_TerrorPlayer::DrawModel` 路径，启用时只修改本地人物绘制门控中的一字节跳转位移，关闭时检查原始字节恢复；异常时报告 `Unknown`，不会盲目覆盖第三方修改。已移除纯诊断型 `ShouldDraw` Hook。FPB 关闭时不会再额外读取 Studio 模型数据。
 
-> **实验分支新增：FreeCamera 外部 ABI 接口**。FreeCamera 菜单可单独授权外部插件（默认关闭）；用户动键鼠立即抢回镜头、保留当前自由摄像机位置，闲置 1–30 秒（默认 3 秒）后交还外部。仅开放镜头坐标/启停接口，尚未集成 DangoMusic 的自动运镜轨迹。见 [外部 Camera API 说明](docs/FREE-CAMERA-EXTERNAL-ABI.md)。\n\n**FreeCamera** 可通过菜单直接切换；F6 绑定需要在菜单中单独开启，默认不占用 F6。三个 ClientMode Hook 在第一次实际请求 FreeCamera 时才安装，以后关闭时透传原生调用。第一人称武器隐藏与人物世界位置保持相互独立。菜单中的「运行数据与诊断」用于查看 Hook、运行阶段与计数。服务器环境下的鼠标转向卡顿曾有反馈，本版包含额外鼠标采样修复，但尚未取得修复后的服务器实机复验结论。
+> **实验分支：FreeCamera ABI v2**。手动和外部共用启停开关，键鼠优先，闲置 1–30 秒（默认 3 秒）后交还外部；支持 GetPose，F6/配置快捷键或菜单关闭即取消外部会话。见 [外部 Camera API 说明](docs/FREE-CAMERA-EXTERNAL-ABI.md)。
+
+**FreeCamera** 可通过菜单直接切换；F6 绑定需要在菜单中单独开启，默认不占用 F6。三个 ClientMode Hook 在第一次实际请求 FreeCamera 时才安装，以后关闭时透传原生调用。第一人称武器隐藏与人物世界位置保持相互独立。菜单中的「运行数据与诊断」用于查看 Hook、运行阶段与计数。服务器环境下的鼠标转向卡顿曾有反馈，本版包含额外鼠标采样修复，但尚未取得修复后的服务器实机复验结论。
 
 `main` 开发版新增 `freeCamera.hotkey` 字符串配置，可在 `hud.json` 中手动改为 `f7`、`p` 等；现有 `f6Binding` 继续控制是否启用快捷键，默认 F6、默认关闭。**该改动尚未包含在已发布的 v1.0.0 安装包中。** 详见 [FreeCamera 配置说明](docs/FREE-CAMERA.md)。
 
