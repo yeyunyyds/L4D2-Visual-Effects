@@ -27,8 +27,7 @@ inline std::shared_ptr<const ModelIdentity> activeModel() {
     tick<sample||tick-sample>2000)return nullptr;
  return current;
 }
-inline void observeModel(const visual::StudioPose& studio,std::uint32_t epoch){
- auto name=visual::canonicalModel(studio.name);
+inline void observeModel(const visual::StudioPose& studio,const std::string& name,std::uint32_t epoch){
  auto current=std::atomic_load(&modelIdentity);
  if(!current||current->name!=name||current->checksum!=studio.checksum||current->epoch!=epoch){
   std::atomic_store(&modelIdentity,
@@ -70,12 +69,11 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  const dango::Vec3& origin,Original&& original) {
  std::uint32_t renderable=0,header=0;
  auto ptr=std::uint32_t(std::uintptr_t(info));
- if(!info||!source_entities::wire::load(source_entities::reader,ptr,header)||
-    !source_entities::wire::load(source_entities::reader,ptr+24,renderable)){
+ if(!info||!source_entities::wire::load(source_entities::reader,ptr+24,renderable)){
   original(bones,origin);return;
  }
  Context ctx;
- if(!select(renderable,ctx)) {original(bones,origin);return;}
+ if(!select(renderable,ctx)||!source_entities::wire::load(source_entities::reader,ptr,header)) {original(bones,origin);return;}
  // View-compatibility camera mode is committed once by the game-frame callback.
  // Do not reclassify/rewrite its state from individual Studio draw calls:
  // doing so flips the native gate during movement and resets alignment.
@@ -87,17 +85,18 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  const bool wantParts=settings->hideHead||settings->hideArms;
  const bool wantDynamic=settings->dynamicAnchor;
  const visual::StudioPose* studio=nullptr;
+ dynamic::CachedModel* model=nullptr;
  bool ready=false;
  if(bones&&(wantOffset||wantParts||wantDynamic)){
-  static thread_local visual::StudioCache cache;
+  static thread_local visual::StudioCacheWith<dynamic::CachedModel> cache;
   const char* reason=nullptr;
-  studio=cache.find(source_entities::reader,header,ctx.camera->epoch,&reason);
-  if(studio&&studio->count>0&&studio->count<=256&&
+  studio=cache.find(source_entities::reader,header,ctx.camera->epoch,&reason,&model);
+  if(studio&&model&&studio->count>0&&studio->count<=256&&
      source_entities::reader.read(std::uint32_t(std::uintptr_t(bones)),temporary,studio->count*sizeof(visual::Matrix3x4))){
    ready=true;
    for(unsigned i=0;i<studio->count;++i)
     if(!parts::matrixValid(temporary[i])){ready=false;break;}
-   if(ready)observeModel(*studio,ctx.camera->epoch);
+   if(ready){model->identify(*studio);observeModel(*studio,model->name,ctx.camera->epoch);}
   }
  }
  if(wantDynamic){
@@ -110,11 +109,10 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   if(ready&&source_camera::sampleDuringDraw(live)&&
      live.epoch==ctx.camera->epoch&&dango::cameraPose(live,pose)){
    ++sameFrameCamera;
-   auto rig=dynamic::discover(*studio,settings->fallbackEyeHeight);
-   auto id=visual::canonicalModel(studio->name);
-   auto prof=visual::firstperson::profile(*settings,id,studio->checksum);
+   const auto& rig=model->alignment(*studio,settings->fallbackEyeHeight);
+   auto prof=visual::firstperson::profile(*settings,model->name,studio->checksum);
    const auto resolved=dynamic::compute(*studio,rig,temporary,pose,*settings,prof,
-                                       ctx.camera->epoch,ctx.handle,live.tick,tracking);
+                                       ctx.camera->epoch,ctx.handle,live.tick,tracking,&model->key);
    if(resolved.ok&&rig.anchor>=0&&unsigned(rig.anchor)<studio->count){
     auto pivot=dynamic::location(temporary[unsigned(rig.anchor)]);
     if(dynamic::transform(temporary,studio->count,pivot,
@@ -158,7 +156,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   if(ready){
    // Use actual model bone hierarchy; never guess head from vertex height.
    // Only this draw's temporary bone matrices are modified.
-   const auto plan=parts::discover(*studio);
+   const auto& plan=model->partPlan(*studio);
    const auto result=parts::apply(*studio,plan,temporary,settings->hideHead,settings->hideArms);
    partChanged=result.modified!=0;
    if(settings->hideHead){

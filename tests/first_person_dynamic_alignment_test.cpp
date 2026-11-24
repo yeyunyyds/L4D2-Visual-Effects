@@ -31,6 +31,13 @@ int main(){
  auto anchor=discover(rig,5);
  assert(anchor.anchor==2&&anchor.bindEye&&anchor.knownEye);
  assert(anchor.eyeFromAnchor.z==15);
+ CachedModel cached;cached.identify(rig);
+ assert(cached.name==canonicalModel(rig.name)&&cached.key==cached.name+"#678");
+ const auto& plan=cached.partPlan(rig);
+ assert(plan.head==4&&plan.neck==3);
+ const auto& cachedRig=cached.alignment(rig,5);
+ assert(cachedRig.anchor==anchor.anchor&&cachedRig.eyeFromAnchor.z==15);
+ assert(&cached.partPlan(rig)==&plan);
  Matrix3x4 bones[7]{};
  for(int i=0;i<7;++i)bones[i]=matrix(0,0,float(i*8));
  bones[2]=matrix(0,0,50);bones[5]=matrix(0,9,53);bones[6]=matrix(0,-9,53);
@@ -43,6 +50,9 @@ int main(){
  Track track;
  auto r=compute(rig,anchor,bones,camera,options,nullptr,1,123,1000,track);
  assert(r.ok&&std::abs(r.translation.z)<.001f);
+ Track cachedTrack;
+ auto cachedResult=compute(rig,cachedRig,bones,camera,options,nullptr,1,123,1000,cachedTrack,&cached.key);
+ assert(cachedResult.ok&&cachedResult.translation.z==r.translation.z&&cachedTrack.model==track.model);
  // Jump/landing: camera rises 10u but animated chest rises 24u.
  camera.eye.z=75;bones[2].m[2][3]=74;
  auto jump=compute(rig,anchor,bones,camera,options,nullptr,1,123,1016,track);
@@ -67,6 +77,10 @@ int main(){
  auto fallback=discover(rig,5);
  assert(fallback.knownEye&&!fallback.bindEye);
  assert(fallback.eyeFromAnchor.z==19);
+ CachedModel fallbackCache;
+ assert(fallbackCache.alignment(rig,5).eyeFromAnchor.z==19);
+ assert(fallbackCache.alignment(rig,7).eyeFromAnchor.z==21);
+ assert(fallbackCache.alignment(rig,7).eyeFromAnchor.z==21);
  // Full inverse bind missing: bootstrap once, then track independent motion.
  rig.bindValid.assign(7,0);
  auto boot=discover(rig,5);

@@ -114,6 +114,17 @@ inline std::optional<std::string> page(uintptr_t id){
 }
 inline bool action(uintptr_t id){if(entityAction(id))return true;if(id==100)toggle();if(id>=110&&id<=117){auto a=*std::atomic_load(&visual::render::animation);a=visual::adjustAnimation(a,unsigned(id));std::atomic_store(&visual::render::animation,std::make_shared<const visual::AnimationSettings>(a));visual::render::startedAt=GetTickCount64();saveMessage=u8"动画设置未保存";}if(id==119){visual::render::compatibility=!visual::render::compatibility.load();saveMessage=u8"渲染模式未保存";}if(id==118){visual::render::boneLimit=visual::nextBoneLimit(visual::render::boneLimit.load());saveMessage=u8"骨骼上限未保存";}return id==100||(id>=110&&id<=119);}
 inline void onFrame(const dango::GameCameraFrame& frame){
+ // Disabled animation must not evaluate inventories requested by other modules.
+ // Drop the old snapshot once; re-enabling always rebuilds the selection.
+ if(!requested.load(std::memory_order_acquire)){
+  if(previous){
+   previous.reset();previousSelection.reset();previousProximity.reset();selected=false;
+   visual::render::enabled=false;visual::render::proximityActive=false;
+   visual::render::proximityCount=0;visual::render::proximitySources=0;
+   std::atomic_store(&visual::render::proximityTargets,std::make_shared<const visual::ProximityResult>());
+  }
+  return;
+ }
  auto selection=std::atomic_load(&visual::render::selection);
  auto proximity=std::atomic_load(&visual::render::proximity);
  auto inventory=std::atomic_load(&source_entities::snapshot);
@@ -140,7 +151,7 @@ inline modules::Module bindings(){
  modules::Module m;m.id="animation";m.menuOrder=0;
  // Menu parent lives in entity scaling; this remains a separate module.
  m.page=[this](std::uintptr_t id){return page(id);};m.action=[this](std::uintptr_t id){return action(id);};m.frame=[this](const dango::GameCameraFrame& frame){onFrame(frame);};
- m.needsEntities=[this] {auto selection=std::atomic_load(&render::selection);auto proximity=std::atomic_load(&render::proximity);return requested&&(selection->anyEnabled()||proximity->enabled);};
+ m.needsEntities=[this] {if(!requested.load(std::memory_order_acquire))return false;auto selection=std::atomic_load(&render::selection);auto proximity=std::atomic_load(&render::proximity);return selection->anyEnabled()||proximity->enabled;};
  m.diagnostics=[this]{return "requested="+std::to_string(requested.load())+" proximity="+std::to_string(render::proximityActive.load())+" proximityCount="+std::to_string(render::proximityCount.load())+" proximitySources="+std::to_string(render::proximitySources.load());};
  m.needsCompatibility=[] {return render::enabled.load();};
  m.save=[](nlohmann::json& j){writeAnimationSettings(j,*std::atomic_load(&render::animation));writeBoneLimit(j,render::boneLimit);writeRenderCompatibility(j,render::compatibility);writeEntitySelection(j,*std::atomic_load(&render::selection));writeProximity(j,*std::atomic_load(&render::proximity));};

@@ -33,6 +33,17 @@ int main(){
     before=reader.reads;reader.integer(8,42);check(cache.find(reader,0x1000,1,&reason)!=nullptr);check(reader.reads>before+1);
     before=reader.reads;check(cache.find(reader,0x1000,2,&reason)!=nullptr);check(reader.reads>before+1);
     reader.integer(4,99);check(cache.find(reader,0x1000,2,&reason)==nullptr);reader.integer(4,49);
+    StudioCacheWith<unsigned> extended;unsigned* derived=nullptr;
+    check(extended.find(reader,0x1000,2,&reason,&derived)&&derived&&*derived==0);
+    *derived=7;
+    check(extended.find(reader,0x1000,2,&reason,&derived)&&derived&&*derived==7);
+    reader.integer(8,43);
+    check(extended.find(reader,0x1000,2,&reason,&derived)&&derived&&*derived==0);
+    *derived=9;
+    check(extended.find(reader,0x1000,3,&reason,&derived)&&derived&&*derived==0);
+    reader.integer(4,99);
+    check(!extended.find(reader,0x1000,3,&reason,&derived)&&derived==nullptr);
+    reader.integer(4,49);
     Matrix3x4 pose[5]{};
     for(unsigned i=0;i<5;++i){pose[i].m[0][0]=pose[i].m[1][1]=pose[i].m[2][2]=1;pose[i].m[2][3]=float(i*10);}
     pose[2].m[2][3]=25; // feet at different heights must both retain full poses

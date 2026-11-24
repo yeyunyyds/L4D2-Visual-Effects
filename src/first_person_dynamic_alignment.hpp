@@ -38,9 +38,8 @@ inline bool bind(const StudioPose& studio,int index,Vec3& out){
  const auto& p=studio.bindLocal[unsigned(index)];
  out={p[0],p[1],p[2]};return valid(out);
 }
-inline Rig discover(const StudioPose& studio,float fallbackHeight){
+inline Rig discover(const StudioPose& studio,float fallbackHeight,const parts::Selection& selected){
  Rig rig{};
- const auto selected=parts::discover(studio);
  rig.neck=selected.neck;rig.head=selected.head;
  if(studio.count==0||studio.parents.size()!=studio.count||studio.boneNames.size()!=studio.count)return rig;
  // Prefer a stable upper-spine/chest ancestor; the head and neck animate independently.
@@ -86,6 +85,29 @@ inline Rig discover(const StudioPose& studio,float fallbackHeight){
  rig.source="live-pose-bootstrap";
  return rig;
 }
+inline Rig discover(const StudioPose& studio,float fallbackHeight){
+ return discover(studio,fallbackHeight,parts::discover(studio));
+}
+// Lives inside the validated StudioCache entry, never keyed by a raw pose pointer.
+struct CachedModel {
+ std::string name,key;
+ parts::Selection selection;
+ Rig rig{};
+ bool named=false,partsReady=false,rigReady=false;
+ float fallback=0;
+ void identify(const StudioPose& studio){
+  if(named)return;
+  name=canonicalModel(studio.name);key=name+"#"+std::to_string(studio.checksum);named=true;
+ }
+ const parts::Selection& partPlan(const StudioPose& studio){
+  if(!partsReady){selection=parts::discover(studio);partsReady=true;}
+  return selection;
+ }
+ const Rig& alignment(const StudioPose& studio,float height){
+  if(!rigReady||fallback!=height){rig=discover(studio,height,partPlan(studio));fallback=height;rigReady=true;}
+  return rig;
+ }
+};
 inline bool modelBasis(const Rig& rig,const Matrix3x4* bones,unsigned count,Vec3& front,Vec3& right){
  if(!bones||rig.left<0||rig.right<0||unsigned(rig.left)>=count||unsigned(rig.right)>=count)return false;
  auto left=location(bones[unsigned(rig.left)]),r=location(bones[unsigned(rig.right)]);
@@ -110,7 +132,8 @@ struct Track {
 struct Result {bool ok=false,usedBootstrap=false;Vec3 translation{};float yawRadians=0;const char* source="unavailable";};
 inline Result compute(const StudioPose& studio,const Rig& rig,const Matrix3x4* bones,
   const dango::CameraPose& camera,const Settings& config,const ModelProfile* model,
-  std::uint32_t epoch,std::uint32_t handle,std::uint64_t tick,Track& track){
+  std::uint32_t epoch,std::uint32_t handle,std::uint64_t tick,Track& track,
+  const std::string* cachedKey=nullptr){
  Result out{};out.source=rig.source;
  if(!config.dynamicAnchor||!bones||rig.anchor<0||unsigned(rig.anchor)>=studio.count||!valid(camera.eye))return out;
  Vec3 cameraFront{},cameraRight{};
@@ -120,7 +143,9 @@ inline Result compute(const StudioPose& studio,const Rig& rig,const Matrix3x4* b
  Vec3 bodyFront=cameraFront,bodyRight=cameraRight;
  bool haveBody=modelBasis(rig,bones,studio.count,bodyFront,bodyRight);
  // Treat model swap/respawn/map/large camera discontinuity as a new calibration.
- const auto key=canonicalModel(studio.name)+"#"+std::to_string(studio.checksum);
+ std::string uncachedKey;
+ if(!cachedKey)uncachedKey=canonicalModel(studio.name)+"#"+std::to_string(studio.checksum);
+ const auto& key=cachedKey?*cachedKey:uncachedKey;
  const bool reset=!track.active||track.model!=key||track.epoch!=epoch||track.handle!=handle||
      tick<track.tick||tick-track.tick>500||dango::length(camera.eye-track.lastEye)>128.f;
  if(reset){
