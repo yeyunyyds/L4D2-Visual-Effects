@@ -19,6 +19,8 @@ int main(){
  step(c,forward,.30f);assert(c.currentSpeed()>975.f&&c.currentSpeed()<1000.01f);
  step(c,forward,1.f);near(c.currentSpeed(),1000.f,.01f);
 
+ Camera walk;walk.start({0,0,64},{0,0,0});Input walking=forward;walking.side=1;walking.speedScale=.3f;step(walk,walking,1.5f);near(walk.currentSpeed(),300.f,.02f);
+
  // Release never drops velocity instantaneously.
  Input released{};const float before=c.currentSpeed(),x=c.origin.x;
  c.advance(released,.01f);

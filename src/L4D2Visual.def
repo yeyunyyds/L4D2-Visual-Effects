@@ -1,3 +1,11 @@
 LIBRARY L4D2Visual
 EXPORTS
     GetL4NPluginInstance
+    L4D2VisualCameraGetVersion
+    L4D2VisualCameraSetExternalActive
+    L4D2VisualCameraSetPose
+    L4D2VisualCameraGetStatus
+    L4D2VisualCameraGetPose
+    L4D2VisualCameraSetInitialIdle
+    L4D2VisualCameraSetNativeOnInput
+    L4D2VisualShutdown

@@ -23,6 +23,9 @@ int main(){
  assert(parse("left")==0x25);
  assert(parse("pageup")==0x21);
  assert(parse("ctrl")==0x11);
+ assert(parse("lshift")==0xA0&&parse("rshift")==0xA1);
+ assert(parse("caps")==0x14&&parse("capslock")==0x14);
+ assert(label(0)=="none"&&label(0xA0)=="lshift");
  assert(label(*parse("f6"))=="F6");
  assert(label(*parse("mouse5"))=="mouse5");
  assert(label(*parse("numpad1"))=="Numpad1");

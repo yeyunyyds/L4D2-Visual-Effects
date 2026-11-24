@@ -87,6 +87,18 @@
   "freeCamera": {
     "hideViewmodel": true,
     "f6Binding": false,
-    "hotkey": "f6"
+    "hotkey": "f6",
+    "externalEnabled": false,
+    "externalIdleSeconds": 3,
+    "movement": {
+      "forward": "w",
+      "back": "s",
+      "left": "a",
+      "right": "d",
+      "up": "space",
+      "down": "lshift",
+      "walk": "capslock",
+      "walkScale": 0.3
+    }
   }
 }

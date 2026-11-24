@@ -5,7 +5,7 @@ FreeCamera 是 L4D2Visual 的可选客户端自由视角功能。**默认关闭*
 ## 操作
 
 - WASD 水平飞行，鼠标调整朝向。
-- Space 上升，Shift 下降。
+- Space 上升，左 Shift 下降，按住 Caps Lock 慢速（默认30%），右 Shift 不控制高度。
 - 菜单可调整最高飞行速度，默认 1000 游戏单位/秒，调节步长 50；运动具有平滑加减速。
 - Esc 或切出游戏窗口会暂停移动；重新进入游戏后恢复。
 - 可选择隐藏第一人称手臂和武器（该子选项默认开启，但只有 FreeCamera 真正运行时才生效）。
@@ -55,3 +55,22 @@ FreeCamera 不切换游戏的第三人称模式。FPB 若同时开启，会保�
 将 `hotkey` 改成 `f7`、`f8`、`p`、`mouse4` 等即可；支持 F1–F24（F10 除外）、字母、数字、数字键盘、方向键、Tab、Enter、Insert、Delete、Home、End、PageUp/PageDown、空格、常见修饰键和鼠标中键/侧键。键名忽略大小写与前后空格。F10 已被 HUD 占用，Esc 用于菜单关闭，故不允许绑定。绑定到 WASD、Space、Shift 等游戏操作键会同时触发原有操作，不推荐。
 
 **`f6Binding` 仍是快捷键总开关**：可在 FreeCamera 设置菜单中开启，也可直接设为 `true`。现有旧配置未写 `hotkey` 时继续默认 F6。错误键名或非字符串类型会禁用快捷键触发，并在诊断中显示无效（不会悄悄切回 F6 造成误触）。为避免热键和数字菜单互相冲突，HUD 菜单打开时不触发快捷键。编辑后重启游戏加载配置；仅在 HUD 菜单内“保存设置”不会重读磁盘文件。
+
+## 实验分支：外部 Camera API（尚未进入正式 v1.0.0）
+
+FreeCamera 可以通过菜单显式授权同进程 L4N 插件（例如 L4D2DangoMusic）调用版本化的 C ABI，按世界坐标控制外部镜头。用户的鼠标/键盘输入会立即让自动控制退回手动 FreeCamera，并且**不重置摄像机坐标**；没有任何键鼠操作持续 1–30 秒（默认 3 秒）后才允许外部重新接管。接口授权默认关闭。
+
+完整结构、可调用符号、返回状态、控制权仲裁及调用示例： [FREE-CAMERA-EXTERNAL-ABI.md](FREE-CAMERA-EXTERNAL-ABI.md)。实验分支使用 ABI v4：外部请求仅登记 AFK 等待，达到设定时间后才开启 FreeCamera。手动和 ABI 共用同一个开关，F6/菜单关闭会取消外部会话。GetPose 返回实际视角，外部控制期间允许有效配置快捷键退出，即使普通快捷键绑定关闭。运镜轨迹由 DangoMusic 提供。
+
+## 自定义移动键
+
+在现有 hud.json 的 freeCamera 对象中增加 movement（保留其他字段），重启游戏读取：
+
+```json
+"movement": {
+  "forward": "w", "back": "s", "left": "a", "right": "d",
+  "up": "space", "down": "lshift", "walk": "capslock", "walkScale": 0.3
+}
+```
+
+walk 为按住生效；支持 lshift/rshift、lctrl/rctrl、lalt/ralt、capslock/caps、none（禁用该方向）。shift 表示任一 Shift，默认刻意使用 lshift。未知移动键只禁用对应动作。F6 或菜单关闭当前自由相机后保留 AFK 请求并从头计时，关闭 DangoMusic AFK 开关才停止自动请求。旁观者缺少 CreateMove 时，已授权且有效的 ABI 会话仍可通过现有渲染回调保持相机覆盖。

@@ -1,3 +1,4 @@
+#include "plugin_lifetime.hpp"
 #pragma once
 #include <windows.h>
 #include <atomic>
@@ -223,6 +224,7 @@ inline void studioPass(void* self,void* results,const void* info,Matrix3x4* bone
  else continuation(&context,bones,origin);
 }
 inline void __fastcall engineHook(void* self,void*,const DrawState& state,const ModelInfo& info,Matrix3x4* bones) {
+    visual::lifetime::Guard guard;if(!guard){engineOriginal(self,state,info,bones);return;}
     if(!enabled.load(std::memory_order_acquire)&&
        !modelObserver.load(std::memory_order_acquire)){
         engineOriginal(self,state,info,bones);return;
@@ -310,6 +312,7 @@ template<unsigned Capacity> __declspec(noinline) void studioCompose(void* self,v
  studioCore(self,nullptr,results,info,bones,flex,delayed,origin,flags);
 }
 inline void __fastcall studioHook(void* self,void*,void* results,const void* info,Matrix3x4* bones,float* flex,float* delayed,const Vec3& origin,int flags){
+ visual::lifetime::Guard guard;if(!guard){studioOriginal(self,results,info,bones,flex,delayed,origin,flags);return;}
  if(!enabled.load(std::memory_order_acquire)&&
     !poseModifier.load(std::memory_order_acquire)&&
     !studioObserver.load(std::memory_order_acquire)&&

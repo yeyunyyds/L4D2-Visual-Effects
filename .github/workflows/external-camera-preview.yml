@@ -1,0 +1,73 @@
+name: External FreeCamera ABI preview (no release)
+on:
+  push:
+    branches: [feature/external-freecamera-abi]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: visual-camera-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  mingw-x86:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MinGW x86
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: Run regression tests
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: |
+          bash scripts/test.sh
+          g++ -std=c++17 -Wall -Wextra -Werror tests/free_camera_core_test.cpp -o /tmp/freecamera-core
+          /tmp/freecamera-core
+          g++ -std=c++17 -Wall -Wextra -Werror tests/free_camera_hotkey_test.cpp -o /tmp/freecamera-hotkey
+          /tmp/freecamera-hotkey
+      - name: Build Windows x86 L4D2Visual
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: |
+          bash scripts/build-mingw.sh
+          i686-w64-mingw32-objdump -p build/L4D2Visual.dll > build/exports.txt
+          for symbol in L4D2VisualCameraGetVersion L4D2VisualCameraSetExternalActive L4D2VisualCameraSetPose L4D2VisualCameraGetPose L4D2VisualCameraSetInitialIdle L4D2VisualCameraSetNativeOnInput L4D2VisualCameraGetStatus; do
+            grep -q "$symbol" build/exports.txt || { echo "Missing ABI export: $symbol"; exit 1; }
+          done
+      - name: Package preview
+        run: |
+          python3 scripts/package.py
+          cp build/L4D2Visual-1.1.0.zip build/L4D2Visual-external-camera-preview.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-external-camera-preview-MinGW-x86
+          path: |
+            build/L4D2Visual-external-camera-preview.zip
+            build/exports.txt
+          if-no-files-found: error
+  msvc-x86:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile policy and ABI
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
+          if not exist build mkdir build
+          cl /nologo /utf-8 /std:c++17 /EHsc /MT /I src tests\free_camera_external_policy_test.cpp /Fe:build\free_camera_external_policy_test.exe
+          if errorlevel 1 exit /b 1
+          build\free_camera_external_policy_test.exe
+          if errorlevel 1 exit /b 1
+      - name: Build MSVC x86 DLL
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
+          cl /nologo /utf-8 /std:c++17 /EHsc /O2 /MT /DNOMINMAX /DWIN32_LEAN_AND_MEAN /LD /I src /I vendor /I vendor\imgui src\plugin.cpp vendor\imgui\imgui.cpp vendor\imgui\imgui_draw.cpp vendor\imgui\imgui_tables.cpp vendor\imgui\imgui_widgets.cpp vendor\imgui\backends\imgui_impl_dx9.cpp /link /OUT:build\L4D2Visual.dll /DEF:src\L4D2Visual.def user32.lib d3d9.lib comctl32.lib gdi32.lib uuid.lib advapi32.lib ole32.lib windowscodecs.lib
+          if errorlevel 1 exit /b 1
+          dumpbin /exports build\L4D2Visual.dll > build\msvc-exports.txt
+          if errorlevel 1 exit /b 1
+          findstr /c:"L4D2VisualCameraSetPose" build\msvc-exports.txt
+          if errorlevel 1 exit /b 1
+          findstr /c:"L4D2VisualCameraGetPose" build\msvc-exports.txt
+          if errorlevel 1 exit /b 1

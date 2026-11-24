@@ -1,0 +1,62 @@
+#pragma once
+#include <algorithm>
+#include <cstdint>
+
+namespace visual::freecamera::external {
+enum class Owner : std::uint32_t { Native=0, User=1, External=2 };
+
+// One camera switch. Owner only decides who supplies the pose, never which
+// FreeCamera is running. F6 suspends only the view; the armed lease survives.
+struct Policy {
+ bool allowed=false;
+ bool desired=false;
+ bool on=false;
+ bool hasPose=false;
+ bool nativeOnInput=false,externalWasDriving=false;
+ unsigned idleSeconds=3,initialIdleSeconds=10;
+ std::uint64_t lastInputMs=0,lastPoseMs=0;
+ static constexpr std::uint64_t poseLeaseMs=15000;
+
+ void stop() noexcept {on=false;desired=false;hasPose=false;externalWasDriving=false;nativeOnInput=false;}
+ void allow(bool value,std::uint64_t now) noexcept {
+  if(!value&&desired)stop();
+  allowed=value;
+  lastInputMs=now;
+ }
+ void setIdle(unsigned value) noexcept {idleSeconds=std::clamp(value,1u,30u);}
+ bool request(bool value,std::uint64_t now) noexcept {
+  if(!value){if(desired)stop();return true;}
+  if(!allowed)return false;
+  if(!desired){desired=true;hasPose=false;lastPoseMs=now;lastInputMs=now;}
+  return true;
+ }
+ void setPose(std::uint64_t now) noexcept {if(desired){hasPose=true;lastPoseMs=std::max(lastPoseMs,now);}}
+ void noteInput(std::uint64_t now,bool human=false) noexcept {
+  if(human&&nativeOnInput&&externalWasDriving&&desired&&on){on=false;externalWasDriving=false;}
+  lastInputMs=std::max(lastInputMs,now);
+ }
+ void toggle(std::uint64_t now) noexcept {
+  on=!on;externalWasDriving=false;lastInputMs=now;
+  // Keep a live provider heartbeat when the user returns to native view.
+  // The full initial idle interval must pass before the next automatic entry.
+ }
+ bool leaseAlive(std::uint64_t now) const noexcept {
+  // A sample taken before a concurrent heartbeat cannot prove expiration.
+  return now<=lastPoseMs||now-lastPoseMs<=poseLeaseMs;
+ }
+ bool expire(std::uint64_t now) noexcept {if(desired&&!leaseAlive(now)){stop();return true;}return false;}
+ std::uint32_t remainingMs(std::uint64_t now) const noexcept {
+  const std::uint64_t threshold=std::uint64_t(on?idleSeconds:initialIdleSeconds)*1000;
+  if(now<lastInputMs)return static_cast<std::uint32_t>(threshold);
+  const auto elapsed=now-lastInputMs;
+  return elapsed>=threshold?0:static_cast<std::uint32_t>(threshold-elapsed);
+ }
+ // Advance from verified live game input/render polling, never status polling.
+ void advance(std::uint64_t now) noexcept {expire(now);if(!on&&allowed&&desired&&hasPose&&remainingMs(now)==0){on=true;const auto resume=std::uint64_t(idleSeconds)*1000;lastInputMs=now>=resume?std::min(lastInputMs,now-resume):0;}}
+ Owner select(std::uint64_t now) const noexcept {
+  if(!on)return Owner::Native;
+  if(allowed&&desired&&hasPose&&leaseAlive(now)&&remainingMs(now)==0)return Owner::External;
+  return Owner::User;
+ }
+};
+} // namespace visual::freecamera::external
