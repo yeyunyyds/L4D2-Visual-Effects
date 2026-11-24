@@ -1,4 +1,4 @@
-# FreeCamera 外部接口（C ABI v3）
+# FreeCamera 外部接口（C ABI v4）
 
 实验分支：`feature/external-freecamera-abi`。只支持同一 L4D2 Windows x86 进程内的 L4N 插件，不新增 ClientMode Hook，也不需要独立测试 EXE。
 
@@ -11,7 +11,7 @@
 - 关闭外部授权会结束当前外部会话并恢复原生视角，但不影响没有外部会话的普通 FreeCamera。DangoMusic 可等待重新授权，再发起新会话。
 - 15 秒无有效心跳、地图切换或停用插件时撤销会话。
 
-## ABI v3
+## ABI v4
 
 头文件：[`include/l4d2visual_camera_api.h`](../include/l4d2visual_camera_api.h)。结构布局沿用 v1，但行为改变，版本号提升至 3。两个插件需同时更新。所有函数使用 `__cdecl`；结构的 `size` 必须预先设为 `sizeof`。版本函数返回 3，其余函数返回 1（成功）或 0（拒绝/不可用）。
 
@@ -29,3 +29,6 @@
 ## 验证
 
 状态机测试覆盖统一启停、用户抢占、闲置恢复、关闭后拒绝旧坐标、重新授权、租约失效。实际游戏内的 F6、键鼠接管、再次授权及轨迹连续性仍需实机验证。ABI 不提供引擎碰撞保证；调用方可使用自己的路径检查。
+
+## v4 会话语义
+F6/FreeCamera 菜单关闭当前视角时保留 external_requested，并重置首次闲置计时。仅外部客户端主动释放、授权撤回、超时、安全失效或地图切换销毁运行会话。客户端的功能开关独立于运行会话。外部所有权的视角覆盖不依赖 CreateMove 心跳；有效地图、视角布局和 pose lease 仍然是安全前提。双方必须使用 v4。
