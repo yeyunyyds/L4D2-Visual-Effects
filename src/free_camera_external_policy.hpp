@@ -12,7 +12,7 @@ struct Policy {
  bool desired=false;
  bool on=false;
  bool hasPose=false;
- unsigned idleSeconds=3;
+ unsigned idleSeconds=3,initialIdleSeconds=10;
  std::uint64_t lastInputMs=0,lastPoseMs=0;
  static constexpr std::uint64_t poseLeaseMs=15000;
 
@@ -26,7 +26,7 @@ struct Policy {
  bool request(bool value,std::uint64_t now) noexcept {
   if(!value){if(desired)stop();return true;}
   if(!allowed)return false;
-  if(!desired){desired=true;on=true;hasPose=false;lastPoseMs=now;lastInputMs=now;}
+  if(!desired){desired=true;hasPose=false;lastPoseMs=now;lastInputMs=now;}
   return true;
  }
  void setPose(std::uint64_t now) noexcept {if(desired){hasPose=true;lastPoseMs=now;}}
@@ -37,11 +37,13 @@ struct Policy {
  }
  void expire(std::uint64_t now) noexcept {if(desired&&!leaseAlive(now))stop();}
  std::uint32_t remainingMs(std::uint64_t now) const noexcept {
-  const std::uint64_t threshold=std::uint64_t(idleSeconds)*1000;
+  const std::uint64_t threshold=std::uint64_t(on?idleSeconds:initialIdleSeconds)*1000;
   if(now<lastInputMs)return static_cast<std::uint32_t>(threshold);
   const auto elapsed=now-lastInputMs;
   return elapsed>=threshold?0:static_cast<std::uint32_t>(threshold-elapsed);
  }
+ // Activate only on a fresh, foreground game input sample, never on status polling.
+ void advance(std::uint64_t now) noexcept {expire(now);if(!on&&allowed&&desired&&hasPose&&remainingMs(now)==0)on=true;}
  Owner select(std::uint64_t now) const noexcept {
   if(!on)return Owner::Native;
   if(allowed&&desired&&hasPose&&leaseAlive(now)&&remainingMs(now)==0)return Owner::External;
