@@ -29,17 +29,18 @@ struct Policy {
   if(!desired){desired=true;hasPose=false;lastPoseMs=now;lastInputMs=now;}
   return true;
  }
- void setPose(std::uint64_t now) noexcept {if(desired){hasPose=true;lastPoseMs=now;}}
- void noteInput(std::uint64_t now) noexcept {lastInputMs=now;}
+ void setPose(std::uint64_t now) noexcept {if(desired){hasPose=true;lastPoseMs=std::max(lastPoseMs,now);}}
+ void noteInput(std::uint64_t now) noexcept {lastInputMs=std::max(lastInputMs,now);}
  void toggle(std::uint64_t now) noexcept {
   on=!on;lastInputMs=now;
   // Keep a live provider heartbeat when the user returns to native view.
   // The full initial idle interval must pass before the next automatic entry.
  }
  bool leaseAlive(std::uint64_t now) const noexcept {
-  return now>=lastPoseMs&&now-lastPoseMs<=poseLeaseMs;
+  // A sample taken before a concurrent heartbeat cannot prove expiration.
+  return now<=lastPoseMs||now-lastPoseMs<=poseLeaseMs;
  }
- void expire(std::uint64_t now) noexcept {if(desired&&!leaseAlive(now))stop();}
+ bool expire(std::uint64_t now) noexcept {if(desired&&!leaseAlive(now)){stop();return true;}return false;}
  std::uint32_t remainingMs(std::uint64_t now) const noexcept {
   const std::uint64_t threshold=std::uint64_t(on?idleSeconds:initialIdleSeconds)*1000;
   if(now<lastInputMs)return static_cast<std::uint32_t>(threshold);
