@@ -11,14 +11,14 @@ inline std::optional<std::string> page(std::uintptr_t id){
  if(id==930){
   // Keep the frequently adjusted options on one small page.
   return "\"FreeCamera · 设置\" {"+
-   item(freecamera::requested.load()?u8"FreeCamera：[开启]":freecamera::externalSession.load()?"FreeCamera: AFK pending (cancel)":u8"FreeCamera：[关闭]",931)+
+   item(freecamera::requested.load()?u8"FreeCamera：[开启]":freecamera::externalSession.load()?"FreeCamera: AFK pending":u8"FreeCamera：[关闭]",931)+
    item(std::string(u8"快捷键启用：[")+(freecamera::f6Binding.load()?u8"开]":u8"关]（默认）")+"  "+freecamera::hotkey::label(freecamera::hotkeyVk.load()),937)+
    row(freecamera::hotkeyConfigValid.load()?u8"按键可在 hud.json 修改；外部会话中允许快捷键退出":u8"快捷键配置无效：已禁用，请检查 hud.json")+
    item(freecamera::hideViewmodel.load()?u8"隐藏第一人称手臂和武器：[开]":u8"隐藏第一人称手臂和武器：[关]",935)+
    item(freecamera::externalPermission.load()?u8"外部接口（ABI）：[允许]":u8"外部接口（ABI）：[关闭]（默认）",938)+
    row(u8"放开键鼠后交还外部（1-30秒）："+std::to_string(freecamera::externalIdleSeconds())+"s")+
    item(u8"交还等待 +1 秒",939)+item(u8"交还等待 -1 秒",940)+
-   row(u8"同一相机：快捷键或菜单关闭即取消外部请求；键鼠优先")+
+   row(u8"同一相机：快捷键关闭后重新等待闲置；键鼠优先")+
    row(std::string(u8"当前控制权：")+
        (freecamera::currentOwner.load()==freecamera::external::Owner::External?u8"Dango/外部":
         freecamera::currentOwner.load()==freecamera::external::Owner::User?u8"用户 FreeCamera":u8"原生游戏"))+
@@ -31,7 +31,7 @@ inline std::optional<std::string> page(std::uintptr_t id){
  // Observational data is collected by existing camera/render callbacks,
  // independent of which native HUD page is open; only its display moves.
  return "\"FreeCamera · 运行数据与诊断\" {"+
-  row(u8"快捷键通过 hud.json 指定；WASD/鼠标移动，Space 上升，Shift 下降")+
+  row(u8"hud.json movement: WASD / Space / LShift / Caps (hold)")+
   row(std::string("Runtime phase: ")+freecamera::activation::label(freecamera::currentPhase()))+
   row(std::string("ViewModel: ")+freecamera::viewModelHookStatus.load())+
   row("ViewModel checks/native-visible/hidden: "+
@@ -94,6 +94,7 @@ inline modules::Module create(){
   bool hide=true,binding=false,valid=true,externalAllowed=false;
   unsigned idleSeconds=3;
   int keycode=freecamera::hotkey::defaultVk;
+  freecamera::MovementKeys movement;
   auto root=j.find("freeCamera");
   if(root!=j.end()&&root->is_object()){
    auto keybind=root->find("f6Binding");
@@ -106,6 +107,12 @@ inline modules::Module create(){
    if(timeout!=root->end()&&timeout->is_number_integer()){
     const auto value=timeout->get<int>();idleSeconds=static_cast<unsigned>(std::clamp(value,1,30));
    }
+   auto keys=root->find("movement");
+   if(keys!=root->end()&&keys->is_object()){
+    auto readKey=[&](const char* name,int& value){auto it=keys->find(name);if(it==keys->end())return;auto parsed=it->is_string()?freecamera::hotkey::parse(it->get<std::string>()):std::optional<int>{};value=parsed.value_or(0);};
+    readKey("forward",movement.forward);readKey("back",movement.back);readKey("left",movement.left);readKey("right",movement.right);readKey("up",movement.up);readKey("down",movement.down);readKey("walk",movement.walk);
+    auto scale=keys->find("walkScale");if(scale!=keys->end()&&scale->is_number()){auto value=scale->get<float>();if(std::isfinite(value))movement.walkScale=std::clamp(value,.05f,1.f);}
+   }
    auto configured=root->find("hotkey");
    if(configured!=root->end()){
     const auto parsed=configured->is_string()?
@@ -114,6 +121,7 @@ inline modules::Module create(){
     else valid=false; // Unknown bindings must never silently activate F6.
    }
   }
+  freecamera::setMovementKeys(movement);
   freecamera::hideViewmodel=hide;
   freecamera::hotkeyVk=keycode;
   freecamera::hotkeyConfigValid=valid;
@@ -124,6 +132,8 @@ inline modules::Module create(){
  m.save=[](nlohmann::json& j){
   if(!j.contains("freeCamera")||!j["freeCamera"].is_object())
    j["freeCamera"]=nlohmann::json::object();
+  auto keys=freecamera::getMovementKeys();auto label=[](int vk){return freecamera::hotkey::normalize(freecamera::hotkey::label(vk));};
+  j["freeCamera"]["movement"]={{"forward",label(keys.forward)},{"back",label(keys.back)},{"left",label(keys.left)},{"right",label(keys.right)},{"up",label(keys.up)},{"down",label(keys.down)},{"walk",label(keys.walk)},{"walkScale",keys.walkScale}};
   j["freeCamera"]["hideViewmodel"]=freecamera::hideViewmodel.load();
   j["freeCamera"]["f6Binding"]=freecamera::f6Binding.load();
   j["freeCamera"]["externalEnabled"]=freecamera::externalPermission.load();

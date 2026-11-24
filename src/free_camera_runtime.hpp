@@ -47,13 +47,17 @@ inline core::Vec externalOrigin{},externalAngles{};
 inline bool externalTargetReady=false; // guarded by motionMutex
 inline std::mutex motionMutex;
 inline core::Input latestInput{};
+inline std::atomic<bool> liveMap{false};
+struct MovementKeys {int forward='W',back='S',left='A',right='D',up=VK_SPACE,down=VK_LSHIFT,walk=VK_CAPITAL;float walkScale=.30f;};
+inline MovementKeys movementKeys;
+inline void setMovementKeys(MovementKeys value){std::lock_guard<std::mutex> lock(motionMutex);movementKeys=value;}
+inline MovementKeys getMovementKeys(){std::lock_guard<std::mutex> lock(motionMutex);return movementKeys;}
 inline core::MouseQueue pendingMouse;
 inline std::atomic<std::int64_t> mouseReceivedX{0},mouseReceivedY{0};
 inline std::atomic<std::int64_t> mouseAppliedX{0},mouseAppliedY{0};
 inline std::atomic<std::int64_t> mouseDroppedX{0},mouseDroppedY{0};
 inline std::atomic<std::uint64_t> mouseSamples{0},mouseZeroSamples{0};
 inline std::atomic<std::uint64_t> serverCmdSamples{0},extraMouseSamples{0},extraMouseNonzero{0};
-inline std::atomic<int> lastObservedButtons{0};
 inline core::FrameClock renderClock;
 inline std::atomic<unsigned long> renderSteps{0},renderRepeats{0},renderGaps{0};
 inline std::atomic<float> renderDeltaMs{0.f};
@@ -127,7 +131,9 @@ inline bool foreground(){
  if(window)GetWindowThreadProcessId(window,&pid);
  return pid==GetCurrentProcessId();
 }
-inline bool key(int code){return (GetAsyncKeyState(code)&0x8000)!=0;}
+inline bool key(int code){return code>0&&(GetAsyncKeyState(code)&0x8000)!=0;}
+// Called under motionMutex. Caps is a held modifier, not a toggle/LED state.
+inline void sampleMovementLocked(){const auto& k=movementKeys;latestInput.forward=float(int(key(k.forward))-int(key(k.back)));latestInput.side=float(int(key(k.right))-int(key(k.left)));latestInput.up=float(int(key(k.up))-int(key(k.down)));latestInput.speedScale=key(k.walk)?k.walkScale:1.f;}
 inline bool enabled(){return requested.load()&&active.load();}
 inline activation::Phase currentPhase(){
  return activation::phase(requested.load(),bound.load(),active.load(),paused.load());
@@ -249,10 +255,10 @@ inline bool statusExternal(L4D2VisualCameraStatusV1* output){
  };
  return true;
 }
-inline bool hasHumanInput(const Cmd* cmd){
+inline bool hasHumanInput(const Cmd* cmd=nullptr){
  // Only physical input counts as activity. AI/server model movement
  // and toggled command bits must not reset the AFK timer.
- if(cmd->mousedx||cmd->mousedy)return true;
+ if(cmd&&(cmd->mousedx||cmd->mousedy))return true;
  // Detect held keyboard/mouse buttons while the L4D2 window has focus.
  for(int vk=VK_LBUTTON;vk<=VK_OEM_CLEAR;++vk){
   if(vk==VK_PACKET||vk==VK_PROCESSKEY)continue;
@@ -305,7 +311,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
   ++viewRejected;disable("CViewSetup layout mismatch; disabled");return;
  }
  const auto now=GetTickCount64(),last=lastInput.load();
- if(!last||now<last||now-last>1000){
+ if(!externalSession.load(std::memory_order_acquire)&&(!last||now<last||now-last>1000)){
   active=false;message="Waiting for CreateMove";
   std::lock_guard<std::mutex> lock(motionMutex);
   camera.halt();renderClock.reset();dropMouseLocked();
@@ -338,7 +344,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
    renderDeltaMs=tick.dt*1000.f;
    if(owner==external::Owner::External){
     // Pose is submitted by the provider; no manual movement integration.
-   }else if(paused.load()||!foreground()){
+   }else if(paused.load()||externalMenuBlocked.load()||!foreground()){
     dropMouseLocked();
     camera.halt();
    }else{
@@ -349,7 +355,8 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
     if(tick.kind==core::FrameKind::Gap){
      ++renderGaps;camera.halt();
     }else if(tick.kind==core::FrameKind::Step){
-     camera.advance(latestInput,tick.dt);
+     // Manual keyboard input is available even without spectator CreateMove.
+     sampleMovementLocked();camera.speed=movementSpeed.load(std::memory_order_relaxed);camera.advance(latestInput,tick.dt);
     }
    }
    currentMovementSpeed=camera.currentSpeed();
@@ -397,7 +404,7 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  {
   std::lock_guard<std::mutex> lock(motionMutex);
   if(input||!focused||paused.load()||externalMenuBlocked.load())ownerPolicy.noteInput(at);
-  else ownerPolicy.advance(at);
+  else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
   owner=selectOwnerLocked(at);
  }
  if(owner==external::Owner::Native)return result;
@@ -420,9 +427,7 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
   ++mouseSamples;
   if(!cmd->mousedx&&!cmd->mousedy)++mouseZeroSamples;
   if(owner==external::Owner::User&&!paused.load()&&focused){
-   latestInput.forward=float(int(key('W'))-int(key('S')));
-   latestInput.side=float(int(key('D'))-int(key('A')));
-   latestInput.up=float(int(key(VK_SPACE))-int(key(VK_SHIFT)));
+   sampleMovementLocked();
    pendingMouse.push(cmd->mousedx,cmd->mousedy);
   }else{
    latestInput={};
@@ -586,6 +591,7 @@ inline void tryBind(){
  tryBindViewModel();
 }
 inline void frame(const dango::GameCameraFrame& f){
+ liveMap.store(f.active!=0,std::memory_order_release);
  bool externalPending=false;
  {
   std::lock_guard<std::mutex> lock(motionMutex);
@@ -618,14 +624,17 @@ inline void poll(bool escape,bool menu,bool gameForeground){
  previousVk=vk;
  // Do not toggle via hotkey while the native menu is open: digit/navigation
  // key choices may otherwise trigger both a menu action and FreeCamera.
- // Keep camera movement active with the menu open as before.
- const bool shouldPause=escape||!gameForeground;
+ // Do not move the detached camera while using menu controls.
+ const bool shouldPause=escape||menu||!gameForeground;
  // Menus, lost focus and Escape all interrupt the external controller.
  // Never resume it while the menu is continuously open.
- if((escape||menu||!gameForeground)&&externalPermission.load(std::memory_order_acquire)){
+ if(externalSession.load(std::memory_order_acquire)){
+  const auto at=GetTickCount64();
+  const bool input=escape||menu||!gameForeground||hasHumanInput();
   std::lock_guard<std::mutex> lock(motionMutex);
-  ownerPolicy.noteInput(GetTickCount64());
-  selectOwnerLocked(GetTickCount64());
+  if(input)ownerPolicy.noteInput(at);
+  else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
+  selectOwnerLocked(at);
  }
  const bool previouslyPaused=paused.exchange(shouldPause);
  if(shouldPause&&!previouslyPaused){

@@ -15,7 +15,8 @@ inline constexpr NamedKey named[]={
  {"end",0x23},{"home",0x24},{"left",0x25},{"up",0x26},
  {"right",0x27},{"down",0x28},{"insert",0x2D},{"delete",0x2E},
  {"shift",0x10},{"ctrl",0x11},{"control",0x11},{"alt",0x12},
- {"capslock",0x14},{"pause",0x13},
+ {"capslock",0x14},{"caps",0x14},{"pause",0x13},
+ {"lshift",0xA0},{"rshift",0xA1},{"lctrl",0xA2},{"rctrl",0xA3},{"lalt",0xA4},{"ralt",0xA5},
  {"numlock",0x90},{"scrolllock",0x91},
  {"mouse3",0x04},{"mouse4",0x05},{"mouse5",0x06}
 };
@@ -51,6 +52,7 @@ inline std::optional<int> parse(std::string_view raw){
  return std::nullopt;
 }
 inline std::string label(int vk){
+ if(vk==0)return "none";
  if(vk>=0x70&&vk<=0x87)return "F"+std::to_string(vk-0x70+1);
  if(vk>='A'&&vk<='Z')return std::string(1,char(vk));
  if(vk>='0'&&vk<='9')return std::string(1,char(vk));

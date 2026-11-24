@@ -6,7 +6,7 @@ namespace visual::freecamera::external {
 enum class Owner : std::uint32_t { Native=0, User=1, External=2 };
 
 // One camera switch. Owner only decides who supplies the pose, never which
-// FreeCamera is running. Explicit OFF cancels the external session.
+// FreeCamera is running. F6 suspends only the view; the armed lease survives.
 struct Policy {
  bool allowed=false;
  bool desired=false;
@@ -31,7 +31,11 @@ struct Policy {
  }
  void setPose(std::uint64_t now) noexcept {if(desired){hasPose=true;lastPoseMs=now;}}
  void noteInput(std::uint64_t now) noexcept {lastInputMs=now;}
- void toggle(std::uint64_t now) noexcept {if(on||desired)stop();else{on=true;lastInputMs=now;}}
+ void toggle(std::uint64_t now) noexcept {
+  on=!on;lastInputMs=now;
+  // Keep a live provider heartbeat when the user returns to native view.
+  // The full initial idle interval must pass before the next automatic entry.
+ }
  bool leaseAlive(std::uint64_t now) const noexcept {
   return now>=lastPoseMs&&now-lastPoseMs<=poseLeaseMs;
  }
@@ -42,7 +46,7 @@ struct Policy {
   const auto elapsed=now-lastInputMs;
   return elapsed>=threshold?0:static_cast<std::uint32_t>(threshold-elapsed);
  }
- // Activate only on a fresh, foreground game input sample, never on status polling.
+ // Advance from verified live game input/render polling, never status polling.
  void advance(std::uint64_t now) noexcept {expire(now);if(!on&&allowed&&desired&&hasPose&&remainingMs(now)==0){on=true;const auto resume=std::uint64_t(idleSeconds)*1000;lastInputMs=now>=resume?std::min(lastInputMs,now-resume):0;}}
  Owner select(std::uint64_t now) const noexcept {
   if(!on)return Owner::Native;
