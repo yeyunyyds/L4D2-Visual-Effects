@@ -189,6 +189,14 @@ inline unsigned externalIdleSeconds(){
  std::lock_guard<std::mutex> lock(motionMutex);
  return ownerPolicy.idleSeconds;
 }
+inline std::atomic<bool> externalMenuBlocked{true};
+inline bool setExternalInitialIdle(unsigned seconds){
+ if(!apiLive.load(std::memory_order_acquire))return false;
+ std::lock_guard<std::mutex> lock(motionMutex);
+ if(!ownerPolicy.allowed)return false;
+ ownerPolicy.initialIdleSeconds=std::clamp(seconds,1u,120u);
+ return true;
+}
 inline bool requestExternal(bool enabled){
  if(!apiLive.load(std::memory_order_acquire))return false;
  std::lock_guard<std::mutex> lock(motionMutex);
@@ -389,7 +397,8 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  external::Owner owner;
  {
   std::lock_guard<std::mutex> lock(motionMutex);
-  if(input)ownerPolicy.noteInput(at);
+  if(input||!focused||paused.load()||externalMenuBlocked.load())ownerPolicy.noteInput(at);
+  else ownerPolicy.advance(at);
   owner=selectOwnerLocked(at);
  }
  if(owner==external::Owner::Native)return result;
@@ -598,6 +607,7 @@ inline void frame(const dango::GameCameraFrame& f){
  if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");}
 }
 inline void poll(bool escape,bool menu,bool gameForeground){
+ externalMenuBlocked.store(escape||menu||!gameForeground,std::memory_order_release);
  ++keyPolls;
  static bool held=false;
  static int previousVk=0;
