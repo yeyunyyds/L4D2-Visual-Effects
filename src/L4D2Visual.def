@@ -8,3 +8,4 @@ EXPORTS
     L4D2VisualCameraGetPose
     L4D2VisualCameraSetInitialIdle
     L4D2VisualCameraSetNativeOnInput
+    L4D2VisualShutdown

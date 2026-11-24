@@ -1,8 +1,10 @@
 #include "free_camera_external_policy.hpp"
+#include "plugin_lifetime.hpp"
 #include <cassert>
 using visual::freecamera::external::Owner;
 using visual::freecamera::external::Policy;
 int main(){
+ {visual::lifetime::Guard guard;assert(guard&&visual::lifetime::callbacks.load()==1);visual::lifetime::requestStop();visual::lifetime::Guard denied;assert(!denied&&visual::lifetime::callbacks.load()==1);}assert(!visual::lifetime::callbacks.load());
  Policy p;p.allow(true,1000);assert(p.request(true,1000)&&!p.on);
  p.setPose(1001);p.advance(10999);assert(!p.on);
  p.advance(11000);assert(p.on&&p.select(11000)==Owner::External);

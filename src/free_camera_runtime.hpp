@@ -1,3 +1,4 @@
+#include "plugin_lifetime.hpp"
 #pragma once
 // EXPERIMENTAL: exact-build, fail-closed L4D2 ClientMode vtable experiment.
 // Indexes and field offsets below are SDK-derived hypotheses; actual 2026
@@ -205,6 +206,7 @@ inline unsigned externalIdleSeconds(){
 }
 inline std::atomic<bool> externalMenuBlocked{true};
 inline bool setExternalInitialIdle(unsigned seconds){
+ visual::lifetime::Guard guard;if(!guard)return false;
  if(!apiLive.load(std::memory_order_acquire))return false;
  std::lock_guard<std::mutex> lock(motionMutex);
  if(!ownerPolicy.allowed)return false;
@@ -212,12 +214,14 @@ inline bool setExternalInitialIdle(unsigned seconds){
  return true;
 }
 inline bool setExternalNativeOnInput(bool enabled){
+ visual::lifetime::Guard guard;if(!guard)return false;
  if(!apiLive.load(std::memory_order_acquire))return false;
  std::lock_guard<std::mutex> lock(motionMutex);
  if(!ownerPolicy.allowed)return false;
  ownerPolicy.nativeOnInput=enabled;return true;
 }
 inline bool requestExternal(bool enabled){
+ visual::lifetime::Guard guard;if(!guard)return false;
  if(!apiLive.load(std::memory_order_acquire))return false;
  std::lock_guard<std::mutex> lock(motionMutex);
  const auto at=GetTickCount64();
@@ -227,6 +231,7 @@ inline bool requestExternal(bool enabled){
  return true;
 }
 inline bool publishExternalPose(const L4D2VisualCameraPoseV1* p){
+ visual::lifetime::Guard guard;if(!guard)return false;
  if(!apiLive.load(std::memory_order_acquire)||!p||p->size!=sizeof(*p))return false;
  core::Vec origin{p->origin[0],p->origin[1],p->origin[2]};
  core::Vec angles{p->angles[0],p->angles[1],p->angles[2]};
@@ -249,6 +254,7 @@ inline bool publishExternalPose(const L4D2VisualCameraPoseV1* p){
  return true;
 }
 inline bool getExternalPose(L4D2VisualCameraPoseV1* output){
+ visual::lifetime::Guard guard;if(!guard)return false;
  if(!apiLive.load(std::memory_order_acquire)||!output||output->size!=sizeof(*output))return false;
  std::lock_guard<std::mutex> lock(motionMutex);
  if(!ownerPolicy.allowed||!ownerPolicy.on||!active.load()||!camera.ready)return false;
@@ -256,6 +262,7 @@ inline bool getExternalPose(L4D2VisualCameraPoseV1* output){
  return true;
 }
 inline bool statusExternal(L4D2VisualCameraStatusV1* output){
+ visual::lifetime::Guard guard;if(!guard||!apiLive.load())return false;
  if(!output||output->size!=sizeof(*output))return false;
  std::lock_guard<std::mutex> lock(motionMutex);
  const ULONGLONG at=GetTickCount64();
@@ -313,6 +320,7 @@ inline void toggle(){
 inline void __fastcall overrideView(void* self,void*,void* setup){
  auto fn=reinterpret_cast<ViewCallback>(originalView);
  if(fn)fn(self,setup);
+ visual::lifetime::Guard guard;if(!guard)return;
  ++viewCount;
  external::Owner owner;
  {
@@ -404,6 +412,7 @@ inline bool __fastcall shouldDrawViewModel(void* self,void*) {
 inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  auto fn=reinterpret_cast<MoveCallback>(originalMove);
  bool result=fn?fn(self,dt,cmd):false;
+ visual::lifetime::Guard guard;if(!guard)return result;
  ++cmdCount;
  if(!requested&&!externalPermission)return result;
  if(!cmd||!source_camera::readable(cmd,offsetof(Cmd,predicted)+1))return result;
