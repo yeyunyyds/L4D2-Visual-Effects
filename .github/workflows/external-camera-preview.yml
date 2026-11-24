@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: visual-camera-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   mingw-x86:
     runs-on: ubuntu-latest
