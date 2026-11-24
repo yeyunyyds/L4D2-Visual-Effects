@@ -129,3 +129,4 @@ extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraGetPose(L4D2VisualCameraPo
 }
 
 extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraSetInitialIdle(uint32_t seconds){return visual::freecamera::setExternalInitialIdle(seconds)?1:0;}
+extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraSetNativeOnInput(int enabled){return visual::freecamera::setExternalNativeOnInput(enabled!=0)?1:0;}

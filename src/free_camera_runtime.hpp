@@ -166,6 +166,7 @@ inline void expireLeaseLocked(ULONGLONG at){
 inline external::Owner selectOwnerLocked(ULONGLONG at){
  expireLeaseLocked(at);
  const auto next=ownerPolicy.select(at);
+ if(next==external::Owner::External)ownerPolicy.externalWasDriving=true;
  const auto previous=currentOwner.load(std::memory_order_relaxed);
  if(next!=previous){
   externalTargetReady=false;
@@ -209,6 +210,12 @@ inline bool setExternalInitialIdle(unsigned seconds){
  if(!ownerPolicy.allowed)return false;
  ownerPolicy.initialIdleSeconds=std::clamp(seconds,1u,120u);
  return true;
+}
+inline bool setExternalNativeOnInput(bool enabled){
+ if(!apiLive.load(std::memory_order_acquire))return false;
+ std::lock_guard<std::mutex> lock(motionMutex);
+ if(!ownerPolicy.allowed)return false;
+ ownerPolicy.nativeOnInput=enabled;return true;
 }
 inline bool requestExternal(bool enabled){
  if(!apiLive.load(std::memory_order_acquire))return false;
@@ -268,7 +275,7 @@ inline bool hasHumanInput(const Cmd* cmd=nullptr){
  if(cmd&&(cmd->mousedx||cmd->mousedy))return true;
  // Detect held keyboard/mouse buttons while the L4D2 window has focus.
  for(int vk=VK_LBUTTON;vk<=VK_OEM_CLEAR;++vk){
-  if(vk==VK_PACKET||vk==VK_PROCESSKEY)continue;
+  if(vk==VK_PACKET||vk==VK_PROCESSKEY||(externalSession.load()&&hotkeyConfigValid.load()&&vk==hotkeyVk.load()))continue;
   if(GetAsyncKeyState(vk)&0x8000)return true;
  }
  return false;
@@ -413,7 +420,7 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  {
   std::lock_guard<std::mutex> lock(motionMutex);
   const auto at=GetTickCount64();expireLeaseLocked(at);
-  if(input||!focused||paused.load()||externalMenuBlocked.load())ownerPolicy.noteInput(at);
+  if(input||!focused||paused.load()||externalMenuBlocked.load())ownerPolicy.noteInput(at,input&&focused&&!paused.load()&&!externalMenuBlocked.load());
   else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
   owner=selectOwnerLocked(at);
  }
@@ -659,7 +666,7 @@ inline void poll(bool escape,bool menu,bool gameForeground){
   const bool input=escape||menu||!gameForeground||hasHumanInput();
   std::lock_guard<std::mutex> lock(motionMutex);
   const auto at=GetTickCount64();expireLeaseLocked(at);
-  if(input)ownerPolicy.noteInput(at);
+  if(input)ownerPolicy.noteInput(at,!shouldPause&&!edge);
   else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
   selectOwnerLocked(at);
  }

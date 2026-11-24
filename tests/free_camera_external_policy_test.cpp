@@ -21,4 +21,9 @@ int main(){
  p.setPose(47998);assert(p.lastPoseMs==48000);p.noteInput(48002);p.noteInput(48001);assert(p.lastInputMs==48002);
  assert(!p.expire(63000)&&p.desired);assert(p.expire(63001)&&!p.desired&&!p.on);
  p.stop();assert(p.select(47001)==Owner::Native);
+ Policy native;native.allow(true,1000);native.nativeOnInput=true;assert(native.request(true,1000));native.setPose(1001);native.advance(11000);assert(native.select(11000)==Owner::External);native.externalWasDriving=true;
+ native.noteInput(11001,false);assert(native.on&&native.select(11001)==Owner::User); // menu pause is not takeover
+ native.noteInput(11002,true);assert(!native.on&&native.desired&&native.select(11002)==Owner::Native);
+ native.setPose(12000);native.advance(21001);assert(!native.on);native.advance(21002);assert(native.select(21002)==Owner::External);
+ native.externalWasDriving=true;native.nativeOnInput=false;native.noteInput(21003,true);assert(native.on&&native.select(21003)==Owner::User);
 }
