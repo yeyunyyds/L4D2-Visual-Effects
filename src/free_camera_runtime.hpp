@@ -47,7 +47,10 @@ inline core::Vec externalOrigin{},externalAngles{};
 inline bool externalTargetReady=false; // guarded by motionMutex
 inline std::mutex motionMutex;
 inline core::Input latestInput{};
-inline std::atomic<bool> liveMap{false};
+inline std::atomic<bool> liveMap{false},bodyClear{false};
+inline Vec nativeEntryEye{}; // guarded by motionMutex
+inline bool nativeEntryKnown=false;
+inline std::atomic<ULONGLONG> lastBadFrameLog{0},lastBadViewLog{0},lastBadCmdLog{0},lastMismatchLog{0};
 struct MovementKeys {int forward='W',back='S',left='A',right='D',up=VK_SPACE,down=VK_LSHIFT,walk=VK_CAPITAL;float walkScale=.30f;};
 inline MovementKeys movementKeys;
 inline void setMovementKeys(MovementKeys value){std::lock_guard<std::mutex> lock(motionMutex);movementKeys=value;}
@@ -149,15 +152,19 @@ inline core::MouseCounts queuedMouse(){
  return pendingMouse.peek();
 }
 inline void resetMotionLocked(){
- camera.ready=false;camera.halt();
+ camera.ready=false;camera.halt();nativeEntryKnown=false;bodyClear=false;
  latestInput={};dropMouseLocked();
  renderClock.reset();haveAim=false;lastInput=0;
  currentMovementSpeed=0.f;renderDeltaMs=0.f;
 }
 // The camera owner is selected under motionMutex. Never call an original
 // engine hook while holding this lock.
+inline void expireLeaseLocked(ULONGLONG at){
+ const auto last=ownerPolicy.lastPoseMs;
+ if(ownerPolicy.expire(at))source_camera::log("FreeCamera lease expired: now="+std::to_string(at)+" lastPose="+std::to_string(last));
+}
 inline external::Owner selectOwnerLocked(ULONGLONG at){
- ownerPolicy.expire(at);
+ expireLeaseLocked(at);
  const auto next=ownerPolicy.select(at);
  const auto previous=currentOwner.load(std::memory_order_relaxed);
  if(next!=previous){
@@ -222,7 +229,7 @@ inline bool publishExternalPose(const L4D2VisualCameraPoseV1* p){
  std::lock_guard<std::mutex> lock(motionMutex);
  if(!ownerPolicy.allowed||!ownerPolicy.desired)return false;
  const auto at=GetTickCount64();
- ownerPolicy.expire(at);
+ expireLeaseLocked(at);
  if(!ownerPolicy.desired){selectOwnerLocked(at);return false;}
  const auto previous=currentOwner.load(std::memory_order_relaxed);
  ownerPolicy.setPose(at);
@@ -283,7 +290,7 @@ inline void disable(const char* reason="FreeCamera off"){
   selectOwnerLocked(GetTickCount64());
   active=false;resetMotionLocked();
  }
- message=reason;
+ message=reason;source_camera::log(std::string("FreeCamera reset: ")+reason);
 }
 inline void toggle(){
  bool next=false;
@@ -308,7 +315,9 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  if(owner==external::Owner::Native){active=false;return;}
  Vec origin{},angles{};ViewLayout layout{};
  if(!viewFields(setup,origin,angles,layout)){
-  ++viewRejected;disable("CViewSetup layout mismatch; disabled");return;
+  ++viewRejected;
+  if(externalSession.load()){const auto at=GetTickCount64();if(at-lastBadViewLog.load()>=1000){lastBadViewLog=at;source_camera::log("FreeCamera ignored invalid view layout; preserving external lease");}return;}
+  disable("CViewSetup layout mismatch; disabled");return;
  }
  const auto now=GetTickCount64(),last=lastInput.load();
  if(!externalSession.load(std::memory_order_acquire)&&(!last||now<last||now-last>1000)){
@@ -324,7 +333,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
   owner=selectOwnerLocked(GetTickCount64());
   if(owner==external::Owner::Native)return;
   if(!camera.ready){
-   camera.start(origin,angles);
+   camera.start(origin,angles);nativeEntryEye=origin;nativeEntryKnown=camera.ready;bodyClear=false;
    epoch=source_camera::epoch;
    renderClock.reset();
   }
@@ -363,8 +372,9 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
   }
   outputOrigin=camera.origin;
   outputAngles=camera.angles;
+  if(nativeEntryKnown&&core::magnitude(outputOrigin-nativeEntryEye)>=48.f)bodyClear=true;
   if(!write(setup,layout.origin,&outputOrigin,12)||!write(setup,layout.angles,&outputAngles,12)){
-   ++viewRejected;ownerPolicy.stop();selectOwnerLocked(GetTickCount64());message="CViewSetup write failed";return;
+   ++viewRejected;ownerPolicy.stop();selectOwnerLocked(GetTickCount64());message="CViewSetup write failed";source_camera::log("FreeCamera reset: CViewSetup write failed");return;
   }
   active=true;
   message=owner==external::Owner::External?"FreeCamera EXTERNAL":"FreeCamera USER";
@@ -397,12 +407,12 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
   ++extraMouseSamples;
   if(cmd->mousedx||cmd->mousedy)++extraMouseNonzero;
  }else ++serverCmdSamples;
- const auto at=GetTickCount64();
  const bool focused=foreground();
  const bool input=focused&&externalPermission.load(std::memory_order_acquire)&&hasHumanInput(cmd);
  external::Owner owner;
  {
   std::lock_guard<std::mutex> lock(motionMutex);
+  const auto at=GetTickCount64();expireLeaseLocked(at);
   if(input||!focused||paused.load()||externalMenuBlocked.load())ownerPolicy.noteInput(at);
   else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
   owner=selectOwnerLocked(at);
@@ -410,18 +420,20 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  if(owner==external::Owner::Native)return result;
  // Never suppress server commands before a valid detached view exists.
  if(!active.load(std::memory_order_acquire)){
-  lastInput=at;
+  lastInput=GetTickCount64();
   return result;
  }
  if(!validCmd(cmd)){
-  ++cmdRejected;disable("CUserCmd layout mismatch; disabled");return result;
+  ++cmdRejected;
+  if(externalSession.load()){const auto at=GetTickCount64();if(at-lastBadCmdLog.load()>=1000){lastBadCmdLog=at;source_camera::log("FreeCamera ignored invalid command; preserving external lease");}return result;}
+  disable("CUserCmd layout mismatch; disabled");return result;
  }
  {
   std::lock_guard<std::mutex> lock(motionMutex);
   owner=selectOwnerLocked(GetTickCount64());
   if(owner==external::Owner::Native)return result;
   if(!haveAim){lockedAim=cmd->viewangles;haveAim=true;}
-  lastInput=at;
+  lastInput=GetTickCount64();
   mouseReceivedX.fetch_add(cmd->mousedx,std::memory_order_relaxed);
   mouseReceivedY.fetch_add(cmd->mousedy,std::memory_order_relaxed);
   ++mouseSamples;
@@ -598,6 +610,13 @@ inline void frame(const dango::GameCameraFrame& f){
   externalPending=ownerPolicy.desired;
  }
  if(!f.active){
+  const auto state=source_camera::captureState.load();
+  const bool sameEpoch=observedEpoch!=0&&observedEpoch==f.epoch;
+  // 3/4 = unreadable or temporarily mismatched matrices, not a level exit.
+  if(sameEpoch&&(state==3||state==4)){
+   if(externalPending&&f.tick-lastBadFrameLog.load()>=1000){lastBadFrameLog=f.tick;source_camera::log("FreeCamera transient invalid frame; preserving external lease state="+std::to_string(state));}
+   return;
+  }
   observedEpoch=0;
   if(requested||externalPending)disable("FreeCamera reset on map exit");
   return;
@@ -610,6 +629,14 @@ inline void frame(const dango::GameCameraFrame& f){
  // until a valid pose and idle interval, CreateMove is native passthrough.
  if(requested.load(std::memory_order_acquire)||externalPermission.load(std::memory_order_acquire))tryBind();
  if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");}
+ if(externalPending&&active.load()&&currentOwner.load()==external::Owner::External){
+  dango::CameraPose rendered;
+  if(dango::cameraPose(f,rendered)){
+   std::lock_guard<std::mutex> lock(motionMutex);
+   auto delta=core::magnitude(Vec{rendered.eye.x,rendered.eye.y,rendered.eye.z}-camera.origin);
+   if(camera.ready&&delta>32.f&&f.tick-lastMismatchLog.load()>=1000){lastMismatchLog=f.tick;source_camera::log("FreeCamera final matrix/override mismatch units="+std::to_string(delta));}
+  }
+ }
 }
 inline void poll(bool escape,bool menu,bool gameForeground){
  externalMenuBlocked.store(escape||menu||!gameForeground,std::memory_order_release);
@@ -629,9 +656,9 @@ inline void poll(bool escape,bool menu,bool gameForeground){
  // Menus, lost focus and Escape all interrupt the external controller.
  // Never resume it while the menu is continuously open.
  if(externalSession.load(std::memory_order_acquire)){
-  const auto at=GetTickCount64();
   const bool input=escape||menu||!gameForeground||hasHumanInput();
   std::lock_guard<std::mutex> lock(motionMutex);
+  const auto at=GetTickCount64();expireLeaseLocked(at);
   if(input)ownerPolicy.noteInput(at);
   else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
   selectOwnerLocked(at);
