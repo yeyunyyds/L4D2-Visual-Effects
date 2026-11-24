@@ -87,6 +87,8 @@
   "freeCamera": {
     "hideViewmodel": true,
     "f6Binding": false,
-    "hotkey": "f6"
+    "hotkey": "f6",
+    "externalEnabled": false,
+    "externalIdleSeconds": 3
   }
 }
