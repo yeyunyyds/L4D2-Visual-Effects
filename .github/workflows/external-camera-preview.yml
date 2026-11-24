@@ -29,7 +29,7 @@ jobs:
         run: |
           bash scripts/build-mingw.sh
           i686-w64-mingw32-objdump -p build/L4D2Visual.dll > build/exports.txt
-          for symbol in L4D2VisualCameraGetVersion L4D2VisualCameraSetExternalActive L4D2VisualCameraSetPose L4D2VisualCameraGetStatus; do
+          for symbol in L4D2VisualCameraGetVersion L4D2VisualCameraSetExternalActive L4D2VisualCameraSetPose L4D2VisualCameraGetPose L4D2VisualCameraGetStatus; do
             grep -q "$symbol" build/exports.txt || { echo "Missing ABI export: $symbol"; exit 1; }
           done
       - name: Package preview
@@ -65,4 +65,6 @@ jobs:
           dumpbin /exports build\L4D2Visual.dll > build\msvc-exports.txt
           if errorlevel 1 exit /b 1
           findstr /c:"L4D2VisualCameraSetPose" build\msvc-exports.txt
+          if errorlevel 1 exit /b 1
+          findstr /c:"L4D2VisualCameraGetPose" build\msvc-exports.txt
           if errorlevel 1 exit /b 1
