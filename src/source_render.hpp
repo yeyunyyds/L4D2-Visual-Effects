@@ -331,8 +331,8 @@ inline void connect() {
     auto studioBuild=visual::studioabi::select(source_entities::reader,std::uint32_t(reinterpret_cast<std::uintptr_t>(studioModule)));if(!studioBuild){status="Unsupported Studio PE profile; original drawing retained";return;}
     if(!matchesImage(engineModule,EngineTimestamp,EngineImageSize,"visual engine") ||
        !matchesImage(clientModule,ClientTimestamp,ClientImageSize,"visual client"))return;
-    if(!verifiedModuleFile(engineModule,"8a6d468059394bf4cfce32f11dcba12ef45de88da1373084d5a2916d0bf7ba86") ||
-       !verifiedModuleFile(clientModule,"c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f") ||
+    if(!verifiedModuleFile(engineModule,"d451800729322f25bfc65d58a408edb4f4243a8ea8c26fabccbba4bc7ecc1db3") ||
+       !verifiedModuleFile(clientModule,"4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d") ||
        !verifiedModuleFile(studioModule,studioBuild->sha256)) {
         status="Disk game DLL hash mismatch; render hooks refused";return;
     }

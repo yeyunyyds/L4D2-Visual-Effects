@@ -56,10 +56,10 @@ inline void* originalView=nullptr;inline void* originalMove=nullptr;
 using ViewModelCallback=bool(__thiscall*)(void*);
 inline ViewModelCallback originalViewModel=nullptr;
 inline ULONGLONG nextProbe=0;
-// Verified against SHA256 c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f.
+// Verified against SHA256 4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d.
 // IClientMode::ShouldDrawViewModel follows LevelShutdown in the vtable.
 constexpr unsigned viewSlot=19,moveSlot=27,viewModelSlot=30;
-constexpr std::uintptr_t originalViewModelRva=0x2286b0;
+constexpr std::uintptr_t originalViewModelRva=0x2287a0;
 struct Cmd {
  void* vptr;int command_number,tick_count;Vec viewangles;
  float forwardmove,sidemove,upmove;int buttons;unsigned char impulse,pad[3];
@@ -306,17 +306,17 @@ inline bool changeSlot(void** vt,unsigned index,void* expected,void* replacement
  DWORD ignored=0;VirtualProtect(vt+index,4,before,&ignored);
  return actual==expected;
 }
-// Verified exact 2026 client.dll SHA256 c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f
-// Disassembly: client+0x22854e stores EAX DIRECTLY into client+0x7b1b8c[esi].
-// ClientMode object = client+0x7c3240+index*0x148, vt = client+0x5bd4fc.
-// OverrideView[19] at client+0x26ff40; CreateMove[27] at client+0xc2d70.
+// Verified exact 2026 client.dll SHA256 4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d
+// Disassembly: client+0x22863e stores EAX DIRECTLY into client+0x7b1b8c[esi].
+// ClientMode object = client+0x7c3240+index*0x148, vt = client+0x5bd504.
+// OverrideView[19] at client+0x270010; CreateMove[27] at client+0xc2da0.
 // The previous two-level read was incorrect.
 inline std::atomic<const char*> locateDetail{"not attempted"};
 inline std::atomic<int> locatedMode{-1};
-constexpr std::uintptr_t globalRva=0x7b1b8c,registerInsnRva=0x22854e;
+constexpr std::uintptr_t globalRva=0x7b1b8c,registerInsnRva=0x22863e;
 constexpr std::uintptr_t objectBaseRva=0x7c3240,objectStride=0x148;
-constexpr std::uintptr_t vtableRva=0x5bd4fc;
-constexpr std::uintptr_t originalViewRva=0x26ff40,originalMoveRva=0x0c2d70;
+constexpr std::uintptr_t vtableRva=0x5bd504;
+constexpr std::uintptr_t originalViewRva=0x270010,originalMoveRva=0x0c2da0;
 inline void* locate(HMODULE dll){
  locateDetail="checking exact-build client mode profile";
  locatedMode=-1;
@@ -377,15 +377,15 @@ inline void tryBindViewModel(){
  }
  const auto base=reinterpret_cast<std::uintptr_t>(dll);
  // Checked against the source DLL with SHA256
- // c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f.
+ // 4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d.
  constexpr unsigned char signature[]={
   0x55,0x8b,0xec,0x83,0xec,0x08,0x53,0x56,
-  0x8b,0xd9,0xe8,0x71,0x9a,0xff,0xff
+  0x8b,0xd9,0xe8,0x61,0x9a,0xff,0xff
  };
  const auto expected=reinterpret_cast<const void*>(base+originalViewModelRva);
  if(!source_camera::matchesImage(dll,source_camera::ClientTimestamp,
        source_camera::ClientImageSize,"FreeCamera ViewModel client")||
-    !verifiedModuleFile(dll,"c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f")||
+    !verifiedModuleFile(dll,"4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d")||
     !source_camera::readable(expected,sizeof(signature))||
     std::memcmp(expected,signature,sizeof(signature))!=0||
     !source_camera::executable(expected)||
@@ -419,7 +419,7 @@ inline void tryBind(){
  if(!dll||!source_camera::hooked){message="Waiting for Source camera initialization";return;}
  if(!source_camera::matchesImage(dll,source_camera::ClientTimestamp,
     source_camera::ClientImageSize,"FreeCamera client")||
-    !verifiedModuleFile(dll,"c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f")){
+    !verifiedModuleFile(dll,"4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d")){
   message="FreeCamera game build mismatch";return;
  }
  auto instance=locate(dll);

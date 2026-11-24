@@ -1,7 +1,7 @@
 {
   "engine": {
-    "sha256": "8a6d468059394bf4cfce32f11dcba12ef45de88da1373084d5a2916d0bf7ba86",
-    "timestamp": 1782845142,
+    "sha256": "d451800729322f25bfc65d58a408edb4f4243a8ea8c26fabccbba4bc7ecc1db3",
+    "timestamp": 1794946460,
     "image_size": 7598080,
     "samples": [
       {
@@ -39,8 +39,8 @@
     "constructor_rva": 903727
   },
   "client": {
-    "sha256": "c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f",
-    "timestamp": 1782845135,
+    "sha256": "4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d",
+    "timestamp": 1794952363,
     "image_size": 9842688,
     "samples": [
       {
@@ -56,21 +56,21 @@
     ],
     "compatibility": {
       "variable": "cl_modelfastpath",
-      "name_rva": 5822460,
+      "name_rva": 5822468,
       "object_rva": 8020688,
-      "vtable_rva": 6663980,
+      "vtable_rva": 6663996,
       "parent_offset": 28,
       "integer_offset": 48,
       "setter_slot": 14,
-      "setter_rva": 4013456,
-      "registration_rva": 5278512,
-      "consumer_rva": 1910189
+      "setter_rva": 4013616,
+      "registration_rva": 5278704,
+      "consumer_rva": 1910301
     }
   },
   "studio": {
-    "sha256": "03964dedcf8b7f4ebde24cd3d0738873d37c075a7a9b313dad001bb937f9d1b6",
-    "timestamp": 1782844886,
-    "image_size": 6631424,
+    "sha256": "a7efe8304d0e0bb5cfa87193d234670ea59ead1323d43a10da60b2fbd6f65d14",
+    "timestamp": 1794274100,
+    "image_size": 4534272,
     "samples": [
       {
         "rva": 434512,

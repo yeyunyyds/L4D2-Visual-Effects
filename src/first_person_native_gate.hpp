@@ -128,8 +128,8 @@ inline bool verify(std::uint32_t entity) noexcept {
  if(!cm||!em||
     !matchesImage(cm,ClientTimestamp,ClientImageSize,"fpb client")||
     !matchesImage(em,EngineTimestamp,EngineImageSize,"fpb engine")||
-    !visual::verifiedModuleFile(cm,"c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f")||
-    !visual::verifiedModuleFile(em,"8a6d468059394bf4cfce32f11dcba12ef45de88da1373084d5a2916d0bf7ba86")){
+    !visual::verifiedModuleFile(cm,"4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d")||
+    !visual::verifiedModuleFile(em,"d451800729322f25bfc65d58a408edb4f4243a8ea8c26fabccbba4bc7ecc1db3")){
   fail(u8"客户端/引擎 PE 或 SHA-256 不匹配");return false;
  }
  auto image=std::uint32_t(std::uintptr_t(cm));
@@ -146,11 +146,11 @@ inline bool verify(std::uint32_t entity) noexcept {
     !executable(reinterpret_cast<void*>(std::uintptr_t(draw)))){
   fail(u8"C_TerrorPlayer RTTI/DrawModel[9] 不匹配");return false;
  }
- constexpr unsigned char callsite[]={0x8b,0x45,0x0c,0x50,0x56,0x8b,0xcf,0xe8,0x6e,0xac,0xfc,0xff,0x8b,0xf8};
- constexpr unsigned char prologue[]={0x55,0x8b,0xec,0x56,0x57,0x6a,0xff,0x8b,0xf1,0xe8,0x72,0x01,0xe4,0xff};
+ constexpr unsigned char callsite[]={0x8b,0x45,0x0c,0x50,0x56,0x8b,0xcf,0xe8,0x8e,0xac,0xfc,0xff,0x8b,0xf8};
+ constexpr unsigned char prologue[]={0x55,0x8b,0xec,0x56,0x57,0x6a,0xff,0x8b,0xf1,0xe8,0x92,0x00,0xe4,0xff};
  auto base=std::uintptr_t(cm);
- if(!readable(reinterpret_cast<void*>(base+0x2586e6),sizeof(callsite))||
-    std::memcmp(reinterpret_cast<void*>(base+0x2586e6),callsite,sizeof(callsite))||
+ if(!readable(reinterpret_cast<void*>(base+0x2587a6),sizeof(callsite))||
+    std::memcmp(reinterpret_cast<void*>(base+0x2587a6),callsite,sizeof(callsite))||
     !readable(reinterpret_cast<void*>(base+branch::DrawRva),sizeof(prologue))||
     std::memcmp(reinterpret_cast<void*>(base+branch::DrawRva),prologue,sizeof(prologue))){
   fail(u8"原版 DrawModel 调用点/函数指纹不匹配");return false;

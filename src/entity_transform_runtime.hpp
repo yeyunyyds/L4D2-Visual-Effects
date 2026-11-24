@@ -9,6 +9,9 @@
 #include <unordered_map>
 namespace visual::deform {
 inline std::shared_ptr<const Settings> options=std::make_shared<const Settings>();
+// New client build: BuildTransformations slot 175 and native cache layout are not yet independently revalidated.
+// Keep the existing render-copy fallback; never install the native hooks on unverified layouts.
+inline constexpr bool nativeDeformationVerified=false;
 inline std::atomic<bool> live{false},stopRequested{false},clean{true};
 inline std::atomic<unsigned> boneLimit{128};inline std::atomic<DWORD> owner{0};
 inline std::atomic<unsigned long> builds{0},fields{0},studioDraws{0},failures{0},restores{0};
@@ -94,7 +97,7 @@ template<class Reader> std::uint32_t scaleProp(Reader& reader,std::uint32_t root
 inline void cleanup(){live=false;auto old=std::atomic_load(&targets);std::atomic_store(&targets,emptyTargets);if(GetModuleHandleW(L"client.dll")==source_camera::clientModule)for(const auto& i:old->bases){auto& t=*i.second;std::lock_guard<std::mutex> l(t.state->mutex);restorePose(t);restoreField(t);}detach(buildHooks,buildCount.load());detach(proxyHooks,proxyCount.load());pending.clear();clean=true;}
 inline void onFrameWork(const dango::GameCameraFrame& camera,unsigned limit){owner=GetCurrentThreadId();boneLimit=limit;auto cfg=std::atomic_load(&options);auto frame=std::atomic_load(&source_entities::snapshot);
  if(stopRequested||!any(*cfg)||!camera.active||camera.epoch!=frame->epoch||camera.tick<frame->tick||camera.tick-frame->tick>250){if(!clean)cleanup();status="关闭或没有有效目标；构建和代理已卸载";return;}
- if(!source_camera::clientModule||!verifiedModuleFile(source_camera::clientModule,"c0a8e1e88f7312db11bcfd4b0ec574d224a34b2d9a615d6088b28335eeb4af1f")){status="客户端版本未验证；不安装原生形变";return;}
+ if(!source_camera::clientModule||!verifiedModuleFile(source_camera::clientModule,"4d01ed9fb856d57ce549b8587c386f361083ee581b001295fac0eff4c835d52d")){status="客户端版本未验证；不安装原生形变";return;}
  static std::shared_ptr<const Settings> previousCfg;static std::shared_ptr<const source_entities::Frame> previousFrame;
  if(live&&previousCfg==cfg&&previousFrame==frame)return;pending.clear();pending.reserve(frame->records.size());previousCfg=cfg;previousFrame=frame;
  static std::uint32_t propEpoch=0;static std::unordered_map<std::uint32_t,std::uint32_t> props;if(propEpoch!=frame->epoch){props.clear();propEpoch=frame->epoch;}
@@ -103,7 +106,7 @@ inline void onFrameWork(const dango::GameCameraFrame& camera,unsigned limit){own
  for(const auto& r:frame->records){auto rule=selected(*cfg,r);if(!rule.enabled||identity(rule)||!r.modelIndex||*r.modelIndex<=0)continue;source_entities::wire::Entry entry;std::uint32_t net=0;if(!source_entities::wire::load(source_entities::reader,entries+r.index*16,entry)||entry.serial!=r.serial||!entry.entity||!source_entities::wire::load(source_entities::reader,object+source_entities::profile::CacheOffset+r.index*8,net)||!net)continue;
  auto t=std::make_shared<Target>();pending.push_back(t);t->epoch=frame->epoch;t->handle=r.handle;t->base=entry.entity;t->index=r.index;t->model=unsigned(*r.modelIndex);t->tick=frame->tick;t->rule=rule;t->label=r.className;t->view=handModelClass(r.className)&&r.className.find("View")!=std::string::npos;
  auto previous=old->bases.find(t->base);if(previous!=old->bases.end()&&(previous->second->handle!=t->handle||previous->second->epoch!=t->epoch||previous->second->model!=t->model)){std::lock_guard<std::mutex> lock(previous->second->state->mutex);restorePose(*previous->second);restoreField(*previous->second);}if(previous!=old->bases.end()&&previous->second->handle==t->handle&&previous->second->epoch==t->epoch&&previous->second->model==t->model)t->state=previous->second->state;
- auto address=source_entities::classAddress(net);if(address){auto info=source_entities::classes.find(*address);if(info!=source_entities::classes.end()){auto mi=info->second.fields.find("m_nModelIndex");if(mi!=info->second.fields.end())t->modelOffset=mi->second.offset;if(previous!=old->bases.end()&&previous->second->state==t->state&&factors(previous->second->rule)!=factors(t->rule)){std::lock_guard<std::mutex> l(t->state->mutex);restorePose(*t);}auto field=info->second.fields.find("m_flModelScale");if(!cfg->studioOnly&&field!=info->second.fields.end()&&field->second.type==1&&field->second.offset<0x4000){t->scaleOffset=field->second.offset;
+ auto address=source_entities::classAddress(net);if(address){auto info=source_entities::classes.find(*address);if(info!=source_entities::classes.end()){auto mi=info->second.fields.find("m_nModelIndex");if(mi!=info->second.fields.end())t->modelOffset=mi->second.offset;if(previous!=old->bases.end()&&previous->second->state==t->state&&factors(previous->second->rule)!=factors(t->rule)){std::lock_guard<std::mutex> l(t->state->mutex);restorePose(*t);}auto field=info->second.fields.find("m_flModelScale");if(nativeDeformationVerified&&!cfg->studioOnly&&field!=info->second.fields.end()&&field->second.type==1&&field->second.offset<0x4000){t->scaleOffset=field->second.offset;
  t->field=survivorPlayerClass(r.className)&&r.team&&*r.team==3&&uniform(rule);
  bool admitted=t->field;std::uint32_t table=0;if(!admitted&&source_entities::wire::load(source_entities::reader,t->base,table)&&source_camera::owns(reinterpret_cast<void*>(uintptr_t(table)),source_camera::clientModule))admitted=t->build=installBuild(t->buildSlot=reinterpret_cast<void**>(uintptr_t(table+175*4)));
  if(admitted){
@@ -121,7 +124,7 @@ inline void onFrameWork(const dango::GameCameraFrame& camera,unsigned limit){own
  next->bases[t->base]=t;++eligible;
  }
  live=false;for(const auto& i:old->bases)if(!next->bases.count(i.first)||next->bases[i.first]->state!=i.second->state){auto& t=*i.second;std::lock_guard<std::mutex> l(t.state->mutex);restorePose(t);restoreField(t);}
- std::atomic_store(&targets,std::shared_ptr<const Targets>(next));live=eligible>0;clean=false;status=eligible?"实体形变已就绪：构建优先，Studio补充":"没有可绘制的已选实体";
+ std::atomic_store(&targets,std::shared_ptr<const Targets>(next));live=eligible>0;clean=false;status=eligible?(nativeDeformationVerified?"实体形变已就绪：构建优先，Studio补充":"新版客户端：仅 Studio 绘制副本，原生构建待验证"):"没有可绘制的已选实体";
  std::set<void**> needBuild,needProxy;for(const auto& i:next->bases){if(i.second->build)needBuild.insert(i.second->buildSlot);if(i.second->build||i.second->field)needProxy.insert(i.second->proxySlot);}for(unsigned i=0;i<buildCount.load();++i)if(buildHooks[i].installed&&!needBuild.count(buildHooks[i].slot))swap(buildHooks[i],false);for(unsigned i=0;i<proxyCount.load();++i)if(proxyHooks[i].installed&&!needProxy.count(proxyHooks[i].slot))swap(proxyHooks[i],false);
 }
 inline void onFrame(const dango::GameCameraFrame& camera,unsigned limit)noexcept{try{onFrameWork(camera,limit);}catch(...){live=false;for(const auto& t:pending){std::lock_guard<std::mutex> lock(t->state->mutex);restorePose(*t);restoreField(*t);}cleanup();++failures;status="形变初始化失败；已恢复并停止";}}
