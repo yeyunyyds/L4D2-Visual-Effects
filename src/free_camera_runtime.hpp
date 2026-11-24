@@ -58,7 +58,6 @@ inline std::atomic<std::int64_t> mouseAppliedX{0},mouseAppliedY{0};
 inline std::atomic<std::int64_t> mouseDroppedX{0},mouseDroppedY{0};
 inline std::atomic<std::uint64_t> mouseSamples{0},mouseZeroSamples{0};
 inline std::atomic<std::uint64_t> serverCmdSamples{0},extraMouseSamples{0},extraMouseNonzero{0};
-inline std::atomic<int> lastObservedButtons{0};
 inline core::FrameClock renderClock;
 inline std::atomic<unsigned long> renderSteps{0},renderRepeats{0},renderGaps{0};
 inline std::atomic<float> renderDeltaMs{0.f};
@@ -357,7 +356,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
      ++renderGaps;camera.halt();
     }else if(tick.kind==core::FrameKind::Step){
      // Manual keyboard input is available even without spectator CreateMove.
-     sampleMovementLocked();camera.advance(latestInput,tick.dt);
+     sampleMovementLocked();camera.speed=movementSpeed.load(std::memory_order_relaxed);camera.advance(latestInput,tick.dt);
     }
    }
    currentMovementSpeed=camera.currentSpeed();
@@ -625,7 +624,7 @@ inline void poll(bool escape,bool menu,bool gameForeground){
  previousVk=vk;
  // Do not toggle via hotkey while the native menu is open: digit/navigation
  // key choices may otherwise trigger both a menu action and FreeCamera.
- // Keep camera movement active with the menu open as before.
+ // Do not move the detached camera while using menu controls.
  const bool shouldPause=escape||menu||!gameForeground;
  // Menus, lost focus and Escape all interrupt the external controller.
  // Never resume it while the menu is continuously open.
