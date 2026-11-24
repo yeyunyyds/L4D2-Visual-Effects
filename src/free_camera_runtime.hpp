@@ -262,7 +262,12 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  auto fn=reinterpret_cast<ViewCallback>(originalView);
  if(fn)fn(self,setup);
  ++viewCount;
- if(!requested){active=false;return;}
+ external::Owner owner;
+ {
+  std::lock_guard<std::mutex> lock(motionMutex);
+  owner=selectOwnerLocked(GetTickCount64());
+ }
+ if(owner==external::Owner::Native){active=false;return;}
  Vec origin{},angles{};ViewLayout layout{};
  if(!viewFields(setup,origin,angles,layout)){
   ++viewRejected;disable("CViewSetup layout mismatch; disabled");return;
@@ -278,13 +283,20 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  Vec outputOrigin{},outputAngles{};
  {
   std::lock_guard<std::mutex> lock(motionMutex);
-  if(!requested)return;
+  owner=selectOwnerLocked(GetTickCount64());
+  if(owner==external::Owner::Native)return;
   if(!camera.ready){
    camera.start(origin,angles);
    epoch=source_camera::epoch;
    renderClock.reset();
   }
   if(!camera.ready)return;
+  if(owner==external::Owner::External){
+   // Provider-supplied absolute pose. Never consume or integrate mouse input
+   // while DangoMusic owns the detached camera.
+   camera.origin=externalOrigin;camera.angles=externalAngles;
+   camera.halt();latestInput={};dropMouseLocked();
+  }
   const auto renderId=source_camera::renderBegins.load(std::memory_order_relaxed);
   const core::FrameTick tick=renderClock.next(renderId,renderTimeSeconds());
   if(tick.kind==core::FrameKind::Repeat){
@@ -292,13 +304,12 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
   }else{
    ++renderSteps;
    renderDeltaMs=tick.dt*1000.f;
-   const core::Input i=latestInput;
-   if(paused.load()||!foreground()){
+   if(owner==external::Owner::External){
+    // Pose is submitted by the provider; no manual movement integration.
+   }else if(paused.load()||!foreground()){
     dropMouseLocked();
     camera.halt();
    }else{
-    // Every real render (including Gap) consumes available mouse movement.
-    // Gap only halts translation; it must never discard rotation.
     const auto delta=pendingMouse.take();
     camera.look(float(delta.x),float(delta.y));
     mouseAppliedX.fetch_add(delta.x,std::memory_order_relaxed);
@@ -306,7 +317,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
     if(tick.kind==core::FrameKind::Gap){
      ++renderGaps;camera.halt();
     }else if(tick.kind==core::FrameKind::Step){
-     camera.advance(i,tick.dt);
+     camera.advance(latestInput,tick.dt);
     }
    }
    currentMovementSpeed=camera.currentSpeed();
@@ -318,7 +329,13 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
     !write(setup,layout.angles,&outputAngles,12)){
   ++viewRejected;disable("CViewSetup write failed");return;
  }
- active=true;message="FreeCamera ACTIVE";
+ if(owner==external::Owner::External){
+  std::lock_guard<std::mutex> lock(motionMutex);
+  if(ownerPolicy.select(GetTickCount64())==external::Owner::External)
+   ownerPolicy.onExternalFrame();
+ }
+ active=true;
+ message=owner==external::Owner::External?"FreeCamera EXTERNAL":"FreeCamera USER";
 }
 // Preserve the original client-mode decision and any upstream hook in the
 // chain. In FreeCamera mode, override ONLY the viewmodel visibility result.
@@ -338,23 +355,28 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  auto fn=reinterpret_cast<MoveCallback>(originalMove);
  bool result=fn?fn(self,dt,cmd):false;
  ++cmdCount;
- if(!requested)return result;
- if(!cmd)return result;
- // Source's extra render-frame mouse sampler uses command_number == 0.
- // These are valid camera inputs, even though no server command is sent.
+ if(!requested&&!externalPermission)return result;
+ if(!cmd||!source_camera::readable(cmd,offsetof(Cmd,predicted)+1))return result;
+ // Source ExtraMouseSample uses command_number==0 and must be observed.
  const auto kind=commandpolicy::classify(cmd->command_number);
  if(kind==commandpolicy::Kind::Invalid)return result;
  if(kind==commandpolicy::Kind::ExtraMouseSample){
-  extraMouseSamples.fetch_add(1,std::memory_order_relaxed);
-  if(cmd->mousedx||cmd->mousedy)
-   extraMouseNonzero.fetch_add(1,std::memory_order_relaxed);
- }else{
-  serverCmdSamples.fetch_add(1,std::memory_order_relaxed);
+  ++extraMouseSamples;
+  if(cmd->mousedx||cmd->mousedy)++extraMouseNonzero;
+ }else ++serverCmdSamples;
+ const auto at=GetTickCount64();
+ const bool focused=foreground();
+ const bool input=focused&&externalPermission.load(std::memory_order_acquire)&&hasHumanInput(cmd);
+ external::Owner owner;
+ {
+  std::lock_guard<std::mutex> lock(motionMutex);
+  if(input)ownerPolicy.noteInput(at);
+  owner=selectOwnerLocked(at);
  }
- // Preserve native commands until the camera is actually Active.
- // A fresh input timestamp allows OverrideView to complete startup.
+ if(owner==external::Owner::Native)return result;
+ // Never suppress server commands before a valid detached view exists.
  if(!active.load(std::memory_order_acquire)){
-  lastInput=GetTickCount64();
+  lastInput=at;
   return result;
  }
  if(!validCmd(cmd)){
@@ -362,15 +384,15 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  }
  {
   std::lock_guard<std::mutex> lock(motionMutex);
-  if(!requested)return result;
+  owner=selectOwnerLocked(GetTickCount64());
+  if(owner==external::Owner::Native)return result;
   if(!haveAim){lockedAim=cmd->viewangles;haveAim=true;}
-  lastInput=GetTickCount64();
+  lastInput=at;
   mouseReceivedX.fetch_add(cmd->mousedx,std::memory_order_relaxed);
   mouseReceivedY.fetch_add(cmd->mousedy,std::memory_order_relaxed);
-  mouseSamples.fetch_add(1,std::memory_order_relaxed);
-  if(!cmd->mousedx&&!cmd->mousedy)
-   mouseZeroSamples.fetch_add(1,std::memory_order_relaxed);
-  if(!paused.load()&&foreground()){
+  ++mouseSamples;
+  if(!cmd->mousedx&&!cmd->mousedy)++mouseZeroSamples;
+  if(owner==external::Owner::User&&!paused.load()&&focused){
    latestInput.forward=float(int(key('W'))-int(key('S')));
    latestInput.side=float(int(key('D'))-int(key('A')));
    latestInput.up=float(int(key(VK_SPACE))-int(key(VK_SHIFT)));
@@ -381,8 +403,7 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
    mouseDroppedX.fetch_add(cmd->mousedx,std::memory_order_relaxed);
    mouseDroppedY.fetch_add(cmd->mousedy,std::memory_order_relaxed);
   }
-  // The engine also calls SetViewAngles after ExtraMouseSample.
-  // Keep the world's player body locked while the free view rotates.
+  // Camera control is local only; keep the networked survivor stationary.
   cmd->viewangles=lockedAim;
   cmd->forwardmove=cmd->sidemove=cmd->upmove=0;
   cmd->buttons=0;cmd->impulse=0;cmd->weaponselect=0;
