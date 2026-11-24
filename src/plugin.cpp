@@ -104,22 +104,22 @@ const char* __fastcall menu(void*,void*,bool title){return instance().RequestHud
 void* table[]={reinterpret_cast<void*>(&destroy),reinterpret_cast<void*>(&version),reinterpret_cast<void*>(&name),reinterpret_cast<void*>(&release),reinterpret_cast<void*>(&module),reinterpret_cast<void*>(&launch),reinterpret_cast<void*>(&d3d),reinterpret_cast<void*>(&device),reinterpret_cast<void*>(&menu)};
 struct Object{void** vtable;} object{table};
 }
-extern "C" __declspec(dllexport) IL4NPlugin* GetL4NPluginInstance(){instance();return reinterpret_cast<IL4NPlugin*>(&object);}
+extern "C" IL4NPlugin* GetL4NPluginInstance(){instance();return reinterpret_cast<IL4NPlugin*>(&object);}
 #else
-extern "C" __declspec(dllexport) IL4NPlugin* GetL4NPluginInstance(){return &instance();}
+extern "C" IL4NPlugin* GetL4NPluginInstance(){return &instance();}
 #endif
 
 /* Optional, versioned C ABI: DangoMusic never hooks ClientMode itself.
  * Calls only accept poses after explicit user consent in the Visual menu. */
-extern "C" __declspec(dllexport) uint32_t L4D2VISUAL_CAMERA_CALL L4D2VisualCameraGetVersion(void){
+extern "C" uint32_t L4D2VISUAL_CAMERA_CALL L4D2VisualCameraGetVersion(void){
  return L4D2VISUAL_CAMERA_ABI_VERSION;
 }
-extern "C" __declspec(dllexport) int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraSetExternalActive(int enabled){
+extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraSetExternalActive(int enabled){
  return visual::freecamera::requestExternal(enabled!=0)?1:0;
 }
-extern "C" __declspec(dllexport) int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraSetPose(const L4D2VisualCameraPoseV1* pose){
+extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraSetPose(const L4D2VisualCameraPoseV1* pose){
  return visual::freecamera::publishExternalPose(pose)?1:0;
 }
-extern "C" __declspec(dllexport) int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraGetStatus(L4D2VisualCameraStatusV1* output){
+extern "C" int L4D2VISUAL_CAMERA_CALL L4D2VisualCameraGetStatus(L4D2VisualCameraStatusV1* output){
  return visual::freecamera::statusExternal(output)?1:0;
 }
