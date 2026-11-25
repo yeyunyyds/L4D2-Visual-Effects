@@ -1,7 +1,10 @@
-name: L4D2Visual v1.1.0 build and authorized release
+name: L4D2Visual v1.1.0 candidate build
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.github/workflows/finalize-v1.1.0.yml'
+      - '.github/workflows/v1.0.0-candidate.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -118,36 +121,3 @@ jobs:
           name: L4D2Visual-1.1.0-candidate-MSVC-x86
           path: build/candidate-install/
           if-no-files-found: error
-  publish:
-    if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release L4D2Visual v1.1.0')
-    needs: [mingw-x86, msvc-x86]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/download-artifact@v4
-        with:
-          name: L4D2Visual-1.1.0-release-assets
-          path: release-assets
-      - name: Verify and publish immutable release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          (cd release-assets && sha256sum -c *.sha256)
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          if gh release view v1.1.0 >/dev/null 2>&1; then
-            echo 'Release already exists; refusing to overwrite'
-            exit 1
-          fi
-          tag_sha="$(gh api "repos/$GH_REPO/git/ref/tags/v1.1.0" --jq '.object.sha' 2>/dev/null || true)"
-          if [ -z "$tag_sha" ]; then
-            gh api "repos/$GH_REPO/git/refs" -f ref=refs/tags/v1.1.0 -f sha="$GITHUB_SHA" >/dev/null
-          else
-            test "$tag_sha" = "$GITHUB_SHA"
-          fi
-          gh release create v1.1.0 --verify-tag --draft --title 'L4D2Visual v1.1.0' --notes-file docs/releases/v1.1.0.md release-assets/*
-          gh release edit v1.1.0 --draft=false --prerelease=false --latest
