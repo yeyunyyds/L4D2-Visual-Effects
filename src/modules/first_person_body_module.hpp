@@ -122,7 +122,8 @@ inline modules::Module create(){
  m.save=[](nlohmann::json& j){
   firstperson::writeSettings(j,*std::atomic_load(&firstperson::options));
  };
- m.needsEntities=[] {return std::atomic_load(&firstperson::options)->enabled||(freecamera::requested.load()&&freecamera::externalSession.load());};
+ // Diagnostic build: keep the inventory alive for the FPB-off control group.
+ m.needsEntities=[] {return true;};
  m.frame=[](const dango::GameCameraFrame& frame) {
   // Keep the real player entity rendered while FreeCamera observes it.
   // onFrame still verifies the local handle/model/life state before opening

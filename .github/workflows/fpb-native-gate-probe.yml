@@ -24,15 +24,16 @@ jobs:
         run: |
           bash scripts/build-mingw.sh
           file build/L4D2Visual.dll
-          i686-w64-mingw32-objdump -p build/L4D2Visual.dll | grep -F L4D2VisualCameraSetPose
+          i686-w64-mingw32-objdump -p build/L4D2Visual.dll > build/exports.txt
+          grep -F L4D2VisualCameraSetPose build/exports.txt
       - name: Package diagnostic
         run: |
           python3 scripts/package.py
-          mv build/L4D2Visual-1.1.0.zip build/L4D2Visual-FPB-Native-Gate-Probe.zip
+          mv build/L4D2Visual-1.1.0.zip build/L4D2Visual-FPB-Native-Gate-Probe-2.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: L4D2Visual-FPB-Native-Gate-Probe
+          name: L4D2Visual-FPB-Native-Gate-Probe-2
           path: |
-            build/L4D2Visual-FPB-Native-Gate-Probe.zip
+            build/L4D2Visual-FPB-Native-Gate-Probe-2.zip
             docs/FPB-NATIVE-GATE-PROBE.md
           if-no-files-found: error

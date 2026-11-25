@@ -1,11 +1,10 @@
-# FPB 原生绘制许可探针 1
+# FPB 原生绘制许可探针 2
 
 基线 Visual v1.1.0。仅诊断分支，不发布正式版，不改变现有视角判断、门控、骨骼计算或 FreeCamera 行为。不安装额外 Hook，不调用未知游戏函数，不写入诊断目标内存。原有 FPB 原生门控补丁照常工作。
 
-## 假设与限制
-已验证 DrawModel 分支：client+0x2234d1 push edi; call client+0xf670; add esp,4; cmp byte ptr [eax+0x25ec],0; jz +0x13。原生分支为零时跳过绘制，非零时继续；字段语义、getter 参数和返回对象尚未证实。
-探针仅在当前 PE/SHA 和完整分支指纹匹配时读取原始字段；仅支持已完整识别的无参数依赖的 MOV EAX,imm32; RET / MOV EAX,[abs32]; RET。其他 getter 标为 raw=-1、reason=getter-unresolved，不调用、不猜测 EDI 或对象地址。自动记录调用点前96字节和 getter 前160字节（含模块基址），以便后续反汇编。第一阶段可能只能收集机器码，无法直接得到原生许可。
-
+## 第二阶段：读取实体候选字段
+probe.1 捕获完整 getter 与调用者字节。getter 在参数非空且虚表 +0x23c 的检查通过时原样返回传入指针，否则返回空指针；调用者从 renderable-4 得到参数。probe.2 对 getter、调用者前缀、原生分支和 DrawModel 序言逐字节校验，独立验证本机求生者身份、快照时效、handle/serial、RTTI 与方法地址，再只读 entity+0x25ec。不会调用该 getter 或其虚函数，也不宣称已证明虚函数语义。raw 非零代表该局部 JZ 不跳转，不等价于整个游戏一定绘制该人物。任何验证失败返回 -1。
+诊断版本在 FPB 关闭时仍保留实体快照读取，并独立计算 sampleView/sampleXY/sampleEyeZ，以便对照；正式版的逻辑保持原样。probeHandle/probeActor 与 FPB 自己的 local 状态分开记录。仍为 post-render 采样，无法证明调用瞬间的值。
 ## 测试
 退出游戏，备份正式 DLL 和 hud.json，仅替换 DLL，不覆盖 hud.json。建议单机官图测试；不保证 VAC 安全。
 1. FPB、动态定位、头/手隐藏和第三人称兼容全部开启；站立、走动、下蹲、低头。

@@ -14,6 +14,51 @@ inline std::string hex(const std::uint8_t* p,std::size_t n) {
  for(std::size_t i=0;i<n;++i){s+=digits[p[i]>>4];s+=digits[p[i]&15];}
  return s;
 }
+// Independent from FPB's validatedLocal/currentHandle: the production
+// path clears those on third-person entry and when the user disables FPB.
+struct ActorSample {
+ std::uint32_t entity=0,handle=0xffffffffu;
+ std::optional<dango::Vec3> origin;
+ const char* reason="local-unverified";
+};
+inline ActorSample verifiedActor(const dango::GameCameraFrame& f,std::uint32_t base) {
+ ActorSample out{};
+ auto snapshot=std::atomic_load(&source_entities::snapshot);
+ if(!source_entities::bound||source_entities::faulted||!source_entities::list||
+    snapshot->epoch!=f.epoch||f.tick<snapshot->tick||f.tick-snapshot->tick>250){
+  out.reason="snapshot-unverified";return out;
+ }
+ auto h=visual::localplayer::handle(*snapshot);
+ if(h==0xffffffffu)return out;
+ const source_entities::Record* actor=nullptr;
+ for(const auto& r:snapshot->records)if(r.handle==h){actor=&r;break;}
+ if(!actor||actor->className!="CTerrorPlayer"||!actor->team||*actor->team!=2||
+    !actor->health||*actor->health<=0||!actor->lifeState||*actor->lifeState!=0||
+    !actor->modelIndex||*actor->modelIndex<=0||(actor->dormant&&*actor->dormant)){
+  out.reason="not-live-local-survivor";return out;
+ }
+ const auto entries=std::uint32_t(std::int64_t(std::uintptr_t(source_entities::list))+source_entities::profile::EntryBaseDelta);
+ source_entities::wire::Entry entry{};
+ auto& reader=source_entities::reader;
+ if(!source_entities::wire::load(reader,entries+(h&4095u)*sizeof(entry),entry)||
+    !entry.entity||entry.serial!=(h>>12)||entry.entity>0xffffffffu-4u){
+  out.reason="serial-mismatch";return out;
+ }
+ std::uint32_t primary=0,secondary=0,col=0,slot=0,check=0;
+ if(!source_entities::wire::load(reader,entry.entity,primary)||primary!=base+branch::PrimaryTableRva||
+    !source_entities::wire::load(reader,entry.entity+4,secondary)||secondary!=base+branch::RenderableTableRva||
+    !source_entities::wire::load(reader,secondary-4,col)||col!=base+branch::RenderableColRva||
+    !source_entities::wire::load(reader,secondary+branch::DrawSlot*4,slot)||slot!=base+branch::EntryRva||
+    !source_entities::wire::load(reader,primary+0x23cu,check)||
+    !source_camera::owns(reinterpret_cast<void*>(std::uintptr_t(check)),source_camera::clientModule)||
+    !source_camera::executable(reinterpret_cast<void*>(std::uintptr_t(check)))){
+  out.reason="local-rtti-or-method-mismatch";return out;
+ }
+ out.entity=entry.entity;out.handle=h;out.reason="local-verified";
+ out.origin=viewcompat::freshLocalOrigin(entry.entity);
+ if(!out.origin&&f.tick-snapshot->tick<=75)out.origin=actor->networkOrigin;
+ return out;
+}
 struct Probe {
  HMODULE module=nullptr;
  bool verified=false,announced=false,active=false;
@@ -54,10 +99,11 @@ struct Probe {
   const auto base=std::uint32_t(std::uintptr_t(m));
   if(!announced){
    announced=true;
-   source_camera::log("FPB_NATIVE_PROBE diagnostic build; passive reads; native byte semantics unproven; post-render samples");
+   source_camera::log("FPB_NATIVE_PROBE diagnostic build 2; checked-argument local field candidate; passive reads; post-render samples");
    dump(base,branch::LocalGateRva-96,96+sizeof(branch::GateBytes),"gate-context");
    dump(base,GetterRva,160,"getter");
   }
+  const auto actor=verifiedActor(f,base);
   int raw=-1,displacement=-1;
   const char* reason="gate-signature-rejected";
   Getter getter{};
@@ -65,20 +111,27 @@ struct Probe {
   if(source_entities::reader.read(base+branch::LocalGateRva,gate.data(),gate.size())&&
       branch::matches(gate.data(),gate.size(),true)){
    displacement=gate[branch::DisplacementOffset];
-   std::uint8_t bytes[7]{};
+   std::array<std::uint8_t,sizeof(CheckedGetter)> code{};
+   std::array<std::uint8_t,sizeof(GateCallerPrefix)> caller{};
    reason="getter-unreadable";
-   if(source_camera::executable(reinterpret_cast<void*>(std::uintptr_t(base+GetterRva)))&&
-      source_entities::reader.read(base+GetterRva,bytes,sizeof(bytes))){
-    getter=decode(bytes,sizeof(bytes));reason="getter-unresolved";
-    if(getter.kind!=GetterKind::Unknown){
-     auto object=getter.operand;bool resolved=true;
-     if(getter.kind==GetterKind::AbsoluteSlot){
-      resolved=getter.operand>=base&&std::uint64_t(getter.operand)+4<=std::uint64_t(base)+source_camera::ClientImageSize&&
-       source_entities::reader.read(getter.operand,&object,sizeof(object));
-     }
-     std::uint32_t address=0;std::uint8_t value=0;reason="object-unreadable";
-     if(resolved&&fieldAddress(object,address)&&source_entities::reader.read(address,&value,sizeof(value))){
-      raw=int(value);reason="sampled-unproven";
+   if(source_entities::reader.read(base+GetterRva,code.data(),code.size())){
+    getter=decode(code.data(),code.size());reason="getter-signature-rejected";
+    if(getter.kind==GetterKind::CheckedArgument){
+     reason="caller-signature-rejected";
+     constexpr std::uint8_t prologue[]={0x55,0x8b,0xec,0x56,0x57,0x6a,0xff,0x8b,0xf1,0xe8,0x92,0x00,0xe4,0xff};
+     std::uint8_t actual[sizeof(prologue)]{};
+     if(source_entities::reader.read(base+branch::LocalGateRva-96,caller.data(),caller.size())&&
+        callerMatches(caller.data(),caller.size())&&
+        source_entities::reader.read(base+branch::DrawRva,actual,sizeof(actual))&&
+        std::memcmp(actual,prologue,sizeof(actual))==0){
+      reason=actor.reason;
+      std::uint32_t address=0;std::uint8_t value=0;
+      if(actor.entity){
+       reason="field-unreadable";
+       if(fieldAddress(actor.entity,address)&&source_entities::reader.read(address,&value,sizeof(value))){
+        raw=int(value);reason="sampled-local-unproven";
+       }
+      }
      }
     }
    }
@@ -87,6 +140,8 @@ struct Probe {
   const auto shoulder=viewcompat::readShoulder();
   const int sh=shoulder?(*shoulder?1:0):-1;
   const auto mode=viewcompat::mode.load();
+  dango::CameraPose pose{};viewcompat::Observation geometry{};
+  if(dango::cameraPose(f,pose))geometry=viewcompat::classify(pose,actor.origin,shoulder);
   const bool nativeOn=native::active.load(),local=validatedLocal.load();
   std::array<unsigned long,7> counters={effects::matched.load(),effects::dynamicApplied.load(),
    effects::dynamicRejected.load(),effects::headHidden.load(),effects::headRejected.load(),
@@ -96,21 +151,21 @@ struct Probe {
   if(!newEpoch)for(std::size_t i=0;i<delta.size();++i)delta[i]=counters[i]-previous[i];
   previous=counters;epoch=f.epoch;active=true;
   char key[384]{};
-  std::snprintf(key,sizeof(key),"%u:%d:%d:%s:%s:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
+  std::snprintf(key,sizeof(key),"%u:%d:%d:%s:%s:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%u:%s",
     unsigned(epoch),raw,displacement,reason,viewcompat::label(mode),sh,int(cfg->enabled),
     int(cfg->thirdPersonCompatibility),int(cfg->dynamicAnchor),int(nativeOn),int(nativeBefore),int(local),
     int(freeRequested),int(worldBodyActive.load()),int(delta[0]!=0),int(delta[1]!=0),int(delta[2]!=0),
-    int(delta[3]!=0),int(delta[4]!=0),int(delta[5]!=0),int(delta[6]!=0));
+    int(delta[3]!=0),int(delta[4]!=0),int(delta[5]!=0),int(delta[6]!=0),unsigned(actor.handle),viewcompat::label(geometry.evidence));
   const bool heartbeat=newEpoch||f.tick<lastFlush||f.tick-lastFlush>=1000;
   if(heartbeat){flush();lastFlush=f.tick;}
   if(heartbeat||previousKey!=key){
    char line[1024]{};
-   std::snprintf(line,sizeof(line),"FPB_NATIVE_PROBE sample frame=%llu epoch=%u sampleTick=%llu raw=%d originalWouldDraw=%d getter=%s reason=%s jz=%d fpb=%d compat=%d dynamic=%d head=%d arms=%d free=%d world=%d nativeBefore=%d nativeAfter=%d local=%d view=%s shoulder=%d xy=%d eyeZ=%d deltaMatch=%lu deltaAligned=%lu deltaRejected=%lu deltaHead=%lu/%lu deltaArms=%lu/%lu totals=%lu/%lu/%lu/%lu/%lu/%lu/%lu",
+   std::snprintf(line,sizeof(line),"FPB_NATIVE_PROBE sample frame=%llu epoch=%u sampleTick=%llu raw=%d originalWouldDraw=%d getter=%s reason=%s jz=%d fpb=%d compat=%d dynamic=%d head=%d arms=%d free=%d world=%d nativeBefore=%d nativeAfter=%d local=%d probeHandle=%u probeActor=%s view=%s shoulder=%d xy=%d eyeZ=%d sampleView=%s sampleXY=%.2f sampleEyeZ=%.2f deltaMatch=%lu deltaAligned=%lu deltaRejected=%lu deltaHead=%lu/%lu deltaArms=%lu/%lu totals=%lu/%lu/%lu/%lu/%lu/%lu/%lu",
     static_cast<unsigned long long>(source_camera::renderBegins.load()),unsigned(epoch),static_cast<unsigned long long>(f.tick),
     raw,raw<0?-1:int(raw!=0),label(getter.kind),reason,displacement,int(cfg->enabled),
     int(cfg->thirdPersonCompatibility),int(cfg->dynamicAnchor),int(cfg->hideHead),int(cfg->hideArms),
-    int(freeRequested),int(worldBodyActive.load()),int(nativeBefore),int(nativeOn),int(local),viewcompat::label(mode),sh,
-    viewcompat::horizontalUnits.load(),viewcompat::eyeHeightUnits.load(),
+    int(freeRequested),int(worldBodyActive.load()),int(nativeBefore),int(nativeOn),int(local),unsigned(actor.handle),actor.reason,viewcompat::label(mode),sh,
+    viewcompat::horizontalUnits.load(),viewcompat::eyeHeightUnits.load(),viewcompat::label(geometry.evidence),double(geometry.horizontal),double(geometry.eyeHeight),
     delta[0],delta[1],delta[2],delta[3],delta[4],delta[5],delta[6],
     counters[0],counters[1],counters[2],counters[3],counters[4],counters[5],counters[6]);
    if(events<64){if(!batch.empty())batch+='\n';batch+=line;++events;}else ++dropped;
