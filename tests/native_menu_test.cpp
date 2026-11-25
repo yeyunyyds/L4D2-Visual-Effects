@@ -7,7 +7,6 @@ void check(bool v){if(!v)throw std::runtime_error("Native menu regression");}
 int main(){
  check(opensChild(930)&&opensChild(936)&&!opensChild(931)&&!opensChild(932)&&!opensChild(933)&&!opensChild(934)&&!opensChild(937));
  check(opensChild(9001)&&opensChild(860)&&opensChild(865)&&!opensChild(862)&&opensChild(863)&&opensChild(864));
- check(!opensChild(0x720100)&&!opensChild(0x720101));
  check(!opensChild(896)&&!opensChild(9000)&&!opensChild(886)&&opensChild(300));
  for(uintptr_t id=887;id<=895;++id)check(!opensChild(id));
  auto freeRoot=document(R"kv("L4D2Visual" {"FreeCamera" {"user_data" "0x3a2"}})kv");

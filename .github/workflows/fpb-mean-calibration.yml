@@ -1,4 +1,4 @@
-name: FPB mean calibration preview (no release)
+name: FPB combined view preview (no release)
 on:
   push:
     branches: [experimental/fpb-mean-calibration]
@@ -25,11 +25,11 @@ jobs:
       - name: Package
         run: |
           python3 scripts/package.py
-          mv build/L4D2Visual-1.1.0.zip build/L4D2Visual-FPB-Mean-3.zip
+          mv build/L4D2Visual-1.1.0.zip build/L4D2Visual-FPB-View-1.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: L4D2Visual-FPB-Mean-3
+          name: L4D2Visual-FPB-View-1
           path: |
-            build/L4D2Visual-FPB-Mean-3.zip
+            build/L4D2Visual-FPB-View-1.zip
             docs/FPB-MEAN-CALIBRATION.md
           if-no-files-found: error

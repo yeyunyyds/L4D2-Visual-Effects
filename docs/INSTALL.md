@@ -1,4 +1,4 @@
-# FPB mean calibration preview — 非正式版
+# FPB combined view preview — 非正式版
 
 仅替换 DLL，保留原 hud.json。参见 [实验说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experimental/fpb-mean-calibration/docs/FPB-MEAN-CALIBRATION.md)。
 

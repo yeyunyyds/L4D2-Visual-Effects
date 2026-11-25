@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 namespace visual::firstperson {
-// Dedicated FPB experiment actions, outside the global 896 logging action.
-inline constexpr std::uintptr_t MeanToggleAction=0x720100,MeanResetAction=0x720101;
 struct ModelProfile {
  std::string model;
  std::uint32_t checksum=0;
@@ -20,7 +18,6 @@ struct Settings {
  bool thirdPersonCompatibility=false; // Optional view-mode compatibility, off by default.
  // User-adjusted view preset, not a universal per-model calibration.
  bool dynamicAnchor=true,followCameraYaw=true;
- bool dynamicAnchor2=false; // Experimental frozen per-stance mean, takes precedence.
  float forward=-13.f,right=-1.f,up=-1.f,step=1;
  float fallbackEyeHeight=5.f,yawTrim=0.f;
  std::vector<ModelProfile> modelProfiles;
@@ -79,7 +76,7 @@ template<class Json> Settings readSettings(const Json& root){
  readBool("tltpvCompatibility",s.thirdPersonCompatibility);
  readBool("thirdPersonCompatibility",s.thirdPersonCompatibility);
  readBool("hideHead",s.hideHead);readBool("hideArms",s.hideArms);
- readBool("dynamicAnchor",s.dynamicAnchor);readBool("dynamicAnchor2",s.dynamicAnchor2);readBool("followCameraYaw",s.followCameraYaw);
+ readBool("dynamicAnchor",s.dynamicAnchor);readBool("followCameraYaw",s.followCameraYaw);
  readFloat("forward",s.forward);
  readFloat("right",s.right);readFloat("up",s.up);readFloat("step",s.step);
  readFloat("fallbackEyeHeight",s.fallbackEyeHeight);readFloat("yawTrim",s.yawTrim);
@@ -107,7 +104,7 @@ template<class Json> void writeSettings(Json& root,const Settings& settings){
  root["firstPersonBody"]=Json{{"enabled",s.enabled},
   {"thirdPersonCompatibility",s.thirdPersonCompatibility},
   {"hideHead",s.hideHead},{"hideArms",s.hideArms},
-  {"dynamicAnchor",s.dynamicAnchor},{"dynamicAnchor2",s.dynamicAnchor2},{"followCameraYaw",s.followCameraYaw},
+  {"dynamicAnchor",s.dynamicAnchor},{"followCameraYaw",s.followCameraYaw},
   {"forward",s.forward},{"right",s.right},
   {"up",s.up},{"step",s.step},{"fallbackEyeHeight",s.fallbackEyeHeight},
   {"yawTrim",s.yawTrim},{"modelProfiles",std::move(array)}};
@@ -126,7 +123,6 @@ inline bool adjust(Settings& s,std::uintptr_t id){
  case 889:s.fallbackEyeHeight+=1;break;case 890:s.fallbackEyeHeight-=1;break;
  case 891:s.yawTrim+=5;break;case 892:s.yawTrim-=5;break;
  case 893:s.yawTrim=0;break;
- case MeanToggleAction:s.dynamicAnchor2=!s.dynamicAnchor2;break;
  default:return false;
  }
  normalize(s);return true;

@@ -20,14 +20,14 @@ inline freecamerabody::Transition cameraTransition;
 // Only the game-thread class lookup publishes offsets. Draw-time code uses
 // the identity/serial-validated entity and safe reader, never the class map.
 inline std::atomic<int> flagsOffset{-1},originOffset{-1},velocityOffset{-1},probeShoulder{-1};
-inline std::atomic<unsigned> calibrationGeneration{0};
+inline std::atomic<unsigned> cosmeticGeneration{0};
 inline void clear() noexcept{
  worldBodyActive=false;validatedLocal=false;currentHandle=0xffffffffu;currentEpoch=0;localBase=0;localTick=0;flagsOffset=-1;originOffset=-1;velocityOffset=-1;probeShoulder=-1;
 }
 inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequested=false,bool forceWorldBody=false) noexcept {
  // Reset the first-/third-person evidence on BOTH F6 edges. The detached
  // camera's distance is not a valid hint after returning to normal view.
- if(cameraTransition.update(freeCameraRequested))viewcompat::reset();
+ if(cameraTransition.update(freeCameraRequested)){viewcompat::reset();++cosmeticGeneration;}
  struct RestoreOnFailure {bool succeeded=false;~RestoreOnFailure(){if(!succeeded)native::disable();}} gate;
  if(!std::atomic_load(&options)->enabled&&!forceWorldBody){
   clear();status=u8"关闭：原生可见性保持不变";return;

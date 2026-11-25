@@ -83,7 +83,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  auto settings=ctx.options;
  const bool wantOffset=settings->forward!=0||settings->right!=0||settings->up!=0;
  const bool wantParts=settings->hideHead||settings->hideArms;
- const bool wantDynamic=settings->dynamicAnchor||settings->dynamicAnchor2;
+ const bool wantDynamic=settings->dynamicAnchor;
  const visual::StudioPose* studio=nullptr;
  bool ready=false;
  if(bones){
@@ -98,96 +98,73 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
    if(ready)observeModel(*studio,ctx.camera->epoch);
   }
  }
- // Read the unmodified-to-FPB pose before deciding on any cosmetic changes.
- static thread_local meanbody::Calibration mean;
+ // Read original-to-FPB matrices and live entity origin before cosmetics.
+ static thread_local viewpolicy::Gate distanceGate;
  static thread_local distanceprobe::Recorder recorder;
- static thread_local meanbody::DistanceGate distanceGate;
  static thread_local dynamic::Track tracking;
- static thread_local unsigned meanGeneration=0;
+ static thread_local unsigned gateGeneration=0;
  static thread_local std::uint32_t gateEpoch=0,gateHandle=0xffffffffu,gateChecksum=0;
- const auto requestedGeneration=calibrationGeneration.load();
- if(meanGeneration!=requestedGeneration){mean.reset();distanceGate.reset();tracking.reset();meanGeneration=requestedGeneration;}
+ const auto requestedGeneration=cosmeticGeneration.load();
+ if(gateGeneration!=requestedGeneration){
+  distanceGate.reset();tracking.reset();gateGeneration=requestedGeneration;
+ }
  dango::GameCameraFrame measuredFrame{};dango::CameraPose measuredPose{};
  dynamic::Rig measuredRig{};distanceprobe::Sample measured{};
  const bool measuredCamera=ready&&source_camera::sampleDuringDraw(measuredFrame)&&
      measuredFrame.epoch==ctx.camera->epoch&&dango::cameraPose(measuredFrame,measuredPose);
  const ModelProfile* prof=nullptr;
+ parts::Selection plan{};
+ if(ready)plan=parts::discover(*studio);
  if(measuredCamera){
   measuredRig=dynamic::discover(*studio,settings->fallbackEyeHeight);
-  measured=distanceprobe::measure(*studio,measuredRig,temporary,measuredPose,localBase.load());
-  auto id=visual::canonicalModel(studio->name);
-  prof=visual::firstperson::profile(*settings,id,studio->checksum);
-  mean.identify(ctx.camera->epoch,ctx.handle,id,studio->checksum,{
-   settings->fallbackEyeHeight,settings->forward+(prof?prof->forward:0.f),
-   settings->right+(prof?prof->right:0.f),settings->up+(prof?prof->up:0.f),
-   settings->yawTrim+(prof?prof->yaw:0.f),settings->followCameraYaw?1.f:0.f});
+  measured=distanceprobe::measure(*studio,measuredRig,plan,temporary,measuredPose,localBase.load());
+  prof=visual::firstperson::profile(*settings,visual::canonicalModel(studio->name),studio->checksum);
   if(gateEpoch!=ctx.camera->epoch||gateHandle!=ctx.handle||gateChecksum!=studio->checksum){
-   gateEpoch=ctx.camera->epoch;gateHandle=ctx.handle;gateChecksum=studio->checksum;distanceGate.reset();
+   gateEpoch=ctx.camera->epoch;gateHandle=ctx.handle;gateChecksum=studio->checksum;distanceGate.reset();tracking.reset();
   }
  }
  const auto tick=measuredCamera?measuredFrame.tick:GetTickCount64();
- const bool compatibility=settings->thirdPersonCompatibility||settings->dynamicAnchor2;
- const bool allow=!compatibility||(measuredCamera&&distanceGate.update(
-  dango::length(measured.eyeDelta),measured.eyeKnown,measured.shoulder,
-  measured.view.evidence==viewcompat::Mode::First&&viewcompat::mode.load()==viewcompat::Mode::First,tick));
- bool learned=false;
+ const bool compatibility=settings->thirdPersonCompatibility;
+ viewpolicy::Decision decision{};
+ if(compatibility){
+  if(measuredCamera)decision=distanceGate.update({
+   measured.originKnown,measured.eyeKnown,measured.headKnown,
+   measured.view.evidence==viewcompat::Mode::First&&viewcompat::mode.load()==viewcompat::Mode::First,
+   measured.entityOrigin,measuredPose.eye,dango::length(measured.eyeDelta),measured.headDistance,measured.shoulder,tick});
+  else distanceGate.reset();
+ }else{distanceGate.reset();decision.full=true;decision.reason="compat-off";}
  const char* path="native";
- meanbody::TransformSample applied{};
- bool haveApplied=false;
- if(!allow){
-  tracking.reset();mean.observe(meanbody::Stance::Unknown,false,{},tick);
-  dynamicStatus=u8"原始模型距离：保留原生骨骼";
-  if(measuredCamera)recorder.record(measured,*studio,mean,tick,ctx.camera->epoch,ctx.handle,settings->dynamicAnchor2,false,path,false,applied);
-  original(bones,origin);return;
+ dango::Vec3 applied{};float appliedYaw=0;bool haveApplied=false;
+ if(!decision.full){
+  tracking.reset();
+  dynamicStatus=u8"视角组合判断：保留原生位置";
+  if(ready&&settings->hideHead&&decision.earlyHead){
+   auto result=parts::apply(*studio,plan,temporary,true,false);
+   if(result.head){++headHidden;headStatus=u8"相机接近原始头部：提前隐藏";path="head-only";partChanged=true;}
+   else ++headRejected;
+  }else headStatus=u8"原生头部保留";
+  armStatus=u8"原生双臂保留";offsetStatus=u8"原生位置保留";
+  if(measuredCamera)recorder.record(measured,*studio,decision,tick,ctx.camera->epoch,ctx.handle,compatibility,path,false,applied,appliedYaw);
+  original(partChanged?temporary:bones,origin);return;
  }
- // Dynamic 2 only replays a frozen transform captured from successful Dynamic 1.
- // Until a stance is calibrated, Dynamic 1 remains the actual renderer.
- const auto* frozen=settings->dynamicAnchor2&&measuredCamera&&measured.basis?mean.frozen(measured.stance):nullptr;
- if(frozen){
-  auto sample=frozen->result();
-  auto translation=meanbody::replay(sample,measured.front,measured.right);
-  if(dynamic::valid(translation)&&dango::length(translation)<=96.f&&
-     dynamic::transform(temporary,studio->count,measured.anchor,translation,sample.yaw)){
-   shift=translation;dynamicMoved=moved=true;haveApplied=true;applied=sample;path="mean2";
-   ++dynamicApplied;dynamicStatus=u8"动态定位2：复用定位1的姿态均值";dynamicSource=meanbody::label(measured.stance);
-  }
-  tracking.reset(); // Do not keep a stale filter when returning to the teacher.
- }
- if(wantDynamic&&!dynamicMoved){
-  const auto& live=measuredFrame;
-  const auto& pose=measuredPose;
+ if(wantDynamic){
   if(measuredCamera){
    ++sameFrameCamera;
    const auto& rig=measuredRig;
-   const auto resolved=dynamic::compute(*studio,rig,temporary,pose,*settings,prof,
-                                       ctx.camera->epoch,ctx.handle,live.tick,tracking);
+   const auto resolved=dynamic::compute(*studio,rig,temporary,measuredPose,*settings,prof,
+                                       ctx.camera->epoch,ctx.handle,measuredFrame.tick,tracking);
    if(resolved.ok&&rig.anchor>=0&&unsigned(rig.anchor)<studio->count){
     auto pivot=dynamic::location(temporary[unsigned(rig.anchor)]);
     if(dynamic::transform(temporary,studio->count,pivot,resolved.translation,resolved.yawRadians)){
-     shift=resolved.translation;dynamicMoved=moved=true;path="teacher1";
-     ++dynamicApplied;dynamicStatus=u8"动态定位1：本帧成功对齐";
+     shift=resolved.translation;dynamicMoved=moved=true;path="dynamic1";
+     ++dynamicApplied;dynamicStatus=u8"动态身体已对齐本帧相机与胸部锚点";
      dynamicSource=resolved.usedBootstrap?"live-pose-bootstrap":resolved.source;
-     // Capture the actual applied transform, including filtered XYZ,
-     // user/model offsets and yaw. Do not add the manual offsets again.
-     if(measured.basis){
-      applied=meanbody::capture(resolved.translation,resolved.yawRadians,measured.front,measured.right);
-      haveApplied=true;
-      const bool training=measured.first&&measured.eyeKnown&&dango::length(measured.eyeDelta)<=24.f;
-      learned=mean.observe(measured.stance,training,applied,tick);
-      if(learned&&mean.frozen(measured.stance)){
-       const auto* m=mean.frozen(measured.stance);auto v=m->value;
-       char log[280]{};std::snprintf(log,sizeof(log),"FPB_MEAN frozen source=teacher1 stance=%s samples=%u local=%.3f/%.3f/%.3f yaw=%.5f",
-        meanbody::label(measured.stance),m->count,double(v.x),double(v.y),double(v.z),double(m->yaw));
-       source_camera::log(log);
-      }
-     }
+     applied=resolved.translation;appliedYaw=resolved.yawRadians;haveApplied=true;
     }
    }
   }else{++liveCameraRejected;dynamicStatus=u8"同帧相机矩阵不可用：动态定位跳过";}
-  if(!dynamicMoved){++dynamicRejected;if(ready)dynamicStatus=u8"当前MOD锚点/姿态无法安全校准";}
- }else if(!wantDynamic)dynamicStatus=u8"动态定位关闭";
- if(std::strcmp(path,"teacher1")!=0||!haveApplied)mean.observe(meanbody::Stance::Unknown,false,{},tick);
- if(measuredCamera)recorder.record(measured,*studio,mean,tick,ctx.camera->epoch,ctx.handle,settings->dynamicAnchor2,learned,path,haveApplied,applied);
+  if(!dynamicMoved){++dynamicRejected;if(ready)dynamicStatus=u8"当前MOD锚点/姿态无法安全校准，保留原版位置";}
+ }else {tracking.reset();dynamicStatus=u8"动态定位关闭";}
  if(!dynamicMoved&&wantOffset){
   dango::Vec3 manual{};
   if(ready&&math::offset(*ctx.camera,settings->forward,settings->right,settings->up,manual)){
@@ -213,7 +190,6 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   if(ready){
    // Use actual model bone hierarchy; never guess head from vertex height.
    // Only this draw's temporary bone matrices are modified.
-   const auto plan=parts::discover(*studio);
    const auto result=parts::apply(*studio,plan,temporary,settings->hideHead,settings->hideArms);
    partChanged=result.modified!=0;
    if(settings->hideHead){
@@ -229,6 +205,9 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
    if(settings->hideArms){++armsRejected;armStatus=u8"Studio 骨骼校验失败，未隐藏手臂";}
   }
  }else{headStatus=u8"头部分支隐藏关闭";armStatus=u8"双臂分支隐藏关闭";}
+ if(!dynamicMoved&&moved){path="manual";applied=shift;haveApplied=true;}
+ else if(!moved&&partChanged)path="parts-only";
+ if(measuredCamera)recorder.record(measured,*studio,decision,tick,ctx.camera->epoch,ctx.handle,compatibility,path,haveApplied,applied,appliedYaw);
  dango::Vec3 shiftedOrigin=origin+shift;
  original((moved||partChanged)?temporary:bones,shiftedOrigin);
 }

@@ -33,8 +33,6 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
   std::string saved=p?u8"本MOD校准已保存":u8"本MOD没有单独校准";
   return "\"第一人称身体 · 动态锚点\" {"+
    item(s->dynamicAnchor?u8"动态身体定位：[开]":u8"动态身体定位：[关]",887)+
-   item(s->dynamicAnchor2?u8"动态定位2 · 均值校准：[开]":u8"动态定位2 · 均值校准：[关]",firstperson::MeanToggleAction)+
-   item(u8"动态定位2：重新采样",firstperson::MeanResetAction)+
    item(s->followCameraYaw?u8"胸肩朝向跟随视角：[开]":u8"胸肩朝向跟随视角：[关]",888)+
    row(u8"本机 MOD："+modelName)+row(saved)+
    row(u8"眼位失效回退高度："+value(s->fallbackEyeHeight))+
@@ -90,11 +88,10 @@ inline bool action(std::uintptr_t id){
   }else saveMessage=u8"没有可更新的当前MOD校准";
   return true;
  }
- if(id==firstperson::MeanResetAction){++firstperson::calibrationGeneration;note("FPB_MEAN reset requested");saveMessage=u8"已请求重新采样三种姿态";return true;}
- if((id>=876&&id<=893)||id==firstperson::MeanToggleAction){
+ if(id>=876&&id<=893){
   auto s=*std::atomic_load(&visual::firstperson::options);
   if(visual::firstperson::adjust(s,id)){
-   if(id==firstperson::MeanToggleAction){note(s.dynamicAnchor2?"FPB_MEAN toggle ON":"FPB_MEAN toggle OFF");}
+   if(id==886||id==887){++firstperson::cosmeticGeneration;note(id==886?(s.thirdPersonCompatibility?"FPB_COMPAT ON":"FPB_COMPAT OFF"):(s.dynamicAnchor?"FPB_DYNAMIC ON":"FPB_DYNAMIC OFF"));}
    std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(s));
    saveMessage=u8"第一人称身体设置已更新，尚未保存";
    return true;
@@ -102,7 +99,7 @@ inline bool action(std::uintptr_t id){
  }
  if(id==861){auto s=*std::atomic_load(&visual::firstperson::options);s.enabled=!s.enabled;
   std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(s));
-  ++firstperson::calibrationGeneration;
+  ++firstperson::cosmeticGeneration;
   bool restored=true;if(!s.enabled)restored=visual::firstperson::native::disable();
   saveMessage=s.enabled?u8"第一人称身体已请求开启，正在验证本机玩家":
     restored?u8"第一人称身体已关闭，原生绘制状态已恢复":

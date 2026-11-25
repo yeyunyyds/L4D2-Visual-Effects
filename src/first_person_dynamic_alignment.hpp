@@ -112,7 +112,7 @@ inline Result compute(const StudioPose& studio,const Rig& rig,const Matrix3x4* b
   const dango::CameraPose& camera,const Settings& config,const ModelProfile* model,
   std::uint32_t epoch,std::uint32_t handle,std::uint64_t tick,Track& track){
  Result out{};out.source=rig.source;
- if((!config.dynamicAnchor&&!config.dynamicAnchor2)||!bones||rig.anchor<0||unsigned(rig.anchor)>=studio.count||!valid(camera.eye))return out;
+ if(!config.dynamicAnchor||!bones||rig.anchor<0||unsigned(rig.anchor)>=studio.count||!valid(camera.eye))return out;
  Vec3 cameraFront{},cameraRight{};
  if(!unitFrame(camera,cameraFront,cameraRight))return out;
  const auto anchor=location(bones[unsigned(rig.anchor)]);
