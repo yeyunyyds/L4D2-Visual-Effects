@@ -94,7 +94,7 @@ inline bool action(std::uintptr_t id){
  if((id>=876&&id<=893)||id==firstperson::MeanToggleAction){
   auto s=*std::atomic_load(&visual::firstperson::options);
   if(visual::firstperson::adjust(s,id)){
-   if(id==firstperson::MeanToggleAction){++firstperson::calibrationGeneration;note(s.dynamicAnchor2?"FPB_MEAN toggle ON":"FPB_MEAN toggle OFF");}
+   if(id==firstperson::MeanToggleAction){note(s.dynamicAnchor2?"FPB_MEAN toggle ON":"FPB_MEAN toggle OFF");}
    std::atomic_store(&visual::firstperson::options,std::make_shared<const visual::firstperson::Settings>(s));
    saveMessage=u8"第一人称身体设置已更新，尚未保存";
    return true;

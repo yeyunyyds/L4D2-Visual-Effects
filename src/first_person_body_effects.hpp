@@ -98,87 +98,97 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
    if(ready)observeModel(*studio,ctx.camera->epoch);
   }
  }
- // Observe original-to-FPB matrices before modifying any bones, in all views.
+ // Read the unmodified-to-FPB pose before deciding on any cosmetic changes.
  static thread_local meanbody::Calibration mean;
  static thread_local distanceprobe::Recorder recorder;
+ static thread_local meanbody::DistanceGate distanceGate;
+ static thread_local dynamic::Track tracking;
  static thread_local unsigned meanGeneration=0;
+ static thread_local std::uint32_t gateEpoch=0,gateHandle=0xffffffffu,gateChecksum=0;
  const auto requestedGeneration=calibrationGeneration.load();
- if(meanGeneration!=requestedGeneration){mean.reset();meanGeneration=requestedGeneration;}
+ if(meanGeneration!=requestedGeneration){mean.reset();distanceGate.reset();tracking.reset();meanGeneration=requestedGeneration;}
  dango::GameCameraFrame measuredFrame{};dango::CameraPose measuredPose{};
  dynamic::Rig measuredRig{};distanceprobe::Sample measured{};
  const bool measuredCamera=ready&&source_camera::sampleDuringDraw(measuredFrame)&&
      measuredFrame.epoch==ctx.camera->epoch&&dango::cameraPose(measuredFrame,measuredPose);
+ const ModelProfile* prof=nullptr;
  if(measuredCamera){
   measuredRig=dynamic::discover(*studio,settings->fallbackEyeHeight);
   measured=distanceprobe::measure(*studio,measuredRig,temporary,measuredPose,localBase.load());
-  mean.identify(ctx.camera->epoch,ctx.handle,visual::canonicalModel(studio->name),studio->checksum,
-      settings->fallbackEyeHeight,settings->dynamicAnchor2);
-  const bool training=settings->dynamicAnchor2&&measured.first&&measured.eyeKnown&&
-      (!settings->thirdPersonCompatibility||viewcompat::mode.load()==viewcompat::Mode::First);
-  bool learned=mean.observe(measured.stance,training,measured.localCorrection,measuredFrame.tick);
-  recorder.record(measured,*studio,mean,measuredFrame.tick,ctx.camera->epoch,ctx.handle,settings->dynamicAnchor2,learned);
-  if(learned&&mean.frozen(measured.stance)){
-   auto v=mean.frozen(measured.stance)->value;
-   char log[250]{};std::snprintf(log,sizeof(log),"FPB_MEAN frozen stance=%s samples=%u local=%.3f/%.3f/%.3f",
-    meanbody::label(measured.stance),meanbody::Mean::Required,double(v.x),double(v.y),double(v.z));
-   source_camera::log(log);
+  auto id=visual::canonicalModel(studio->name);
+  prof=visual::firstperson::profile(*settings,id,studio->checksum);
+  mean.identify(ctx.camera->epoch,ctx.handle,id,studio->checksum,{
+   settings->fallbackEyeHeight,settings->forward+(prof?prof->forward:0.f),
+   settings->right+(prof?prof->right:0.f),settings->up+(prof?prof->up:0.f),
+   settings->yawTrim+(prof?prof->yaw:0.f),settings->followCameraYaw?1.f:0.f});
+  if(gateEpoch!=ctx.camera->epoch||gateHandle!=ctx.handle||gateChecksum!=studio->checksum){
+   gateEpoch=ctx.camera->epoch;gateHandle=ctx.handle;gateChecksum=studio->checksum;distanceGate.reset();
   }
- }else mean.observe(meanbody::Stance::Unknown,false,{},GetTickCount64());
- // Keep the native skeleton intact when compatibility says not First.
- // Mean mode additionally requires conservative live first-person evidence,
- // even when the old optional compatibility switch is off.
- if((settings->thirdPersonCompatibility&&viewcompat::mode.load()!=viewcompat::Mode::First)||
-    (settings->dynamicAnchor2&&(!measuredCamera||!measured.first||!measured.basis))){
+ }
+ const auto tick=measuredCamera?measuredFrame.tick:GetTickCount64();
+ const bool compatibility=settings->thirdPersonCompatibility||settings->dynamicAnchor2;
+ const bool allow=!compatibility||(measuredCamera&&distanceGate.update(
+  dango::length(measured.eyeDelta),measured.eyeKnown,measured.shoulder,
+  measured.view.evidence==viewcompat::Mode::First&&viewcompat::mode.load()==viewcompat::Mode::First,tick));
+ bool learned=false;
+ const char* path="native";
+ meanbody::TransformSample applied{};
+ bool haveApplied=false;
+ if(!allow){
+  tracking.reset();mean.observe(meanbody::Stance::Unknown,false,{},tick);
+  dynamicStatus=u8"原始模型距离：保留原生骨骼";
+  if(measuredCamera)recorder.record(measured,*studio,mean,tick,ctx.camera->epoch,ctx.handle,settings->dynamicAnchor2,false,path,false,applied);
   original(bones,origin);return;
  }
- if(settings->dynamicAnchor2){
-  // Frozen corrections are in original body axes, not camera/world axes.
-  // Never recompute from camera displacement after calibration.
-  const auto* frozen=mean.frozen(measured.stance);
-  const auto* prof=visual::firstperson::profile(*settings,visual::canonicalModel(studio->name),studio->checksum);
-  auto v=frozen?frozen->value:dango::Vec3{};
-  v=v+dango::Vec3{settings->forward+(prof?prof->forward:0.f),settings->right+(prof?prof->right:0.f),settings->up+(prof?prof->up:0.f)};
-  auto translation=dynamic::bodySpace(measured.front,measured.right,v.x,v.y,v.z);
-  const float yaw=std::clamp((settings->yawTrim+(prof?prof->yaw:0.f))*0.01745329251994329577f,-.90f,.90f);
+ // Dynamic 2 only replays a frozen transform captured from successful Dynamic 1.
+ // Until a stance is calibrated, Dynamic 1 remains the actual renderer.
+ const auto* frozen=settings->dynamicAnchor2&&measuredCamera&&measured.basis?mean.frozen(measured.stance):nullptr;
+ if(frozen){
+  auto sample=frozen->result();
+  auto translation=meanbody::replay(sample,measured.front,measured.right);
   if(dynamic::valid(translation)&&dango::length(translation)<=96.f&&
-     dynamic::transform(temporary,studio->count,measured.anchor,translation,yaw)){
-   shift=translation;dynamicMoved=moved=true;
-   ++dynamicApplied;dynamicStatus=frozen?u8"动态定位2：使用姿态固定均值":u8"动态定位2：采样中，仅手动偏移";
-   dynamicSource=meanbody::label(measured.stance);
-  }else {++dynamicRejected;dynamicStatus=u8"动态定位2：修正量无效";}
- }else if(wantDynamic){
-  static thread_local dynamic::Track tracking;
-  static thread_local unsigned lastModeGeneration=0;
-  const unsigned now=viewcompat::generation.load(std::memory_order_acquire);
-  if(now!=lastModeGeneration){tracking=dynamic::Track{};lastModeGeneration=now;}
+     dynamic::transform(temporary,studio->count,measured.anchor,translation,sample.yaw)){
+   shift=translation;dynamicMoved=moved=true;haveApplied=true;applied=sample;path="mean2";
+   ++dynamicApplied;dynamicStatus=u8"动态定位2：复用定位1的姿态均值";dynamicSource=meanbody::label(measured.stance);
+  }
+  tracking.reset(); // Do not keep a stale filter when returning to the teacher.
+ }
+ if(wantDynamic&&!dynamicMoved){
   const auto& live=measuredFrame;
   const auto& pose=measuredPose;
   if(measuredCamera){
    ++sameFrameCamera;
    const auto& rig=measuredRig;
-   auto id=visual::canonicalModel(studio->name);
-   auto prof=visual::firstperson::profile(*settings,id,studio->checksum);
    const auto resolved=dynamic::compute(*studio,rig,temporary,pose,*settings,prof,
                                        ctx.camera->epoch,ctx.handle,live.tick,tracking);
    if(resolved.ok&&rig.anchor>=0&&unsigned(rig.anchor)<studio->count){
     auto pivot=dynamic::location(temporary[unsigned(rig.anchor)]);
-    if(dynamic::transform(temporary,studio->count,pivot,
-                          resolved.translation,resolved.yawRadians)){
-     shift=resolved.translation;dynamicMoved=moved=true;
-     ++dynamicApplied;dynamicStatus=u8"动态身体已对齐本帧相机与胸部锚点";
+    if(dynamic::transform(temporary,studio->count,pivot,resolved.translation,resolved.yawRadians)){
+     shift=resolved.translation;dynamicMoved=moved=true;path="teacher1";
+     ++dynamicApplied;dynamicStatus=u8"动态定位1：本帧成功对齐";
      dynamicSource=resolved.usedBootstrap?"live-pose-bootstrap":resolved.source;
+     // Capture the actual applied transform, including filtered XYZ,
+     // user/model offsets and yaw. Do not add the manual offsets again.
+     if(measured.basis){
+      applied=meanbody::capture(resolved.translation,resolved.yawRadians,measured.front,measured.right);
+      haveApplied=true;
+      const bool training=measured.first&&measured.eyeKnown&&dango::length(measured.eyeDelta)<=24.f;
+      learned=mean.observe(measured.stance,training,applied,tick);
+      if(learned&&mean.frozen(measured.stance)){
+       const auto* m=mean.frozen(measured.stance);auto v=m->value;
+       char log[280]{};std::snprintf(log,sizeof(log),"FPB_MEAN frozen source=teacher1 stance=%s samples=%u local=%.3f/%.3f/%.3f yaw=%.5f",
+        meanbody::label(measured.stance),m->count,double(v.x),double(v.y),double(v.z),double(m->yaw));
+       source_camera::log(log);
+      }
+     }
     }
    }
-  }else{
-   ++liveCameraRejected;
-   dynamicStatus=u8"同帧相机矩阵不可用：动态定位跳过";
-  }
-  if(!dynamicMoved){
-   ++dynamicRejected;
-   if(ready)dynamicStatus=u8"当前MOD锚点/姿态无法安全校准，保留原版位置";
-  }
- }else dynamicStatus=u8"动态定位关闭";
- if(!settings->dynamicAnchor2&&!dynamicMoved&&wantOffset){
+  }else{++liveCameraRejected;dynamicStatus=u8"同帧相机矩阵不可用：动态定位跳过";}
+  if(!dynamicMoved){++dynamicRejected;if(ready)dynamicStatus=u8"当前MOD锚点/姿态无法安全校准";}
+ }else if(!wantDynamic)dynamicStatus=u8"动态定位关闭";
+ if(std::strcmp(path,"teacher1")!=0||!haveApplied)mean.observe(meanbody::Stance::Unknown,false,{},tick);
+ if(measuredCamera)recorder.record(measured,*studio,mean,tick,ctx.camera->epoch,ctx.handle,settings->dynamicAnchor2,learned,path,haveApplied,applied);
+ if(!dynamicMoved&&wantOffset){
   dango::Vec3 manual{};
   if(ready&&math::offset(*ctx.camera,settings->forward,settings->right,settings->up,manual)){
    bool finite=true;

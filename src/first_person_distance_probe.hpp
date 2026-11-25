@@ -57,23 +57,24 @@ struct Recorder {
  unsigned count=0;
  void flush(){if(!batch.empty())source_camera::log(batch);batch.clear();count=0;}
  void record(const Sample& s,const StudioPose& studio,const meanbody::Calibration& c,
-  std::uint64_t tick,std::uint32_t epoch,std::uint32_t handle,bool dynamic2,bool learned){
+  std::uint64_t tick,std::uint32_t epoch,std::uint32_t handle,bool dynamic2,bool learned,const char* path,bool haveApplied,meanbody::TransformSample applied){
   const auto frame=source_camera::renderBegins.load();
   if(!s.valid||frame==lastFrame||(lastSample&&tick>=lastSample&&tick-lastSample<50))return;
   lastFrame=frame;lastSample=tick;
   if(count>=20|| (flushAt&&tick>=flushAt&&tick-flushAt>=1000)){flush();flushAt=tick;}
   if(!flushAt)flushAt=tick;
-  char line[1000]{};
+  char line[1250]{};
   const auto nan=std::numeric_limits<float>::quiet_NaN();
   auto eye=s.eyeKnown?s.eyeDelta:dango::Vec3{nan,nan,nan};
   auto correction=s.eyeKnown?s.localCorrection:dango::Vec3{nan,nan,nan};
-  std::snprintf(line,sizeof(line),"FPB_DISTANCE frame=%llu tick=%llu epoch=%u handle=%u model=%s checksum=%u mode=%s observed=%s firstCandidate=%d flags=%d stance=%s shoulder=%d speed=%.3f velocityZ=%.3f originXY=%.3f originZ=%.3f chest=%.3f chestXY=%.3f chestZ=%.3f eye=%.3f eyeXY=%.3f eyeZ=%.3f correction=%.3f/%.3f/%.3f source=%s dynamic2=%d learned=%d samples=%u/%u/%u",
+  auto actual=haveApplied?applied.translation:dango::Vec3{nan,nan,nan};
+  std::snprintf(line,sizeof(line),"FPB_DISTANCE frame=%llu tick=%llu epoch=%u handle=%u model=%s checksum=%u mode=%s observed=%s firstCandidate=%d flags=%d stance=%s shoulder=%d speed=%.3f velocityZ=%.3f originXY=%.3f originZ=%.3f chest=%.3f chestXY=%.3f chestZ=%.3f eye=%.3f eyeXY=%.3f eyeZ=%.3f correction=%.3f/%.3f/%.3f source=%s dynamic2=%d learned=%d samples=%u/%u/%u path=%s actualLocal=%.3f/%.3f/%.3f actualYaw=%.5f",
    static_cast<unsigned long long>(frame),static_cast<unsigned long long>(tick),unsigned(epoch),unsigned(handle),
    studio.name.c_str(),unsigned(studio.checksum),viewcompat::label(viewcompat::mode.load()),viewcompat::label(s.view.evidence),
    int(s.first),s.flags,meanbody::label(s.stance),s.shoulder,double(s.speed),double(s.verticalSpeed),double(s.view.horizontal),double(s.view.eyeHeight),
    double(dango::length(s.chestDelta)),double(std::hypot(s.chestDelta.x,s.chestDelta.y)),double(s.chestDelta.z),
    double(dango::length(eye)),double(std::hypot(eye.x,eye.y)),double(eye.z),double(correction.x),double(correction.y),double(correction.z),
-   s.eyeKnown?"bind-estimate":"unavailable",int(dynamic2),int(learned),c.states[0].count,c.states[1].count,c.states[2].count);
+   s.eyeKnown?"bind-estimate":"unavailable",int(dynamic2),int(learned),c.states[0].count,c.states[1].count,c.states[2].count,path,double(actual.x),double(actual.y),double(actual.z),double(haveApplied?applied.yaw:nan));
   if(!batch.empty())batch+='\n';batch+=line;++count;
  }
 };
