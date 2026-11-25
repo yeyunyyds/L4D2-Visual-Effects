@@ -42,6 +42,7 @@ int main(){
  assert(adjust(cfg,889)&&cfg.fallbackEyeHeight==6);
  assert(adjust(cfg,891)&&cfg.yawTrim==5);
  assert(!adjust(cfg,860));
+ assert(!cfg.dynamicAnchor2);assert(adjust(cfg,896)&&cfg.dynamicAnchor2);
  writeSettings(saved,cfg);
  assert(saved.at("tankPrediction").at("enabled")==false);
  assert(!saved.at("firstPersonBody").contains("clipEnabled"));
@@ -49,6 +50,7 @@ int main(){
  assert(!saved.at("firstPersonBody").contains("tltpvCompatibility"));
  assert(saved.at("firstPersonBody").at("thirdPersonCompatibility")==true);
  assert(readSettings(saved).thirdPersonCompatibility);
+ assert(readSettings(saved).dynamicAnchor2);
 
  // If both legacy and neutral names exist, the neutral name has precedence.
  json conflicting={{"firstPersonBody",{{"tltpvCompatibility",true},{"thirdPersonCompatibility",false}}}};

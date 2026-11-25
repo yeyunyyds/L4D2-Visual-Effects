@@ -68,6 +68,7 @@
   },
   "firstPersonBody": {
     "dynamicAnchor": true,
+    "dynamicAnchor2": false,
     "enabled": false,
     "fallbackEyeHeight": 5,
     "followCameraYaw": true,

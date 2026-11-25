@@ -5,6 +5,7 @@
 #include "studio_cache.hpp"
 #include "first_person_body_parts.hpp"
 #include "first_person_dynamic_alignment.hpp"
+#include "first_person_distance_probe.hpp"
 #include <atomic>
 #include <memory>
 #include <cmath>
@@ -48,10 +49,7 @@ inline bool select(std::uint32_t renderable,Context& ctx) noexcept {
  if(!base||renderable!=base+4)return false;
  ctx.options=std::atomic_load(&options);
  if(!ctx.options->enabled)return false;
- if(ctx.options->thirdPersonCompatibility&&
-    viewcompat::mode.load(std::memory_order_acquire)!=viewcompat::Mode::First)return false;
- if(!ctx.options->hideHead&&!ctx.options->hideArms&&
-    ctx.options->forward==0&&ctx.options->right==0&&ctx.options->up==0&&!ctx.options->dynamicAnchor)return false;
+ // Diagnostic mode measures all verified local draws, including native third person.
  ctx.camera=std::atomic_load(&source_camera::snapshot);
  if(!ctx.camera->active||ctx.camera->epoch!=currentEpoch.load(std::memory_order_acquire))return false;
  auto tick=GetTickCount64(),sample=localTick.load(std::memory_order_acquire);
@@ -85,10 +83,10 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  auto settings=ctx.options;
  const bool wantOffset=settings->forward!=0||settings->right!=0||settings->up!=0;
  const bool wantParts=settings->hideHead||settings->hideArms;
- const bool wantDynamic=settings->dynamicAnchor;
+ const bool wantDynamic=settings->dynamicAnchor||settings->dynamicAnchor2;
  const visual::StudioPose* studio=nullptr;
  bool ready=false;
- if(bones&&(wantOffset||wantParts||wantDynamic)){
+ if(bones){
   static thread_local visual::StudioCache cache;
   const char* reason=nullptr;
   studio=cache.find(source_entities::reader,header,ctx.camera->epoch,&reason);
@@ -100,7 +98,55 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
    if(ready)observeModel(*studio,ctx.camera->epoch);
   }
  }
- if(wantDynamic){
+ // Observe original-to-FPB matrices before modifying any bones, in all views.
+ static thread_local meanbody::Calibration mean;
+ static thread_local distanceprobe::Recorder recorder;
+ static thread_local unsigned meanGeneration=0;
+ const auto requestedGeneration=calibrationGeneration.load();
+ if(meanGeneration!=requestedGeneration){mean.reset();meanGeneration=requestedGeneration;}
+ dango::GameCameraFrame measuredFrame{};dango::CameraPose measuredPose{};
+ dynamic::Rig measuredRig{};distanceprobe::Sample measured{};
+ const bool measuredCamera=ready&&source_camera::sampleDuringDraw(measuredFrame)&&
+     measuredFrame.epoch==ctx.camera->epoch&&dango::cameraPose(measuredFrame,measuredPose);
+ if(measuredCamera){
+  measuredRig=dynamic::discover(*studio,settings->fallbackEyeHeight);
+  measured=distanceprobe::measure(*studio,measuredRig,temporary,measuredPose,localBase.load());
+  mean.identify(ctx.camera->epoch,ctx.handle,visual::canonicalModel(studio->name),studio->checksum,
+      settings->fallbackEyeHeight,settings->dynamicAnchor2);
+  const bool training=settings->dynamicAnchor2&&measured.first&&measured.eyeKnown&&
+      (!settings->thirdPersonCompatibility||viewcompat::mode.load()==viewcompat::Mode::First);
+  bool learned=mean.observe(measured.stance,training,measured.localCorrection,measuredFrame.tick);
+  recorder.record(measured,*studio,mean,measuredFrame.tick,ctx.camera->epoch,ctx.handle,settings->dynamicAnchor2,learned);
+  if(learned&&mean.frozen(measured.stance)){
+   auto v=mean.frozen(measured.stance)->value;
+   char log[250]{};std::snprintf(log,sizeof(log),"FPB_MEAN frozen stance=%s samples=%u local=%.3f/%.3f/%.3f",
+    meanbody::label(measured.stance),meanbody::Mean::Required,double(v.x),double(v.y),double(v.z));
+   source_camera::log(log);
+  }
+ }else mean.observe(meanbody::Stance::Unknown,false,{},GetTickCount64());
+ // Keep the native skeleton intact when compatibility says not First.
+ // Mean mode additionally requires conservative live first-person evidence,
+ // even when the old optional compatibility switch is off.
+ if((settings->thirdPersonCompatibility&&viewcompat::mode.load()!=viewcompat::Mode::First)||
+    (settings->dynamicAnchor2&&(!measuredCamera||!measured.first||!measured.basis))){
+  original(bones,origin);return;
+ }
+ if(settings->dynamicAnchor2){
+  // Frozen corrections are in original body axes, not camera/world axes.
+  // Never recompute from camera displacement after calibration.
+  const auto* frozen=mean.frozen(measured.stance);
+  const auto* prof=visual::firstperson::profile(*settings,visual::canonicalModel(studio->name),studio->checksum);
+  auto v=frozen?frozen->value:dango::Vec3{};
+  v=v+dango::Vec3{settings->forward+(prof?prof->forward:0.f),settings->right+(prof?prof->right:0.f),settings->up+(prof?prof->up:0.f)};
+  auto translation=dynamic::bodySpace(measured.front,measured.right,v.x,v.y,v.z);
+  const float yaw=std::clamp((settings->yawTrim+(prof?prof->yaw:0.f))*0.01745329251994329577f,-.90f,.90f);
+  if(dynamic::valid(translation)&&dango::length(translation)<=96.f&&
+     dynamic::transform(temporary,studio->count,measured.anchor,translation,yaw)){
+   shift=translation;dynamicMoved=moved=true;
+   ++dynamicApplied;dynamicStatus=frozen?u8"动态定位2：使用姿态固定均值":u8"动态定位2：采样中，仅手动偏移";
+   dynamicSource=meanbody::label(measured.stance);
+  }else {++dynamicRejected;dynamicStatus=u8"动态定位2：修正量无效";}
+ }else if(wantDynamic){
   static thread_local dynamic::Track tracking;
   static thread_local unsigned lastModeGeneration=0;
   const unsigned now=viewcompat::generation.load(std::memory_order_acquire);
@@ -133,7 +179,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
    if(ready)dynamicStatus=u8"当前MOD锚点/姿态无法安全校准，保留原版位置";
   }
  }else dynamicStatus=u8"动态定位关闭";
- if(!dynamicMoved&&wantOffset){
+ if(!settings->dynamicAnchor2&&!dynamicMoved&&wantOffset){
   dango::Vec3 manual{};
   if(ready&&math::offset(*ctx.camera,settings->forward,settings->right,settings->up,manual)){
    bool finite=true;
