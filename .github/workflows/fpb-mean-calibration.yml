@@ -25,11 +25,11 @@ jobs:
       - name: Package
         run: |
           python3 scripts/package.py
-          mv build/L4D2Visual-1.1.0.zip build/L4D2Visual-FPB-Mean-1.zip
+          mv build/L4D2Visual-1.1.0.zip build/L4D2Visual-FPB-Mean-2.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: L4D2Visual-FPB-Mean-1
+          name: L4D2Visual-FPB-Mean-2
           path: |
-            build/L4D2Visual-FPB-Mean-1.zip
+            build/L4D2Visual-FPB-Mean-2.zip
             docs/FPB-MEAN-CALIBRATION.md
           if-no-files-found: error

@@ -42,7 +42,7 @@ int main(){
  assert(adjust(cfg,889)&&cfg.fallbackEyeHeight==6);
  assert(adjust(cfg,891)&&cfg.yawTrim==5);
  assert(!adjust(cfg,860));
- assert(!cfg.dynamicAnchor2);assert(adjust(cfg,896)&&cfg.dynamicAnchor2);
+ assert(!cfg.dynamicAnchor2);assert(!adjust(cfg,896)&&!cfg.dynamicAnchor2);assert(adjust(cfg,MeanToggleAction)&&cfg.dynamicAnchor2);assert(!adjust(cfg,MeanResetAction));
  writeSettings(saved,cfg);
  assert(saved.at("tankPrediction").at("enabled")==false);
  assert(!saved.at("firstPersonBody").contains("clipEnabled"));

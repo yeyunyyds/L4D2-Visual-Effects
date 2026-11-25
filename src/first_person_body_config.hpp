@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 namespace visual::firstperson {
+// Dedicated FPB experiment actions, outside the global 896 logging action.
+inline constexpr std::uintptr_t MeanToggleAction=0x720100,MeanResetAction=0x720101;
 struct ModelProfile {
  std::string model;
  std::uint32_t checksum=0;
@@ -124,7 +126,7 @@ inline bool adjust(Settings& s,std::uintptr_t id){
  case 889:s.fallbackEyeHeight+=1;break;case 890:s.fallbackEyeHeight-=1;break;
  case 891:s.yawTrim+=5;break;case 892:s.yawTrim-=5;break;
  case 893:s.yawTrim=0;break;
- case 896:s.dynamicAnchor2=!s.dynamicAnchor2;break;
+ case MeanToggleAction:s.dynamicAnchor2=!s.dynamicAnchor2;break;
  default:return false;
  }
  normalize(s);return true;
