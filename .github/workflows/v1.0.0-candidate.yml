@@ -1,9 +1,10 @@
-name: L4D2Visual v1.1.1 build and verified release
+name: L4D2Visual v1.1.1 candidate build
 on:
   push:
     branches: [main]
     paths-ignore:
       - '.github/workflows/finalize-v1.1.0.yml'
+      - '.github/workflows/finalize-v1.1.1.yml'
       - '.github/workflows/v1.0.0-candidate.yml'
   workflow_dispatch:
 permissions:
@@ -124,76 +125,3 @@ jobs:
           path: build/candidate-install/
           if-no-files-found: error
 
-  publish-v1-1-1:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.event.head_commit.message == 'Release L4D2Visual v1.1.1'
-    needs: [mingw-x86, msvc-x86]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-    concurrency:
-      group: release-v1.1.1
-      cancel-in-progress: false
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: v1.1.1
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: L4D2Visual-1.1.1-release-assets
-          path: release-assets
-      - name: Verify release assets and source provenance
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          (cd release-assets && sha256sum -c *.sha256)
-          python3 - <<'PY'
-          import os, struct, json
-          from pathlib import Path
-          from zipfile import ZipFile
-          p=Path('release-assets')
-          assert {x.name for x in p.iterdir()}=={'L4D2Visual-1.1.1.zip','L4D2Visual-1.1.1.zip.sha256','L4D2Visual-1.1.1-source.zip','L4D2Visual-1.1.1-source.zip.sha256'}
-          with ZipFile(p/'L4D2Visual-1.1.1.zip') as z:
-              assert z.testzip() is None
-              assert set(z.namelist())=={'README.md','bin/neko/plugins/L4D2Visual.dll','bin/neko/plugins/L4D2Visual/hud.json'}
-              dll=z.read('bin/neko/plugins/L4D2Visual.dll')
-              pe=struct.unpack_from('<I',dll,0x3c)[0]
-              assert dll[pe:pe+4]==b'PE\x00\x00' and struct.unpack_from('<H',dll,pe+4)[0]==0x14c
-              assert b'L4D2Visual 1.1.1' in dll and b'fpb-view.1' not in dll
-              assert 'Source commit: '+os.environ['GITHUB_SHA'] in z.read('README.md').decode()
-              cfg=json.loads(z.read('bin/neko/plugins/L4D2Visual/hud.json'))
-              assert not cfg['firstPersonBody']['enabled'] and 'dynamicAnchor2' not in cfg['firstPersonBody']
-              assert not cfg['freeCamera']['externalEnabled']
-          with ZipFile(p/'L4D2Visual-1.1.1-source.zip') as z:
-              assert z.testzip() is None and z.comment.decode()==os.environ['GITHUB_SHA']
-              assert z.read('docs/releases/v1.1.1.md')==Path('docs/releases/v1.1.1.md').read_bytes()
-          PY
-      - name: Create or resume verified draft
-        run: |
-          if gh release view "$RELEASE_TAG" --json isDraft,targetCommitish > /tmp/release.json 2>/dev/null; then
-            python3 - <<'PY'
-          import json
-          assert json.load(open('/tmp/release.json'))['isDraft'], 'Already published; refusing to overwrite'
-          PY
-          fi
-          tag_sha="$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)"
-          if [ -z "$tag_sha" ]; then
-            gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$RELEASE_TAG" -f sha="$GITHUB_SHA" >/dev/null
-          fi
-          test "$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')" = "$GITHUB_SHA"
-          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --verify-tag --draft --title 'L4D2Visual v1.1.1' --notes-file docs/releases/v1.1.1.md
-          fi
-      - name: Upload and publish verified artifacts
-        run: |
-          gh release upload "$RELEASE_TAG" release-assets/* --clobber
-          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort > /tmp/actual
-          (cd release-assets && printf '%s\n' * | sort) > /tmp/expected
-          diff -u /tmp/expected /tmp/actual
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
-          test "$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')" = "$GITHUB_SHA"
-          gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,tagName,url
