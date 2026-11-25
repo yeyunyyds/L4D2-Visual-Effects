@@ -2,6 +2,7 @@
 #include "../module_host.hpp"
 #include "../ui_services.hpp"
 #include "../first_person_body_effects.hpp"
+#include "../first_person_native_probe.hpp"
 #include "../free_camera_runtime.hpp"
 #include "../diagnostics.hpp"
 #include <cstdio>
@@ -126,7 +127,9 @@ inline modules::Module create(){
   // Keep the real player entity rendered while FreeCamera observes it.
   // onFrame still verifies the local handle/model/life state before opening
   // the original DrawModel gate; no extra entities or render calls are made.
+  const bool nativeBefore=firstperson::native::active.load();
   firstperson::onFrame(frame,freecamera::requested.load(std::memory_order_acquire),freecamera::requested.load()&&freecamera::externalSession.load()&&freecamera::bodyClear.load());
+  firstperson::nativeprobe::sample(frame,freecamera::requested.load(std::memory_order_acquire),nativeBefore);
  };
  // At this point the shared Studio pipeline has already applied any entity
  // deformation. First-person effects decorate the FINAL draw only.

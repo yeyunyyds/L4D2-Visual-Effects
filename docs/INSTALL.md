@@ -1,3 +1,7 @@
+# FPB Native Gate Probe — diagnostic only
+
+请勿覆盖自己的 hud.json。此为实验诊断 DLL，不是正式版。[诊断测试说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experimental/fpb-native-gate-probe/docs/FPB-NATIVE-GATE-PROBE.md)。
+
 # L4D2Visual 安装说明
 
 ## 正式版本：v1.1.0

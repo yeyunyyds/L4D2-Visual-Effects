@@ -1,0 +1,38 @@
+name: FPB native gate diagnostic (no release)
+on:
+  push:
+    branches: [experimental/fpb-native-gate-probe]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe-x86:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MinGW x86
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: Run full regression suite
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: bash scripts/test.sh
+      - name: Build Windows x86 diagnostic DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: |
+          bash scripts/build-mingw.sh
+          file build/L4D2Visual.dll
+          i686-w64-mingw32-objdump -p build/L4D2Visual.dll | grep -F L4D2VisualCameraSetPose
+      - name: Package diagnostic
+        run: |
+          python3 scripts/package.py
+          mv build/L4D2Visual-1.1.0.zip build/L4D2Visual-FPB-Native-Gate-Probe.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-FPB-Native-Gate-Probe
+          path: |
+            build/L4D2Visual-FPB-Native-Gate-Probe.zip
+            docs/FPB-NATIVE-GATE-PROBE.md
+          if-no-files-found: error
