@@ -151,12 +151,11 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   static thread_local unsigned lastModeGeneration=0;
   const unsigned now=viewcompat::generation.load(std::memory_order_acquire);
   if(now!=lastModeGeneration){tracking=dynamic::Track{};lastModeGeneration=now;}
-  dango::GameCameraFrame live{};
-  dango::CameraPose pose{};
-  if(ready&&source_camera::sampleDuringDraw(live)&&
-     live.epoch==ctx.camera->epoch&&dango::cameraPose(live,pose)){
+  const auto& live=measuredFrame;
+  const auto& pose=measuredPose;
+  if(measuredCamera){
    ++sameFrameCamera;
-   auto rig=dynamic::discover(*studio,settings->fallbackEyeHeight);
+   const auto& rig=measuredRig;
    auto id=visual::canonicalModel(studio->name);
    auto prof=visual::firstperson::profile(*settings,id,studio->checksum);
    const auto resolved=dynamic::compute(*studio,rig,temporary,pose,*settings,prof,

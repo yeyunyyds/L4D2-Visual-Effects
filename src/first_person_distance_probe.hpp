@@ -8,6 +8,7 @@ struct Sample {
  bool valid=false,basis=false,eyeKnown=false,first=false;
  meanbody::Stance stance=meanbody::Stance::Unknown;
  int flags=-1,shoulder=-1;
+ float speed=-1.f,verticalSpeed=std::numeric_limits<float>::quiet_NaN();
  dango::Vec3 anchor{},chestDelta{},eyeDelta{},localCorrection{},front{},right{};
  viewcompat::Observation view{};
 };
@@ -25,6 +26,12 @@ inline Sample measure(const StudioPose& studio,const dynamic::Rig& rig,const Mat
  if(fo>=0&&std::uint64_t(entity)+unsigned(fo)+4<=0x100000000ull&&
     source_entities::wire::load(reader,entity+unsigned(fo),raw)&&raw<=0x7fffffffu)s.flags=int(raw);
  s.stance=meanbody::stance(s.flags);
+ const int vo=velocityOffset.load();dango::Vec3 velocity{};
+ if(vo>=0&&std::uint64_t(entity)+unsigned(vo)+sizeof(velocity)<=0x100000000ull&&
+    source_entities::wire::load(reader,entity+unsigned(vo),velocity)&&dynamic::valid(velocity)&&
+    dango::length(velocity)<10000.f){
+  s.speed=std::hypot(velocity.x,velocity.y);s.verticalSpeed=velocity.z;
+ }
  std::optional<dango::Vec3> origin;
  dango::Vec3 v{};
  if(oo>=0&&std::uint64_t(entity)+unsigned(oo)+sizeof(v)<=0x100000000ull&&
@@ -60,10 +67,10 @@ struct Recorder {
   const auto nan=std::numeric_limits<float>::quiet_NaN();
   auto eye=s.eyeKnown?s.eyeDelta:dango::Vec3{nan,nan,nan};
   auto correction=s.eyeKnown?s.localCorrection:dango::Vec3{nan,nan,nan};
-  std::snprintf(line,sizeof(line),"FPB_DISTANCE frame=%llu tick=%llu epoch=%u handle=%u model=%s checksum=%u mode=%s observed=%s firstCandidate=%d flags=%d stance=%s shoulder=%d originXY=%.3f originZ=%.3f chest=%.3f chestXY=%.3f chestZ=%.3f eye=%.3f eyeXY=%.3f eyeZ=%.3f correction=%.3f/%.3f/%.3f source=%s dynamic2=%d learned=%d samples=%u/%u/%u",
+  std::snprintf(line,sizeof(line),"FPB_DISTANCE frame=%llu tick=%llu epoch=%u handle=%u model=%s checksum=%u mode=%s observed=%s firstCandidate=%d flags=%d stance=%s shoulder=%d speed=%.3f velocityZ=%.3f originXY=%.3f originZ=%.3f chest=%.3f chestXY=%.3f chestZ=%.3f eye=%.3f eyeXY=%.3f eyeZ=%.3f correction=%.3f/%.3f/%.3f source=%s dynamic2=%d learned=%d samples=%u/%u/%u",
    static_cast<unsigned long long>(frame),static_cast<unsigned long long>(tick),unsigned(epoch),unsigned(handle),
    studio.name.c_str(),unsigned(studio.checksum),viewcompat::label(viewcompat::mode.load()),viewcompat::label(s.view.evidence),
-   int(s.first),s.flags,meanbody::label(s.stance),s.shoulder,double(s.view.horizontal),double(s.view.eyeHeight),
+   int(s.first),s.flags,meanbody::label(s.stance),s.shoulder,double(s.speed),double(s.verticalSpeed),double(s.view.horizontal),double(s.view.eyeHeight),
    double(dango::length(s.chestDelta)),double(std::hypot(s.chestDelta.x,s.chestDelta.y)),double(s.chestDelta.z),
    double(dango::length(eye)),double(std::hypot(eye.x,eye.y)),double(eye.z),double(correction.x),double(correction.y),double(correction.z),
    s.eyeKnown?"bind-estimate":"unavailable",int(dynamic2),int(learned),c.states[0].count,c.states[1].count,c.states[2].count);

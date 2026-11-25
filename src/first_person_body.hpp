@@ -19,10 +19,10 @@ inline std::atomic<bool> worldBodyActive{false},validatedLocal{false};
 inline freecamerabody::Transition cameraTransition;
 // Only the game-thread class lookup publishes offsets. Draw-time code uses
 // the identity/serial-validated entity and safe reader, never the class map.
-inline std::atomic<int> flagsOffset{-1},originOffset{-1},probeShoulder{-1};
+inline std::atomic<int> flagsOffset{-1},originOffset{-1},velocityOffset{-1},probeShoulder{-1};
 inline std::atomic<unsigned> calibrationGeneration{0};
 inline void clear() noexcept{
- worldBodyActive=false;validatedLocal=false;currentHandle=0xffffffffu;currentEpoch=0;localBase=0;localTick=0;flagsOffset=-1;originOffset=-1;probeShoulder=-1;
+ worldBodyActive=false;validatedLocal=false;currentHandle=0xffffffffu;currentEpoch=0;localBase=0;localTick=0;flagsOffset=-1;originOffset=-1;velocityOffset=-1;probeShoulder=-1;
 }
 inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequested=false,bool forceWorldBody=false) noexcept {
  // Reset the first-/third-person evidence on BOTH F6 edges. The detached
@@ -64,10 +64,13 @@ inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequeste
  // real networked CTerrorPlayer at its original position. Do not classify
  // detached camera distance as third-person view.
  const auto cfg=std::atomic_load(&options);
- flagsOffset=-1;originOffset=-1;
+ flagsOffset=-1;originOffset=-1;velocityOffset=-1;
  for(const auto& pair:source_entities::classes)if(pair.second.name=="CTerrorPlayer"&&pair.second.schema){
   const auto& fields=pair.second.fields;
   auto flags=fields.find("m_fFlags"),origin=fields.find("m_vecOrigin");
+  auto velocity=fields.find("m_vecVelocity[0]");
+  if(velocity==fields.end()||velocity->second.type!=2)velocity=fields.find("m_vecVelocity");
+  if(velocity!=fields.end()&&velocity->second.type==2&&velocity->second.offset<=65524u)velocityOffset=int(velocity->second.offset);
   if(flags!=fields.end()&&flags->second.type==0&&flags->second.offset<=65532u)flagsOffset=int(flags->second.offset);
   if(origin!=fields.end()&&origin->second.type==2&&origin->second.offset<=65524u)originOffset=int(origin->second.offset);
   break;
@@ -93,8 +96,8 @@ inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequeste
   if(!origin && frame->tick+75>=camera.tick)origin=actor->networkOrigin;
   const auto viewed=viewcompat::detectAndCommit(camera,origin);
   viewcompat::status=viewed==viewcompat::Mode::First?"第一人称：身体显示已启用":
-      viewed==viewcompat::Mode::Third?"第三人称：已恢复原生绘制":
-      "视角状态不明确：保持原生绘制";
+      viewed==viewcompat::Mode::Third?"第三人称：原生门控继续放行，不修改模型":
+      "视角状态不明确：原生门控继续放行，不修改模型";
   // Diagnostic test: keep the verified local native gate open in all
   // normal views. The Studio stage alone decides whether to change bones.
  }else if(viewcompat::mode.load(std::memory_order_acquire)!=viewcompat::Mode::Unknown){
