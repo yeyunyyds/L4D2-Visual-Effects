@@ -1,29 +1,25 @@
-# FPB combined view preview — 非正式版
-
-仅替换 DLL，保留原 hud.json。参见 [实验说明](https://github.com/yeyunyyds/L4D2-Visual-Effects/blob/experimental/fpb-mean-calibration/docs/FPB-MEAN-CALIBRATION.md)。
-
 # L4D2Visual 安装说明
 
-## 正式版本：v1.1.0
+## 正式版本：v1.1.1
 
-下载：[L4D2Visual v1.1.0 正式 Release](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.0)。正式安装包为 `L4D2Visual-1.1.0.zip`；配套提供相同源码提交的源码包与两个 SHA-256 校验文件。历史 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留。
+下载：[L4D2Visual v1.1.1 正式 Release](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.1)。正式安装包为 `L4D2Visual-1.1.1.zip`；配套提供相同源码提交的源码包与两个 SHA-256 校验文件。历史 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留。
 
 支持：**Left 4 Dead 2，Windows x86，L4N v2，以及符合插件 PE/SHA-256 校验的游戏模块版本**。其他游戏 DLL 版本将因安全检查拒绝对应 Hook 或补丁，不能通过强制关闭校验来解决。
 
 ## 安装
 
 1. **完全退出游戏**，备份现有 `bin/neko/plugins/L4D2Visual.dll` 和 `bin/neko/plugins/L4D2Visual/hud.json`。
-2. 从上述正式 Release 下载 `L4D2Visual-1.1.0.zip`；解压后包含 `bin/` 和 `README.md`，没有第二层安装 ZIP。
+2. 从上述正式 Release 下载 `L4D2Visual-1.1.1.zip`；解压后包含 `bin/` 和 `README.md`，没有第二层安装 ZIP。
 3. 把 `bin/` 合并到游戏目录。安装包内的默认配置位于 `bin/neko/plugins/L4D2Visual/hud.json`。
 4. 老用户可以保留自己原有的 `hud.json`，新功能缺失的设置使用默认值。不要用新默认配置覆盖旧版自定义样式，除非你希望全部重置。
-5. 在 L4N 插件菜单中打开 L4D2Visual。正式 DLL 版本字符串为 `1.1.0`；以日志和菜单显示的实际 DLL 版本为准。
+5. 在 L4N 插件菜单中打开 L4D2Visual。正式 DLL 版本字符串为 `1.1.1`；以日志和菜单显示的实际 DLL 版本为准。
 
 **不要替换游戏自带的 `studiorender.dll`。** 若使用过 Hook/原生补丁，更新 DLL 前必须完全退出游戏，不能仅返回主菜单。
 
 ## 功能及默认状态
 
 - **实体缩放与拉伸**：分类识别、整体/XYZ 比例、「邦友的酒」动画与范围触发；总开关关闭。
-- **第一人称身体（FPB）**：原生玩家身体、头/手臂隐藏、动态模型定位、逐模型校准；默认关闭，第三人称兼容默认关闭。异常恢复显示 `Clean / Patched / Unknown`，`Unknown` 时不再启用原生补丁。
+- **第一人称身体（FPB）**：原生玩家身体、头/手臂隐藏、动态模型定位、逐模型校准；默认关闭，第三人称兼容默认关闭。启用兼容后，结合实体原点及原始骨骼距离判断相机脱离，返回第一人称时提前独立隐藏头部。打包过渡与返回第一人称的改进已获实机确认；个别瞬间穿模仍可能存在。异常恢复显示 `Clean / Patched / Unknown`，`Unknown` 时不再启用原生补丁。
 - **FreeCamera**：菜单开关、自由飞行、第一人称手臂武器隐藏；功能默认关闭，**F6 快捷键绑定默认关闭**，首次请求才安装三个 ClientMode Hook。
 - **Tank 行为预测**：条、箭头、攻击范围、红色警告，以及**只读的建筑遮挡修复**；总开关关闭。建筑遮挡选项默认开，但只有 Tank 预测启用后才会工作。
 - **Tank 石头预测**：独立菜单、轨迹和静态世界落点；总开关关闭，预测窗口 500 ms，使用固定重力 320 和假定半尺寸 16 的碰撞箱。

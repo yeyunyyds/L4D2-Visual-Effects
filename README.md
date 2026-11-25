@@ -2,7 +2,7 @@
 
 面向《Left 4 Dead 2》的 **Windows x86 / L4N v2** 客户端视觉效果插件。插件及 DLL 名称均为 `L4D2Visual`。
 
-**当前正式版：v1.1.0。** [下载正式安装包](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.0) · [安装说明](docs/INSTALL.md) · [更新日志](docs/releases/v1.1.0.md) · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v1.1.0) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip)。历史正式版 [v1.0.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0) 与 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留供回退。
+**当前正式版：v1.1.1。** [下载正式安装包](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.1) · [安装说明](docs/INSTALL.md) · [更新日志](docs/releases/v1.1.1.md) · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v1.1.1) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip)。历史正式版 [v1.1.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.0)、[v1.0.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0) 与 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留供回退。
 
 ## 功能
 
@@ -15,7 +15,7 @@
 | Tank 石头预测 | 轨迹与静态世界落点、绘制样式配置 | 关闭 |
 | 菜单与诊断 | F10 菜单、外观、Info/Debug 日志与各模块状态 | Info 日志 |
 
-**FPB** 使用经过验证的原生 `C_TerrorPlayer::DrawModel` 路径，启用时只修改本地人物绘制门控中的一字节跳转位移，关闭时检查原始字节恢复；异常时报告 `Unknown`，不会盲目覆盖第三方修改。已移除纯诊断型 `ShouldDraw` Hook。FPB 关闭时不会再额外读取 Studio 模型数据。
+**FPB** 使用经过验证的原生 `C_TerrorPlayer::DrawModel` 路径，启用时只修改本地人物绘制门控中的一字节跳转位移，关闭时检查原始字节恢复；异常时报告 `Unknown`，不会盲目覆盖第三方修改。已移除纯诊断型 `ShouldDraw` Hook。FPB 关闭时不会再额外读取 Studio 模型数据。开启第三人称兼容时，原生门控与视觉修正分离：依据原始骨骼距离、实体原点相对位置及相机运动判断是否保留完整模型；返回第一人称时可提前独立隐藏头部，减少瞬间穿模。FreeCamera 保留人物世界原位。
 
 > **FreeCamera 外部控制（ABI v4）**。外部请求先等待首次 AFK 阈值（默认10秒），期间保持原生视角；手动和外部共用启停开关，键鼠优先，外部调用方可选择接管后返回第一人称，闲置 1–30 秒（默认 3 秒）后交还外部；支持 GetPose，F6/配置快捷键或菜单关闭当前视角并重新等待首次闲置时间。见 [外部 Camera API 说明](docs/FREE-CAMERA-EXTERNAL-ABI.md)。
 
@@ -29,13 +29,13 @@
 
 ## 安装与更新
 
-参见 [安装说明](docs/INSTALL.md)。从正式 Release 下载 `L4D2Visual-1.1.0.zip`，解压后得到 `bin/` 和 `README.md`，将 `bin/` 合并到游戏目录。**更新前完全退出游戏，备份 `L4D2Visual.dll` 和 `bin/neko/plugins/L4D2Visual/hud.json`**；不要替换游戏自带的 `studiorender.dll`。可保留旧配置；旧版 Glow 和喷漆键不再生效。
+参见 [安装说明](docs/INSTALL.md)。从正式 Release 下载 `L4D2Visual-1.1.1.zip`，解压后得到 `bin/` 和 `README.md`，将 `bin/` 合并到游戏目录。**更新前完全退出游戏，备份 `L4D2Visual.dll` 和 `bin/neko/plugins/L4D2Visual/hud.json`**；不要替换游戏自带的 `studiorender.dll`。可保留旧配置；旧版 Glow 和喷漆键不再生效。
 
 只支持明确校验过的 Windows x86 游戏模块；指纹不匹配时相关原生功能会拒绝执行。对于第三方插件、特殊模型、不同 DXVK/D3D9 环境，不承诺全面兼容。客户端 HUD 的射线/计时预测也不代表服务器的真实判定。**不对联机或 VAC 安全作保证**，请先在离线环境验收。
 
 ## 构建及发布状态
 
-`v1.1.0` 由 GitHub Actions 从正式版本源码构建、验证并发布 Windows x86 安装包、配套源码 ZIP 和 SHA-256 校验文件；`main` 仍保留日常候选 CI。版本标签与安装包源码对应，历史 Release 不会覆盖。
+`v1.1.1` 使用 GitHub Actions 从正式版本源码构建、验证并发布 Windows x86 安装包、配套源码 ZIP 和 SHA-256 校验文件；`main` 仍保留日常候选 CI。版本标签与安装包源码对应，历史 Release 不会覆盖。
 
 ```sh
 ASAN_OPTIONS=detect_leaks=0 bash scripts/test.sh
@@ -43,7 +43,7 @@ CXX_X86=i686-w64-mingw32-g++-posix bash scripts/build-mingw.sh
 python3 scripts/package.py
 ```
 
-构建产物为 `build/L4D2Visual-1.1.0.zip`。源码、依赖许可与署名见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md) 和 [v1.1.0 更新日志](docs/releases/v1.1.0.md)。安装包内的 README 附有完整许可内容。
+构建产物为 `build/L4D2Visual-1.1.1.zip`。源码、依赖许可与署名见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md) 和 [v1.1.1 更新日志](docs/releases/v1.1.1.md)。安装包内的 README 附有完整许可内容。
 
 ## 设计与说明
 

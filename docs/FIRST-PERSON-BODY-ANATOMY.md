@@ -29,8 +29,14 @@ following, manual XYZ adjustments, per-model calibration, diagnostics, and
 saving settings.
 
 Optional third-person view compatibility is also off by default. It only
-governs whether this feature participates in the local player's drawing when
-the view changes; it does not provide a camera or alter external plug-ins.
+governs cosmetic processing, not the verified native local-player draw gate.
+The gate remains open for validated local draws while FPB is enabled. The
+policy combines the original skeletal eye estimate, live entity-origin-relative
+camera height and horizontal separation, stationary-origin motion evidence,
+and explicit third-person evidence. On return, the head can be hidden alone
+before the full-body resume delay. FreeCamera bypasses these cosmetic changes.
+This does not provide a camera or alter external plug-ins.
+See [v1.1.1 release notes](releases/v1.1.1.md) for limitations.
 
 ## Limitations
 
