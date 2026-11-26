@@ -35,4 +35,40 @@ int main(){
  assert(!g.update(at(1460,30,36,0,62,28,20)).full);
  // Unknown evidence fails closed.
  Input unknown{};unknown.tick=1540;assert(!g.update(unknown).full);
+ // Landing: the entity falls faster than the camera, briefly exceeding
+ // 66 units. Preserve full alignment and avoid the 80 ms re-entry delay.
+ Gate landing;
+ assert(!landing.update(at(100,0,36,0,44,15,14)).full);
+ assert(landing.update(at(180,10,30,1,47,13,13)).full);
+ d=landing.update(at(196,14,16,1.5f,55,10,11));assert(d.full);
+ d=landing.update(at(212,18,2,1.5f,67,9,11));assert(d.full);
+ assert(landing.update(at(228,18,2,1.5f,67,9,11)).full);
+ assert(landing.update(at(244,22,0,1,62,6,8)).full);
+ // Upward camera departure must still win, even after recent motion.
+ assert(!landing.update(at(260,22,0,1,67,9,11)).full);
+ // A still-high camera must not inherit landing evidence indefinitely.
+ Gate timeout;
+ timeout.update(at(100,0,36,0,44,15,14));
+ assert(timeout.update(at(180,10,30,1,47,13,13)).full);
+ assert(timeout.update(at(196,14,2,1,67,9,11)).full);
+ assert(timeout.update(at(228,14,2,1,67,9,11)).full);
+ assert(!timeout.update(at(229,14,2,1,67,9,11)).full);
+ // Hard exit conditions still apply during a descent.
+ for(int scenario=0;scenario<6;++scenario){
+  Gate guard;
+  guard.update(at(100,0,36,0,44,15,14));
+  assert(guard.update(at(180,10,30,1,47,13,13)).full);
+  auto sample=at(196,14,2,1,67,9,11);
+  if(scenario==0)sample.shoulder=1;
+  if(scenario==1)sample.camera.x=sample.origin.x+4;
+  if(scenario==2)sample.camera.z=sample.origin.z+71;
+  if(scenario==3)sample.eyeDistance=29;
+  if(scenario==4)sample.headKnown=false;
+  if(scenario==5)sample.shoulder=-1;
+  assert(!guard.update(sample).full);
+ }
+ // A camera cannot use landing retention to bypass initial settling.
+ Gate cold;
+ cold.update(at(100,0,30,1,47,13,13));
+ assert(!cold.update(at(116,4,2,1,67,9,11)).full);
 }
