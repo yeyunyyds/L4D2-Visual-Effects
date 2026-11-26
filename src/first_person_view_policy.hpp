@@ -15,7 +15,7 @@ struct Input {
 };
 struct Decision {
  bool full=false,earlyHead=false,stationary=false,detached=false;
- float originMotion=-1,relativeGrowth=0;
+ float originMotion=-1,relativeGrowth=0,originMotionXY=-1;
  const char* reason="unverified";
 };
 struct Gate {
@@ -24,66 +24,54 @@ struct Gate {
  static constexpr float EyeExit=28.f,EyeEnter=24.f,HeightExit=66.f,HeightEnter=64.5f;
  static constexpr float StillTolerance=.75f,HorizontalExit=4.f,HorizontalEnter=2.5f,Growth=1.5f;
  static constexpr float HeadEnter=10.f,HeadExit=12.f;
- // Only retain an already-confirmed first-person view during a short
- // landing overshoot. Do not widen normal third-person entry thresholds.
- static constexpr float LandingHeight=70.f,LandingEye=12.f,LandingHead=12.f;
- static constexpr float LandingDrop=.5f,LandingRiseTolerance=.5f;
- static constexpr std::uint64_t MotionWindow=80,ResumeDelay=80,LandingHold=32;
+ static constexpr float MovingHeightLimit=70.f;
+ static constexpr std::uint64_t MotionWindow=80,ResumeDelay=80;
  bool allowed=false,pending=false,detached=false,above=false,early=false;
  bool haveWindow=false,haveHead=false,approaching=false;
  std::uint64_t since=0,last=0,windowTick=0,headTick=0;
  Vec3 windowOrigin{},windowRelative{};
- float motion=-1,growth=0,priorHead=0;
+ float motion=-1,growth=0,priorHead=0,horizontalMotion=-1;
  bool stationary=false;
- bool haveLive=false,landingEvidence=false;
- std::uint64_t liveTick=0,landingTick=0;
- Vec3 liveOrigin{},liveCamera{};
- float landingOriginZ=0,landingCameraZ=0;
  void reset(){*this=Gate{};}
  Decision update(Input in){
   if(in.tick<last||(last&&in.tick-last>500))reset();
+  const bool recent=last&&in.tick-last<=MotionWindow;
   last=in.tick;
   const bool origin=in.originKnown&&finite(in.origin)&&finite(in.camera);
   const bool eye=in.eyeKnown&&std::isfinite(in.eyeDistance)&&in.eyeDistance>=0;
   const bool head=in.headKnown&&std::isfinite(in.headDistance)&&in.headDistance>=0;
   Vec3 rel=origin?in.camera-in.origin:Vec3{};
   const float xy=std::hypot(rel.x,rel.y);
-  bool retainLanding=false;
+  bool retainHeight=false;
+  float horizontalEvidence=-1;
   if(origin){
-   // A falling entity can briefly outrun the interpolated camera on landing.
-   // Use fresh vertical motion rather than the potentially stale 80 ms
-   // movement window, and reject any independent upward camera motion.
-   if(haveLive&&in.tick-liveTick<=MotionWindow){
-    const float dz=in.origin.z-liveOrigin.z;
-    const float cz=in.camera.z-liveCamera.z;
-    if(dz<=-LandingDrop&&cz<=0.f&&cz-dz>0.f){
-     landingEvidence=true;landingTick=in.tick;
-     landingOriginZ=in.origin.z;landingCameraZ=in.camera.z;
-    }else if(landingEvidence&&(in.tick-landingTick>LandingHold||
-       in.origin.z>landingOriginZ+LandingRiseTolerance||
-       in.camera.z>landingCameraZ+LandingRiseTolerance)){
-     landingEvidence=false;
-    }
-   }else landingEvidence=false;
-   haveLive=true;liveTick=in.tick;liveOrigin=in.origin;liveCamera=in.camera;
+   // Keep height retention conservative when recent observations are missing.
+   if(!recent)horizontalMotion=-1;
    if(!haveWindow){haveWindow=true;windowTick=in.tick;windowOrigin=in.origin;windowRelative=rel;}
    // Observe accumulated displacement, not consecutive equal samples.
+   float partialXY=std::hypot(in.origin.x-windowOrigin.x,in.origin.y-windowOrigin.y);
    if(in.tick-windowTick>=MotionWindow){
+    horizontalMotion=recent&&in.tick-windowTick<=2*MotionWindow?partialXY:-1.f;
     motion=dango::length(in.origin-windowOrigin);
     growth=xy-std::hypot(windowRelative.x,windowRelative.y);
     stationary=motion<=StillTolerance;
     if(stationary&&xy>=HorizontalExit&&growth>=Growth)detached=true;
-    windowTick=in.tick;windowOrigin=in.origin;windowRelative=rel;
+    windowTick=in.tick;windowOrigin=in.origin;windowRelative=rel;partialXY=0.f;
    }
    if(xy<=HorizontalEnter)detached=false;
-   retainLanding=allowed&&!above&&in.shoulder==0&&landingEvidence&&
-       !detached&&xy<=HorizontalEnter&&rel.z>HeightExit&&rel.z<=LandingHeight&&
-       eye&&in.eyeDistance<=LandingEye&&head&&in.headDistance<=LandingHead;
-   if(rel.z>HeightExit&&!retainLanding)above=true;
+   // A fixed-position interaction cannot by itself produce horizontal
+   // entity motion. Only exempt the height exit for an established first
+   // person view, with positive motion and near-origin camera geometry.
+   horizontalEvidence=recent&&in.tick-windowTick<MotionWindow?
+       std::fmax(horizontalMotion,partialXY):horizontalMotion;
+   if(!recent)horizontalEvidence=-1;
+   retainHeight=allowed&&!above&&in.shoulder==0&&
+       horizontalEvidence>StillTolerance&&xy<=HorizontalEnter&&
+       rel.z>HeightExit&&rel.z<=MovingHeightLimit;
+   if(rel.z>HeightExit&&!retainHeight)above=true;
    if(rel.z<=HeightEnter)above=false;
   }else{
-   haveWindow=false;stationary=false;motion=-1;growth=0;
-   haveLive=landingEvidence=false;
+   haveWindow=false;stationary=false;motion=-1;growth=0;horizontalMotion=-1;
    // Do not clear positive evidence just because a read failed.
   }
   // Head proximity is independent of the full-body resume delay. A returning
@@ -99,14 +87,15 @@ struct Gate {
   }else{haveHead=false;approaching=false;early=false;}
   Decision out{};
   out.stationary=stationary;out.originMotion=motion;out.relativeGrowth=growth;out.detached=detached;
+  out.originMotionXY=horizontalEvidence;
   const char* block=nullptr;
   if(in.shoulder==1)block="shoulder";
   else if(above)block="origin-height";
   else if(detached)block="origin-static-xy";
   else if(eye&&in.eyeDistance>=EyeExit)block="eye-distance";
   else if(!eye&&!in.fallbackFirst)block="unverified";
-  if(block){allowed=pending=landingEvidence=false;out.reason=block;}
-  else if(allowed){out.full=true;out.reason=retainLanding?"landing-retain":"first";}
+  if(block){allowed=pending=false;out.reason=block;}
+  else if(allowed){out.full=true;out.reason=retainHeight?"horizontal-retain":"first";}
   else if((eye&&in.eyeDistance>EyeEnter)||(origin&&rel.z>HeightEnter)){pending=false;out.reason="hysteresis";}
   else{
    if(!pending){pending=true;since=in.tick;}
