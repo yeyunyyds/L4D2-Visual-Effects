@@ -1,0 +1,34 @@
+name: FPB landing preview (no release)
+on:
+  push:
+    branches: [fix/fpb-landing-view-retention]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mingw-x86:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install x86 compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: Run regression tests
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: bash scripts/test.sh
+      - name: Build Windows x86 DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: bash scripts/build-mingw.sh
+      - name: Package preview
+        run: |
+          python3 scripts/package.py
+          mkdir -p build/fpb-landing-preview
+          python3 -m zipfile -e build/L4D2Visual-1.1.1.zip build/fpb-landing-preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-FPB-Landing-Preview-x86
+          path: build/fpb-landing-preview/
+          if-no-files-found: error
