@@ -24,6 +24,17 @@ Detailed periodic snapshots preserve the previous format and nominal
 two-second interval. Turning Debug off stops further periodic snapshots.
 Normal Info events remain enabled in either mode.
 
+High-frequency first-person body traces (`FPB_VIEW`, `FPB_DISTANCE` and
+`FPB_CAMERA_GAP`) are emitted **only** in Debug. The FPB frame recorder is
+cleared when Debug is off, so an old buffered distance sample cannot be
+written after changing levels. `FPB_VIEW` includes a `parts` bitmask (1=head,
+2=left arm, 4=right arm) showing which bone branches were actually collapsed.
+`FPB_CAMERA_GAP` marks the beginning and end of short camera-sample retention;
+the FPB diagnostics menu also shows accepted/denied camera gaps and retained
+dynamic transforms. These are render-path observations, not evidence of what
+the GPU ultimately displays. Confirmed camera-mode transitions and important
+lifecycle/failure Info events remain available with Debug off.
+
 Use **保存设置** in the diagnostics menu or the main menu to persist the
 selection. The optional setting in `hud.json` is:
 
