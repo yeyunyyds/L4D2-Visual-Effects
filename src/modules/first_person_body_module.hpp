@@ -66,6 +66,7 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
   row("Arm branch applied/rejected: "+std::to_string(visual::firstperson::effects::armsHidden.load())+"/"+std::to_string(visual::firstperson::effects::armsRejected.load()))+
   row("Dynamic applied/rejected: "+std::to_string(visual::firstperson::effects::dynamicApplied.load())+"/"+std::to_string(visual::firstperson::effects::dynamicRejected.load()))+
   row("Live camera success/failure: "+std::to_string(visual::firstperson::effects::sameFrameCamera.load())+"/"+std::to_string(visual::firstperson::effects::liveCameraRejected.load()))+
+  row("Camera gap accepted/denied, dynamic retained: "+std::to_string(visual::firstperson::effects::cameraGraceApplied.load())+"/"+std::to_string(visual::firstperson::effects::cameraGraceDenied.load())+"/"+std::to_string(visual::firstperson::effects::dynamicGraceApplied.load()))+
   row(visual::firstperson::effects::dynamicStatus.load())+row(visual::firstperson::effects::dynamicSource.load())+
   row(visual::firstperson::effects::headStatus.load())+row(visual::firstperson::effects::armStatus.load())+
   row(visual::firstperson::effects::offsetStatus.load())+
