@@ -6,6 +6,7 @@
 #include "first_person_body_parts.hpp"
 #include "first_person_dynamic_alignment.hpp"
 #include "first_person_distance_probe.hpp"
+#include "log_settings.hpp"
 #include <atomic>
 #include <memory>
 #include <cmath>
@@ -16,6 +17,7 @@ inline std::atomic<const char*> offsetStatus{u8"位置偏移为零"};
 inline std::atomic<const char*> headStatus{u8"头部分支隐藏关闭"},armStatus{u8"双臂分支隐藏关闭"};
 inline std::atomic<unsigned long> headHidden{0},headRejected{0},armsHidden{0},armsRejected{0};
 inline std::atomic<unsigned long> dynamicApplied{0},dynamicRejected{0},sameFrameCamera{0},liveCameraRejected{0};
+inline std::atomic<unsigned long> cameraGraceApplied{0},cameraGraceDenied{0},dynamicGraceApplied{0};
 inline std::atomic<const char*> dynamicStatus{u8"动态定位关闭"},dynamicSource{"unavailable"};
 struct ModelIdentity{std::string name;std::uint32_t checksum=0,epoch=0;};
 inline std::shared_ptr<const ModelIdentity> modelIdentity=std::make_shared<ModelIdentity>();
@@ -79,6 +81,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  // doing so flips the native gate during movement and resets alignment.
  ++matched;
  dango::Vec3 shift{};bool moved=false,partChanged=false,dynamicMoved=false;
+ bool headApplied=false,leftArmApplied=false,rightArmApplied=false;
  visual::Matrix3x4 temporary[256];
  auto settings=ctx.options;
  const bool wantOffset=settings->forward!=0||settings->right!=0||settings->up!=0;
@@ -102,11 +105,20 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  static thread_local viewpolicy::Gate distanceGate;
  static thread_local distanceprobe::Recorder recorder;
  static thread_local dynamic::Track tracking;
+ static thread_local viewpolicy::CameraGapHold cameraGap;
+ // Last trusted render-only transform, never reused outside the camera gap.
+ static thread_local dango::Vec3 retainedTranslation{};
+ static thread_local float retainedYaw=0.f;
+ static thread_local std::uint64_t retainedAt=0;
+ static thread_local bool gapNotified=false;
  static thread_local unsigned gateGeneration=0;
  static thread_local std::uint32_t gateEpoch=0,gateHandle=0xffffffffu,gateChecksum=0;
  const auto requestedGeneration=cosmeticGeneration.load();
+ const bool fpbDebug=visual::logging::periodicDebugEnabled();
+ if(!fpbDebug){recorder.reset();gapNotified=false;}
  if(gateGeneration!=requestedGeneration){
-  distanceGate.reset();tracking.reset();gateGeneration=requestedGeneration;
+  distanceGate.reset();tracking.reset();cameraGap.reset();retainedAt=0;
+  gateGeneration=requestedGeneration;
  }
  dango::GameCameraFrame measuredFrame{};dango::CameraPose measuredPose{};
  dynamic::Rig measuredRig{};distanceprobe::Sample measured{};
@@ -120,31 +132,56 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   measured=distanceprobe::measure(*studio,measuredRig,plan,temporary,measuredPose,localBase.load());
   prof=visual::firstperson::profile(*settings,visual::canonicalModel(studio->name),studio->checksum);
   if(gateEpoch!=ctx.camera->epoch||gateHandle!=ctx.handle||gateChecksum!=studio->checksum){
-   gateEpoch=ctx.camera->epoch;gateHandle=ctx.handle;gateChecksum=studio->checksum;distanceGate.reset();tracking.reset();
+   gateEpoch=ctx.camera->epoch;gateHandle=ctx.handle;gateChecksum=studio->checksum;
+   distanceGate.reset();tracking.reset();cameraGap.reset();retainedAt=0;
   }
  }
- const auto tick=measuredCamera?measuredFrame.tick:GetTickCount64();
+ const auto wallNow=GetTickCount64();
+ const auto tick=measuredCamera?measuredFrame.tick:wallNow;
  const bool compatibility=settings->thirdPersonCompatibility;
  viewpolicy::Decision decision{};
+ bool retainedCamera=false;
  if(compatibility){
-  if(measuredCamera)decision=distanceGate.update({
-   measured.originKnown,measured.eyeKnown,measured.headKnown,
-   measured.view.evidence==viewcompat::Mode::First&&viewcompat::mode.load()==viewcompat::Mode::First,
-   measured.entityOrigin,measuredPose.eye,dango::length(measured.eyeDelta),measured.headDistance,measured.shoulder,tick});
-  else distanceGate.reset();
- }else{distanceGate.reset();decision.full=true;decision.reason="compat-off";}
+  if(measuredCamera){
+   decision=distanceGate.update({
+    measured.originKnown,measured.eyeKnown,measured.headKnown,
+    measured.view.evidence==viewcompat::Mode::First&&viewcompat::mode.load()==viewcompat::Mode::First,
+    measured.entityOrigin,measuredPose.eye,dango::length(measured.eyeDelta),measured.headDistance,measured.shoulder,tick});
+   // Only a measured, positively identified first-person sample can arm the
+   // 48ms grace period. A rejected/third-person observation clears it.
+   cameraGap.observe(decision.full&&measured.view.evidence==viewcompat::Mode::First&&
+       measured.shoulder==0&&viewcompat::mode.load()==viewcompat::Mode::First,
+       ctx.camera->epoch,ctx.handle,studio->checksum,wallNow);
+  }else if(ready&&cameraGap.accept(
+       ready,viewcompat::mode.load()==viewcompat::Mode::First,probeShoulder.load(),
+       ctx.camera->epoch,ctx.handle,studio->checksum,wallNow,ctx.camera->tick)){
+   decision.full=true;decision.reason="camera-grace";retainedCamera=true;
+   ++cameraGraceApplied;
+  }else{
+   distanceGate.reset();cameraGap.reset();retainedAt=0;
+   if(ready)++cameraGraceDenied;
+  }
+ }else{
+  distanceGate.reset();cameraGap.reset();
+  decision.full=true;decision.reason="compat-off";
+ }
+ if(fpbDebug&&retainedCamera!=gapNotified){
+  source_camera::log(retainedCamera?"FPB_CAMERA_GAP: 48ms verified-first-person retention":
+                                "FPB_CAMERA_GAP: native camera sampling resumed or safety exit");
+  gapNotified=retainedCamera;
+ }
  const char* path="native";
  dango::Vec3 applied{};float appliedYaw=0;bool haveApplied=false;
  if(!decision.full){
-  tracking.reset();
+  tracking.reset();retainedAt=0;
   dynamicStatus=u8"视角组合判断：保留原生位置";
   if(ready&&settings->hideHead&&decision.earlyHead){
    auto result=parts::apply(*studio,plan,temporary,true,false);
-   if(result.head){++headHidden;headStatus=u8"相机接近原始头部：提前隐藏";path="head-only";partChanged=true;}
+   if(result.head){++headHidden;headApplied=true;headStatus=u8"相机接近原始头部：提前隐藏";path="head-only";partChanged=true;}
    else ++headRejected;
   }else headStatus=u8"原生头部保留";
   armStatus=u8"原生双臂保留";offsetStatus=u8"原生位置保留";
-  if(measuredCamera)recorder.record(measured,*studio,decision,tick,ctx.camera->epoch,ctx.handle,compatibility,path,false,applied,appliedYaw);
+  if(fpbDebug&&measuredCamera)recorder.record(measured,*studio,decision,tick,ctx.camera->epoch,ctx.handle,compatibility,path,false,headApplied,false,false,applied,appliedYaw);
   original(partChanged?temporary:bones,origin);return;
  }
  if(wantDynamic){
@@ -160,9 +197,27 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
      ++dynamicApplied;dynamicStatus=u8"动态身体已对齐本帧相机与胸部锚点";
      dynamicSource=resolved.usedBootstrap?"live-pose-bootstrap":resolved.source;
      applied=resolved.translation;appliedYaw=resolved.yawRadians;haveApplied=true;
+     retainedTranslation=resolved.translation;retainedYaw=resolved.yawRadians;retainedAt=wallNow;
     }
    }
-  }else{++liveCameraRejected;dynamicStatus=u8"同帧相机矩阵不可用：动态定位跳过";}
+  }else{
+   ++liveCameraRejected;
+   // The previous transform is safe for one brief missing-sample interval
+   // only after the view policy has already verified first-person retention.
+   if(retainedCamera&&retainedAt&&wallNow>=retainedAt&&
+      wallNow-retainedAt<=viewpolicy::CameraGapHold::MaxAgeMs){
+    const auto rig=dynamic::discover(*studio,settings->fallbackEyeHeight);
+    if(rig.anchor>=0&&unsigned(rig.anchor)<studio->count){
+     auto pivot=dynamic::location(temporary[unsigned(rig.anchor)]);
+     if(dynamic::transform(temporary,studio->count,pivot,retainedTranslation,retainedYaw)){
+      shift=retainedTranslation;dynamicMoved=moved=true;path="dynamic-grace";
+      applied=shift;appliedYaw=retainedYaw;haveApplied=true;
+      ++dynamicGraceApplied;dynamicStatus=u8"短暂相机丢样：保留最近一次可信身体定位";
+     }
+    }
+   }
+   if(!dynamicMoved)dynamicStatus=u8"同帧相机矩阵不可用：动态定位跳过";
+  }
   if(!dynamicMoved){++dynamicRejected;if(ready)dynamicStatus=u8"当前MOD锚点/姿态无法安全校准，保留原版位置";}
  }else {tracking.reset();dynamicStatus=u8"动态定位关闭";}
  if(!dynamicMoved&&wantOffset){
@@ -192,6 +247,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
    // Only this draw's temporary bone matrices are modified.
    const auto result=parts::apply(*studio,plan,temporary,settings->hideHead,settings->hideArms);
    partChanged=result.modified!=0;
+   headApplied=result.head;leftArmApplied=result.left;rightArmApplied=result.right;
    if(settings->hideHead){
     if(result.head){++headHidden;headStatus=u8"已收缩头部及后代骨骼至颈部";}
     else{++headRejected;headStatus=u8"此 MOD 缺少可验证的头部/颈部骨骼分支";}
@@ -207,7 +263,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  }else{headStatus=u8"头部分支隐藏关闭";armStatus=u8"双臂分支隐藏关闭";}
  if(!dynamicMoved&&moved){path="manual";applied=shift;haveApplied=true;}
  else if(!moved&&partChanged)path="parts-only";
- if(measuredCamera)recorder.record(measured,*studio,decision,tick,ctx.camera->epoch,ctx.handle,compatibility,path,haveApplied,applied,appliedYaw);
+ if(fpbDebug&&measuredCamera)recorder.record(measured,*studio,decision,tick,ctx.camera->epoch,ctx.handle,compatibility,path,haveApplied,headApplied,leftArmApplied,rightArmApplied,applied,appliedYaw);
  dango::Vec3 shiftedOrigin=origin+shift;
  original((moved||partChanged)?temporary:bones,shiftedOrigin);
 }
