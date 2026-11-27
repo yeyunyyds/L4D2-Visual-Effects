@@ -110,12 +110,12 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  static thread_local dango::Vec3 retainedTranslation{};
  static thread_local float retainedYaw=0.f;
  static thread_local std::uint64_t retainedAt=0;
- static thread_local bool gapNotified=false;
+ static thread_local int cameraLogState=0;
  static thread_local unsigned gateGeneration=0;
  static thread_local std::uint32_t gateEpoch=0,gateHandle=0xffffffffu,gateChecksum=0;
  const auto requestedGeneration=cosmeticGeneration.load();
  const bool fpbDebug=visual::logging::periodicDebugEnabled();
- if(!fpbDebug){recorder.reset();gapNotified=false;}
+ if(!fpbDebug){recorder.reset();cameraLogState=0;}
  if(gateGeneration!=requestedGeneration){
   distanceGate.reset();tracking.reset();cameraGap.reset();retainedAt=0;
   gateGeneration=requestedGeneration;
@@ -165,10 +165,19 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   distanceGate.reset();cameraGap.reset();
   decision.full=true;decision.reason="compat-off";
  }
- if(fpbDebug&&retainedCamera!=gapNotified){
-  source_camera::log(retainedCamera?"FPB_CAMERA_GAP: 48ms verified-first-person retention":
-                                "FPB_CAMERA_GAP: native camera sampling resumed or safety exit");
-  gapNotified=retainedCamera;
+ if(fpbDebug){
+  // Log only transitions: an unretained invalid camera draw is diagnostically
+  // different from a successful short camera gap.
+  const int state=measuredCamera?0:retainedCamera?1:!ready?3:compatibility?2:4;
+  if(state!=cameraLogState){
+   const char* message=state==0?"FPB_CAMERA_GAP: same-draw camera recovered":
+       state==1?"FPB_CAMERA_GAP: retaining verified first person (48ms max)":
+       state==2?"FPB_CAMERA_GAP: camera unavailable, native cosmetics fallback":
+       state==3?"FPB_CAMERA_GAP: Studio pose invalid, original bones kept":
+                 "FPB_CAMERA_GAP: camera unavailable, compatibility disabled";
+   source_camera::log(message);
+   cameraLogState=state;
+  }
  }
  const char* path="native";
  dango::Vec3 applied{};float appliedYaw=0;bool haveApplied=false;
