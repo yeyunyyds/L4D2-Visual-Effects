@@ -80,4 +80,21 @@ int main(){
  gap.update(at(100,0,30,1,47,13));
  assert(gap.update(at(180,10,20,1,47,13)).full);
  assert(!gap.update(at(280,14,2,1,67,9)).full);
+ // A missing single-draw camera sample may retain cosmetics only while
+ // the last verified first-person evidence and the frame snapshot are fresh.
+ CameraGapHold hold;
+ assert(!hold.accept(true,true,0,1,7,123,1016,1016));
+ hold.observe(true,1,7,123,1000);
+ assert(hold.accept(true,true,0,1,7,123,1020,1016));
+ assert(!hold.accept(true,true,1,1,7,123,1020,1016)); // explicit shoulder camera
+ assert(!hold.accept(true,false,0,1,7,123,1020,1016)); // committed third person
+ assert(!hold.accept(false,true,0,1,7,123,1020,1016)); // invalid skeleton
+ assert(!hold.accept(true,true,0,2,7,123,1020,1016)); // new map
+ assert(!hold.accept(true,true,0,1,8,123,1020,1016)); // new local entity
+ assert(!hold.accept(true,true,0,1,7,124,1020,1016)); // new model
+ assert(!hold.accept(true,true,0,1,7,123,1050,1040)); // expired verified camera
+ assert(!hold.accept(true,true,0,1,7,123,1030,960));  // stale frame snapshot
+ assert(!hold.accept(true,true,0,1,7,123,999,999));   // time went backwards
+ hold.observe(false,1,7,123,1030);
+ assert(!hold.accept(true,true,0,1,7,123,1031,1030));
 }
