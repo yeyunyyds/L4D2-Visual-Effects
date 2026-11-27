@@ -112,4 +112,27 @@ struct Gate {
   return out;
  }
 };
+// Keep a previously verified first-person presentation across a brief failed
+// same-draw camera sample. Explicit third-person evidence, identity changes,
+// stale frame snapshots and gaps beyond 48ms all invalidate this exemption.
+struct CameraGapHold {
+ static constexpr std::uint64_t MaxAgeMs=48;
+ bool valid=false;
+ std::uint64_t acceptedAt=0;
+ std::uint32_t epoch=0,handle=0xffffffffu,checksum=0;
+ void reset(){*this=CameraGapHold{};}
+ void observe(bool safeFirst,std::uint32_t currentEpoch,std::uint32_t currentHandle,
+              std::uint32_t currentChecksum,std::uint64_t now){
+  if(!safeFirst){reset();return;}
+  valid=true;epoch=currentEpoch;handle=currentHandle;checksum=currentChecksum;acceptedAt=now;
+ }
+ bool accept(bool ready,bool committedFirst,int shoulder,
+             std::uint32_t currentEpoch,std::uint32_t currentHandle,std::uint32_t currentChecksum,
+             std::uint64_t now,std::uint64_t cameraFrameTick) const {
+  return valid&&ready&&committedFirst&&shoulder==0&&
+    epoch==currentEpoch&&handle==currentHandle&&checksum==currentChecksum&&
+    now>=acceptedAt&&now-acceptedAt<=MaxAgeMs&&
+    now>=cameraFrameTick&&now-cameraFrameTick<=MaxAgeMs;
+ }
+};
 }
