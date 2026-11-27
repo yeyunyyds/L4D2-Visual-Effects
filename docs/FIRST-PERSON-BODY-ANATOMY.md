@@ -36,6 +36,14 @@ camera height and horizontal separation, stationary-origin motion evidence,
 and explicit third-person evidence. On return, the head can be hidden alone
 before the full-body resume delay. FreeCamera bypasses these cosmetic changes.
 This does not provide a camera or alter external plug-ins.
+
+A missing same-draw camera reading may retain the last *positively verified*
+first-person cosmetics for at most 48ms when the local identity/model is the
+same, the published game-camera frame remains recent, and no third-person
+shoulder/mode evidence exists. A dynamic body alignment can only reuse its last
+verified translation/yaw inside that same grace window. Any explicit third-person
+state, stale source, model change, or prolonged sample failure falls back to the
+previous native rendering behavior; the native DrawModel gate itself is unchanged.
 See [v1.1.1 release notes](releases/v1.1.1.md) for limitations.
 
 ## Limitations
