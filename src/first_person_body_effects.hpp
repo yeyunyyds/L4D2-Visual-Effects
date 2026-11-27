@@ -111,11 +111,13 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  static thread_local float retainedYaw=0.f;
  static thread_local std::uint64_t retainedAt=0;
  static thread_local int cameraLogState=0;
+ static thread_local bool wasDebug=false;
  static thread_local unsigned gateGeneration=0;
  static thread_local std::uint32_t gateEpoch=0,gateHandle=0xffffffffu,gateChecksum=0;
  const auto requestedGeneration=cosmeticGeneration.load();
  const bool fpbDebug=visual::logging::periodicDebugEnabled();
- if(!fpbDebug){recorder.reset();cameraLogState=0;}
+ // Info fast path: do not clear recorder strings on every Studio draw.
+ if(fpbDebug!=wasDebug){recorder.reset();cameraLogState=0;wasDebug=fpbDebug;}
  if(gateGeneration!=requestedGeneration){
   distanceGate.reset();tracking.reset();cameraGap.reset();retainedAt=0;
   gateGeneration=requestedGeneration;
