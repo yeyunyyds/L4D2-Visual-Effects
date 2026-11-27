@@ -2,6 +2,7 @@
 #include "first_person_view_policy.hpp"
 #include "first_person_dynamic_alignment.hpp"
 #include "first_person_body.hpp"
+#include "log_settings.hpp"
 #include <cstdio>
 #include <limits>
 namespace visual::firstperson::distanceprobe {
@@ -65,18 +66,24 @@ struct Recorder {
  std::string batch;
  unsigned count=0;
  std::string lastPath,lastReason;
+ int lastPartMask=-1;
  std::uint32_t lastEpoch=0,lastHandle=0xffffffffu;
+ void reset(){lastSample=lastFrame=flushAt=0;batch.clear();count=0;lastPath.clear();lastReason.clear();lastPartMask=-1;lastEpoch=0;lastHandle=0xffffffffu;}
  void flush(){if(!batch.empty())source_camera::log(batch);batch.clear();count=0;}
  void record(const Sample& s,const StudioPose& studio,const viewpolicy::Decision& d,
-  std::uint64_t tick,std::uint32_t epoch,std::uint32_t handle,bool compatibility,const char* path,bool haveApplied,dango::Vec3 applied,float yaw){
+  std::uint64_t tick,std::uint32_t epoch,std::uint32_t handle,bool compatibility,const char* path,bool haveApplied,bool headApplied,bool leftArmApplied,bool rightArmApplied,
+  dango::Vec3 applied,float yaw){
+  // Even event/transition telemetry is opt-in: Info never formats FPB frame logs.
+  if(!visual::logging::periodicDebugEnabled()){reset();return;}
+  const int partMask=(headApplied?1:0)|(leftArmApplied?2:0)|(rightArmApplied?4:0);
   const auto frame=source_camera::renderBegins.load();
   if(!s.valid)return;
-  if(lastEpoch!=epoch||lastHandle!=handle||lastPath!=path||lastReason!=d.reason){
+  if(lastEpoch!=epoch||lastHandle!=handle||lastPath!=path||lastReason!=d.reason||lastPartMask!=partMask){
    char event[380]{};
-   std::snprintf(event,sizeof(event),"FPB_VIEW tick=%llu compat=%d path=%s reason=%s stationary=%d originMotionXY=%.3f originXY=%.3f originZ=%.3f eye=%.3f head=%.3f",
-    static_cast<unsigned long long>(tick),int(compatibility),path,d.reason,int(d.stationary),double(d.originMotionXY),
+   std::snprintf(event,sizeof(event),"FPB_VIEW tick=%llu compat=%d path=%s reason=%s parts=%d stationary=%d originMotionXY=%.3f originXY=%.3f originZ=%.3f eye=%.3f head=%.3f",
+    static_cast<unsigned long long>(tick),int(compatibility),path,d.reason,partMask,int(d.stationary),double(d.originMotionXY),
     double(s.view.horizontal),double(s.view.eyeHeight),double(s.eyeKnown?dango::length(s.eyeDelta):-1.f),double(s.headKnown?s.headDistance:-1.f));
-   source_camera::log(event);lastEpoch=epoch;lastHandle=handle;lastPath=path;lastReason=d.reason;
+   source_camera::log(event);lastEpoch=epoch;lastHandle=handle;lastPath=path;lastReason=d.reason;lastPartMask=partMask;
   }
   if(frame==lastFrame||(lastSample&&tick>=lastSample&&tick-lastSample<50))return;
   lastFrame=frame;lastSample=tick;
@@ -89,13 +96,13 @@ struct Recorder {
   auto actual=haveApplied?applied:dango::Vec3{nan,nan,nan};
   auto chest=s.chestKnown?s.chestDelta:dango::Vec3{nan,nan,nan};
   auto o=s.originKnown?s.entityOrigin:dango::Vec3{nan,nan,nan};
-  std::snprintf(line,sizeof(line),"FPB_DISTANCE frame=%llu tick=%llu epoch=%u handle=%u model=%s checksum=%u mode=%s observed=%s firstCandidate=%d flags=%d stance=%s shoulder=%d speed=%.3f velocityZ=%.3f originXY=%.3f originZ=%.3f chest=%.3f chestXY=%.3f chestZ=%.3f eye=%.3f eyeXY=%.3f eyeZ=%.3f correction=%.3f/%.3f/%.3f source=%s compat=%d path=%s reason=%s stationary=%d detached=%d originMotion=%.3f originMotionXY=%.3f relativeGrowth=%.3f origin=%.3f/%.3f/%.3f camera=%.3f/%.3f/%.3f head=%.3f actualWorld=%.3f/%.3f/%.3f actualYaw=%.5f",
+  std::snprintf(line,sizeof(line),"FPB_DISTANCE frame=%llu tick=%llu epoch=%u handle=%u model=%s checksum=%u mode=%s observed=%s firstCandidate=%d flags=%d stance=%s shoulder=%d speed=%.3f velocityZ=%.3f originXY=%.3f originZ=%.3f chest=%.3f chestXY=%.3f chestZ=%.3f eye=%.3f eyeXY=%.3f eyeZ=%.3f correction=%.3f/%.3f/%.3f source=%s compat=%d path=%s reason=%s stationary=%d detached=%d originMotion=%.3f originMotionXY=%.3f relativeGrowth=%.3f origin=%.3f/%.3f/%.3f camera=%.3f/%.3f/%.3f head=%.3f actualWorld=%.3f/%.3f/%.3f actualYaw=%.5f parts=%d",
    static_cast<unsigned long long>(frame),static_cast<unsigned long long>(tick),unsigned(epoch),unsigned(handle),
    studio.name.c_str(),unsigned(studio.checksum),viewcompat::label(viewcompat::mode.load()),viewcompat::label(s.view.evidence),
    int(s.first),s.flags,s.stance,s.shoulder,double(s.speed),double(s.verticalSpeed),double(s.view.horizontal),double(s.view.eyeHeight),
    double(dango::length(chest)),double(std::hypot(chest.x,chest.y)),double(chest.z),
    double(dango::length(eye)),double(std::hypot(eye.x,eye.y)),double(eye.z),double(correction.x),double(correction.y),double(correction.z),
-   s.eyeKnown?"bind-estimate":"unavailable",int(compatibility),path,d.reason,int(d.stationary),int(d.detached),double(d.originMotion),double(d.originMotionXY),double(d.relativeGrowth),double(o.x),double(o.y),double(o.z),double(s.camera.x),double(s.camera.y),double(s.camera.z),double(s.headKnown?s.headDistance:nan),double(actual.x),double(actual.y),double(actual.z),double(haveApplied?yaw:nan));
+   s.eyeKnown?"bind-estimate":"unavailable",int(compatibility),path,d.reason,int(d.stationary),int(d.detached),double(d.originMotion),double(d.originMotionXY),double(d.relativeGrowth),double(o.x),double(o.y),double(o.z),double(s.camera.x),double(s.camera.y),double(s.camera.z),double(s.headKnown?s.headDistance:nan),double(actual.x),double(actual.y),double(actual.z),double(haveApplied?yaw:nan),partMask);
   if(!batch.empty())batch+='\n';batch+=line;++count;
  }
 };
