@@ -1,0 +1,28 @@
+name: FPB stability fast x86 compile (no release)
+on:
+  push:
+    branches: [fix/fpb-draw-path-stability]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Windows x86 cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: Compile DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: bash scripts/build-mingw.sh
+      - name: Package preview
+        run: python3 scripts/package.py
+      - name: Upload preview ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-FPB-Stability-Fast-x86
+          path: build/L4D2Visual-1.1.1.zip
+          if-no-files-found: error
