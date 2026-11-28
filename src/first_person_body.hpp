@@ -35,7 +35,7 @@ inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequeste
  if(!camera.active||!source_camera::hooked){
   clear();status=u8"等待有效游戏相机";return;
  }
- auto frame=std::atomic_load(&source_entities::snapshot);
+ auto frame=std::atomic_load(&source_entities::localSnapshot);
  if(!source_entities::bound||source_entities::faulted||frame->epoch!=camera.epoch||
     camera.tick<frame->tick||camera.tick-frame->tick>250){
   clear();status=u8"实体快照未验证或过期";return;
