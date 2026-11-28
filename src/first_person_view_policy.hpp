@@ -135,4 +135,42 @@ struct CameraGapHold {
     now>=cameraFrameTick&&now-cameraFrameTick<=MaxAgeMs;
  }
 };
+// Experimental pass isolation for FPB: a secondary camera can be sampled by
+// Studio while the main view is being rendered. A recent verified centered
+// first-person sample anchors the main view; a clearly off-axis sample from
+// the same entity/model is excluded from FPB cosmetics only. The draw itself
+// continues with its original bones (shadows and other passes stay intact).
+struct MainViewPassFilter {
+ static constexpr std::uint64_t MaxReferenceAgeMs=100;
+ bool valid=false;
+ std::uint32_t epoch=0,handle=0xffffffffu,checksum=0;
+ std::uint64_t observedAt=0;
+ Vec3 lastEye{};
+ void reset(){*this=MainViewPassFilter{};}
+ bool sameIdentity(std::uint32_t e,std::uint32_t h,std::uint32_t c) const{
+  return valid&&epoch==e&&handle==h&&checksum==c;
+ }
+ void observe(bool committedFirst,int shoulder,bool originKnown,
+              float originXY,float originZ,Vec3 camera,
+              std::uint32_t e,std::uint32_t h,std::uint32_t c,
+              std::uint64_t now){
+  if(!committedFirst||shoulder!=0||!originKnown||!finite(camera)||
+     !std::isfinite(originXY)||!std::isfinite(originZ)||originXY>8.f||
+     originZ<30.f||originZ>88.f)return;
+  valid=true;epoch=e;handle=h;checksum=c;observedAt=now;lastEye=camera;
+ }
+ bool isSecondary(bool committedFirst,int shoulder,bool originKnown,
+                  float originXY,float originZ,Vec3 camera,
+                  std::uint32_t e,std::uint32_t h,std::uint32_t c,
+                  std::uint64_t now) const{
+  if(!committedFirst||shoulder!=0||!originKnown||!finite(camera)||
+     !std::isfinite(originXY)||!std::isfinite(originZ)||
+     !sameIdentity(e,h,c)||now<observedAt||
+     now-observedAt>MaxReferenceAgeMs)return false;
+  // Do not infer shadow flags or reject merely displaced legitimate views.
+  // Require BOTH a strongly offset local camera and a different world eye.
+  return originXY>=14.f&&originZ>=30.f&&originZ<=88.f&&
+         dango::length(camera-lastEye)>=12.f;
+ }
+};
 }
