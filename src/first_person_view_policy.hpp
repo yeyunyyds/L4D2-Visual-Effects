@@ -146,6 +146,7 @@ struct MainViewPassFilter {
  std::uint32_t epoch=0,handle=0xffffffffu,checksum=0;
  std::uint64_t observedAt=0;
  Vec3 lastEye{};
+ float lastRelativeZ=0.f;
  void reset(){*this=MainViewPassFilter{};}
  bool sameIdentity(std::uint32_t e,std::uint32_t h,std::uint32_t c) const{
   return valid&&epoch==e&&handle==h&&checksum==c;
@@ -155,22 +156,30 @@ struct MainViewPassFilter {
               std::uint32_t e,std::uint32_t h,std::uint32_t c,
               std::uint64_t now){
   if(!committedFirst||shoulder!=0||!originKnown||!finite(camera)||
-     !std::isfinite(originXY)||!std::isfinite(originZ)||originXY>8.f||
+     !std::isfinite(originXY)||!std::isfinite(originZ)||originXY>2.5f||
      originZ<30.f||originZ>88.f)return;
-  valid=true;epoch=e;handle=h;checksum=c;observedAt=now;lastEye=camera;
+  valid=true;epoch=e;handle=h;checksum=c;observedAt=now;lastEye=camera;lastRelativeZ=originZ;
  }
  bool isSecondary(bool committedFirst,int shoulder,bool originKnown,
                   float originXY,float originZ,Vec3 camera,
                   std::uint32_t e,std::uint32_t h,std::uint32_t c,
-                  std::uint64_t now) const{
+                  std::uint64_t now,int playerFlags=-1) const{
   if(!committedFirst||shoulder!=0||!originKnown||!finite(camera)||
      !std::isfinite(originXY)||!std::isfinite(originZ)||
      !sameIdentity(e,h,c)||now<observedAt||
      now-observedAt>MaxReferenceAgeMs)return false;
-  // Do not infer shadow flags or reject merely displaced legitimate views.
-  // Require BOTH a strongly offset local camera and a different world eye.
-  return originXY>=14.f&&originZ>=30.f&&originZ<=88.f&&
-         dango::length(camera-lastEye)>=12.f;
+  // Preserve the existing large-horizontal-offset exclusion.
+  if(originXY>=14.f&&originZ>=30.f&&originZ<=88.f&&
+     dango::length(camera-lastEye)>=12.f)return true;
+  // Logs: a centered main eye at Z~62 and a separate lower eye
+  // at XY~3/Z~44 both classified as first-person. Only a grounded,
+  // non-ducking near-offset eye can be filtered by the vertical rule.
+  // Genuine jumps/crouches must not be rejected by height alone.
+  const bool groundedStanding=playerFlags>=0&&(playerFlags&1)!=0&&
+                              (playerFlags&2)==0;
+  return groundedStanding&&originXY>=2.5f&&originXY<14.f&&
+         originZ>=30.f&&originZ<=88.f&&
+         lastRelativeZ-originZ>=12.f&&lastEye.z-camera.z>=12.f;
  }
 };
 }
