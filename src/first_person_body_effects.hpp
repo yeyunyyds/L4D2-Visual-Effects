@@ -68,12 +68,11 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  const dango::Vec3& origin,Original&& original) {
  std::uint32_t renderable=0,header=0;
  auto ptr=std::uint32_t(std::uintptr_t(info));
- if(!info||!source_entities::wire::load(source_entities::reader,ptr,header)||
-    !source_entities::wire::load(source_entities::reader,ptr+24,renderable)){
+ if(!info||!source_entities::wire::load(source_entities::reader,ptr+24,renderable)){
   original(bones,origin);return;
  }
  Context ctx;
- if(!select(renderable,ctx)) {original(bones,origin);return;}
+ if(!select(renderable,ctx)||!source_entities::wire::load(source_entities::reader,ptr,header)) {original(bones,origin);return;}
  // View-compatibility camera mode is committed once by the game-frame callback.
  // Do not reclassify/rewrite its state from individual Studio draw calls:
  // doing so flips the native gate during movement and resets alignment.
