@@ -21,6 +21,9 @@ void onFrame(const dango::GameCameraFrame& frame){
  auto& modules=visual::features::host();visual::features::prepareRender();
  source_entities::combatRequested=modules.needsCombat();
  source_entities::browseRequested=modules.needsEntities()||visual::hudruntime::hud.isOpen();
+ const bool localNeeded=std::atomic_load(&visual::firstperson::options)->enabled||(visual::freecamera::requested.load()&&visual::freecamera::externalSession.load()&&visual::freecamera::bodyClear.load());
+ const int localIndex=localNeeded&&frame.active?visual::localplayer::index():-1;
+ source_entities::localRequestedIndex=localIndex>0?unsigned(localIndex):0;
  source_entities::onFrame(frame);modules.frame(frame);visual::features::finishRender();
  visual::modelpath::apply(modules.needsCompatibility()&&visual::render::compatibility.load());
 }
