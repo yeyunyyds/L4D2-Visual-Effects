@@ -178,7 +178,7 @@ inline void captureCombat(const GameCameraFrame& camera){
  }std::atomic_store(&combatSnapshot,std::make_shared<const Frame>(std::move(f)));
 }
 inline void onFrame(const GameCameraFrame& camera)noexcept{
- try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled||localRequestedIndex!=0;if(!active){if(wasEnabled){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}wasEnabled=false;lastLocalIndex=0;nextLocal=0;return;}
+ try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled||localRequestedIndex!=0;if(!active){if(wasEnabled){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}if(lastLocalIndex)std::atomic_store(&localSnapshot,std::make_shared<const Frame>());wasEnabled=false;lastLocalIndex=0;nextLocal=0;return;}
  if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=nextCombat=nextLocal=0;lastLocalIndex=0;epoch=camera.epoch;wasEnabled=true;}
  if(request->enabled&&camera.tick>=nextFollow){nextFollow=camera.tick+33;captureFollow(camera,*request);}
  if((enabled.load()||browseRequested.load())&&camera.tick>=nextCapture){nextCapture=camera.tick+200;capture(camera);}
