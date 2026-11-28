@@ -661,6 +661,10 @@ inline void poll(bool escape,bool menu,bool gameForeground){
  ++keyPolls;
  static bool held=false;
  static int previousVk=0;
+ const bool session=externalSession.load(std::memory_order_acquire);
+ const bool cameraWanted=requested.load(std::memory_order_acquire)||session;
+ const bool keyEnabled=f6Binding.load(std::memory_order_acquire)||session;
+ if(!cameraWanted&&!keyEnabled){held=false;previousVk=0;paused=false;return;}
  const int vk=hotkeyVk.load(std::memory_order_acquire);
  const bool now=vk>0&&key(vk);
  // A new config key may already be down. Arm only after its first release.
@@ -681,6 +685,8 @@ inline void poll(bool escape,bool menu,bool gameForeground){
   else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
   selectOwnerLocked(at);
  }
+ // Native play with only the optional hotkey armed has no camera motion to reset.
+ if(!cameraWanted){paused=false;if(edge&&keyEnabled&&hotkeyConfigValid.load(std::memory_order_acquire)&&gameForeground&&!escape&&!menu){++keyToggles;toggle();}return;}
  const bool previouslyPaused=paused.exchange(shouldPause);
  if(shouldPause&&!previouslyPaused){
   std::lock_guard<std::mutex> lock(motionMutex);
