@@ -11,6 +11,8 @@
 namespace visual::hudruntime {
 inline dango::hud::NativeHud hud;
 inline modules::Host* features=nullptr;
+inline bool (*pollDemand)()=nullptr;
+inline void configurePollDemand(bool(*needed)()){pollDemand=needed;}
 inline void configureModules(modules::Host& host){features=&host;}
 inline bool effectsNeeded(){return features&&features->needsOverlay();}
 struct Hook{void** table;unsigned slot;void* before;void* after;};
@@ -35,14 +37,20 @@ template<class Present> HRESULT paint(IDirect3DDevice9* device,IDirect3DSwapChai
  visual::lifetime::Guard guard;if(!guard)return present();
  std::lock_guard<std::recursive_mutex> lock(paintMutex);
  if(depth++) {auto hr=present();--depth;return hr;}
- if(FAILED(device->TestCooperativeLevel())){if(features)features->unavailable("D3D device unavailable");auto hr=present();--depth;return hr;}
- ++presents;hud.pollHotkey(device);auto camera=std::atomic_load(&source_camera::snapshot);
- if(features)features->pollOverlay(*camera,(GetAsyncKeyState(VK_ESCAPE)&0x8000)!=0,hud.isOpen(),overlaywindow::foregroundGame(device));
+ ++presents;hud.pollHotkey(device);
+ const bool polling=features&&(!pollDemand||pollDemand());
+ static bool wasPolling=false;
+ if(features&&(polling||wasPolling)){
+  auto camera=std::atomic_load(&source_camera::snapshot);
+  features->pollOverlay(*camera,polling&&(GetAsyncKeyState(VK_ESCAPE)&0x8000)!=0,hud.isOpen(),polling&&overlaywindow::foregroundGame(device));
+ }
+ wasPolling=polling;
  const bool overlayRequested=hud.isOpen()||effectsNeeded();
  if(!overlayRequested){
   releaseBackup();paintStatus="HUD closed";
   auto hr=present();--depth;return hr; // Avoid GPU RT and viewport queries.
  }
+ if(FAILED(device->TestCooperativeLevel())){if(features)features->unavailable("D3D device unavailable");auto hr=present();--depth;return hr;}
  paintStatus=hud.isOpen()?"HUD requested":"Overlay requested";
  IDirect3DSurface9* back=nullptr;IDirect3DSurface9* backup=nullptr;D3DSURFACE_DESC desc{};
  bool ready=overlayRequested && SUCCEEDED(chain?chain->GetBackBuffer(0,D3DBACKBUFFER_TYPE_MONO,&back):device->GetBackBuffer(0,0,D3DBACKBUFFER_TYPE_MONO,&back));
@@ -68,9 +76,9 @@ inline HRESULT WINAPI chainPresent(IDirect3DSwapChain9* c,const RECT* s,const RE
 inline void attachChain(IDirect3DSwapChain9* c){attach(c,3,reinterpret_cast<void*>(&chainPresent));}
 inline HRESULT WINAPI getChain(IDirect3DDevice9* d,UINT i,IDirect3DSwapChain9** c){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9*,UINT,IDirect3DSwapChain9**)>(original(d,14));auto hr=f(d,i,c);if(SUCCEEDED(hr)&&c&&*c)attachChain(*c);return hr;}
 inline HRESULT WINAPI addChain(IDirect3DDevice9* d,D3DPRESENT_PARAMETERS* p,IDirect3DSwapChain9** c){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9*,D3DPRESENT_PARAMETERS*,IDirect3DSwapChain9**)>(original(d,13));auto hr=f(d,p,c);if(SUCCEEDED(hr)&&c&&*c)attachChain(*c);return hr;}
-inline HRESULT WINAPI reset(IDirect3DDevice9* d,D3DPRESENT_PARAMETERS* p){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9*,D3DPRESENT_PARAMETERS*)>(original(d,16));visual::lifetime::Guard guard;if(!guard)return f(d,p);std::lock_guard<std::recursive_mutex> lock(paintMutex);releaseBackup();hud.beforeReset();auto hr=f(d,p);hud.afterReset(hr);return hr;}
+inline HRESULT WINAPI reset(IDirect3DDevice9* d,D3DPRESENT_PARAMETERS* p){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9*,D3DPRESENT_PARAMETERS*)>(original(d,16));visual::lifetime::Guard guard;if(!guard)return f(d,p);std::lock_guard<std::recursive_mutex> lock(paintMutex);releaseBackup();overlaywindow::invalidate();hud.beforeReset();auto hr=f(d,p);hud.afterReset(hr);return hr;}
 inline HRESULT WINAPI presentEx(IDirect3DDevice9Ex* d,const RECT* s,const RECT* t,HWND w,const RGNDATA* r,DWORD flags){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9Ex*,const RECT*,const RECT*,HWND,const RGNDATA*,DWORD)>(original(d,121));return paint(d,nullptr,[&]{return f(d,s,t,w,r,flags);});}
-inline HRESULT WINAPI resetEx(IDirect3DDevice9Ex* d,D3DPRESENT_PARAMETERS* p,D3DDISPLAYMODEEX* mode){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9Ex*,D3DPRESENT_PARAMETERS*,D3DDISPLAYMODEEX*)>(original(d,132));visual::lifetime::Guard guard;if(!guard)return f(d,p,mode);std::lock_guard<std::recursive_mutex> lock(paintMutex);releaseBackup();hud.beforeReset();auto hr=f(d,p,mode);hud.afterReset(hr);return hr;}
-inline void created(IDirect3DDevice9* d){visual::lifetime::Guard guard;if(!guard||!d)return;std::lock_guard<std::recursive_mutex> lock(paintMutex);releaseBackup();hud.release();attach(d,17,reinterpret_cast<void*>(&devicePresent));attach(d,16,reinterpret_cast<void*>(&reset));attach(d,14,reinterpret_cast<void*>(&getChain));attach(d,13,reinterpret_cast<void*>(&addChain));IDirect3DSwapChain9* c=nullptr;if(SUCCEEDED(d->GetSwapChain(0,&c))){attachChain(c);c->Release();}IDirect3DDevice9Ex* ex=nullptr;if(SUCCEEDED(d->QueryInterface(__uuidof(IDirect3DDevice9Ex),reinterpret_cast<void**>(&ex)))){attach(ex,121,reinterpret_cast<void*>(&presentEx));attach(ex,132,reinterpret_cast<void*>(&resetEx));ex->Release();}diagnostics::write("D3D9 HUD Present/Reset callbacks installed");}
-inline void stop(){std::lock_guard<std::recursive_mutex> paintLock(paintMutex);releaseBackup();hud.shutdown();std::lock_guard<std::mutex> lock(hookMutex);for(auto it=hooks.rbegin();it!=hooks.rend();++it){DWORD old{};if(VirtualProtect(it->table+it->slot,4,PAGE_READWRITE,&old)){InterlockedCompareExchangePointer(it->table+it->slot,it->before,it->after);DWORD ignored{};VirtualProtect(it->table+it->slot,4,old,&ignored);}}/* Retain original targets for late chained callbacks. */}
+inline HRESULT WINAPI resetEx(IDirect3DDevice9Ex* d,D3DPRESENT_PARAMETERS* p,D3DDISPLAYMODEEX* mode){auto f=reinterpret_cast<HRESULT(WINAPI*)(IDirect3DDevice9Ex*,D3DPRESENT_PARAMETERS*,D3DDISPLAYMODEEX*)>(original(d,132));visual::lifetime::Guard guard;if(!guard)return f(d,p,mode);std::lock_guard<std::recursive_mutex> lock(paintMutex);releaseBackup();overlaywindow::invalidate();hud.beforeReset();auto hr=f(d,p,mode);hud.afterReset(hr);return hr;}
+inline void created(IDirect3DDevice9* d){visual::lifetime::Guard guard;if(!guard||!d)return;std::lock_guard<std::recursive_mutex> lock(paintMutex);releaseBackup();overlaywindow::invalidate();hud.release();attach(d,17,reinterpret_cast<void*>(&devicePresent));attach(d,16,reinterpret_cast<void*>(&reset));attach(d,14,reinterpret_cast<void*>(&getChain));attach(d,13,reinterpret_cast<void*>(&addChain));IDirect3DSwapChain9* c=nullptr;if(SUCCEEDED(d->GetSwapChain(0,&c))){attachChain(c);c->Release();}IDirect3DDevice9Ex* ex=nullptr;if(SUCCEEDED(d->QueryInterface(__uuidof(IDirect3DDevice9Ex),reinterpret_cast<void**>(&ex)))){attach(ex,121,reinterpret_cast<void*>(&presentEx));attach(ex,132,reinterpret_cast<void*>(&resetEx));ex->Release();}diagnostics::write("D3D9 HUD Present/Reset callbacks installed");}
+inline void stop(){std::lock_guard<std::recursive_mutex> paintLock(paintMutex);releaseBackup();overlaywindow::invalidate();hud.shutdown();std::lock_guard<std::mutex> lock(hookMutex);for(auto it=hooks.rbegin();it!=hooks.rend();++it){DWORD old{};if(VirtualProtect(it->table+it->slot,4,PAGE_READWRITE,&old)){InterlockedCompareExchangePointer(it->table+it->slot,it->before,it->after);DWORD ignored{};VirtualProtect(it->table+it->slot,4,old,&ignored);}}/* Retain original targets for late chained callbacks. */}
 }
