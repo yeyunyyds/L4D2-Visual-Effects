@@ -14,13 +14,13 @@ inline int index(){
  using Fn=int(__thiscall*)(void*);int index=reinterpret_cast<Fn>(const_cast<unsigned char*>(fn))(engine);
  return index>=1&&index<=64?index:invalid;
 }
-inline std::uint32_t handle(const dango::inventory::Frame& frame){
+inline std::uint32_t handleAtIndex(const dango::inventory::Frame& frame,int index){
  constexpr std::uint32_t invalid=0xffffffffu;
- const int index=localplayer::index();
  if(index<1||!source_entities::list)return invalid;
  for(const auto& r:frame.records)if(r.index==unsigned(index)){
   auto entries=std::uint32_t(std::int64_t(reinterpret_cast<uintptr_t>(source_entities::list))+source_entities::profile::EntryBaseDelta);source_entities::wire::Entry e;
   if(source_entities::wire::load(source_entities::reader,entries+r.index*16,e)&&e.entity&&e.serial==r.serial&&r.handle==((e.serial<<12)|r.index))return r.handle;
  }return invalid;
 }
+inline std::uint32_t handle(const dango::inventory::Frame& frame){return handleAtIndex(frame,index());}
 }
