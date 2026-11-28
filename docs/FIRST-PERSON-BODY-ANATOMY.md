@@ -54,3 +54,23 @@ still reveal geometry near the neck or shoulders. Camera/body alignment is
 render-only and does not provide full inverse kinematics or independent
 weapon interaction. The current user-tested view-switching behavior does not
 guarantee compatibility with every model or game configuration.
+
+### Experimental secondary-camera pass isolation
+
+This preview uses a recent validated centered first-person camera (within
+8 Source units horizontally from the verified local entity origin, eye height
+30..88) as a short-lived reference. If another Studio draw for the same
+entity/model, within 100ms, samples a camera at least 14 units off the entity
+origin and at least 12 units from the reference eye, FPB leaves that draw's
+**original bones and origin untouched**. It does not suppress the draw or change
+the native DrawModel gate, and does not rewrite the original camera. This avoids
+feeding suspected secondary-pass samples back into the main-view view-policy
+hysteresis and dynamic alignment. The heuristic requires a committed first
+person view, shoulder CVar 0, and positive first-person sample evidence; it
+does not classify any engine draw flags as shadow passes.
+
+Debug logs emit throttled `FPB_SECONDARY_BYPASS` events and the FPB diagnostics
+page shows the cumulative bypass count. This is an experimental isolation fix,
+not proof that extra colored geometry or shadow appearance is resolved. Verify
+with original and MODded survivors, crouch/landing, FreeCamera, native third
+person and model transitions before merging.
