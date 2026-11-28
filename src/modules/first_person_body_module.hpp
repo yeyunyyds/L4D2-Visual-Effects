@@ -135,7 +135,7 @@ inline modules::Module create(){
  // At this point the shared Studio pipeline has already applied any entity
  // deformation. First-person effects decorate the FINAL draw only.
  m.studioDraw=[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,
-                  void* context,modules::StudioNext next){
+                  int studioFlags,void* context,modules::StudioNext next){
   // No model metadata, pointer reads or pose processing while FPB is off.
   if(!std::atomic_load(&firstperson::options)->enabled||
      !firstperson::native::active.load(std::memory_order_acquire)){
@@ -147,7 +147,7 @@ inline modules::Module create(){
    // match the detached camera. Keep the model at its true game-world pose.
    next(context,bones,origin);return;
   }
-  firstperson::effects::draw(info,bones,origin,[&](Matrix3x4* transformed,const dango::Vec3& adjusted){
+  firstperson::effects::draw(info,bones,origin,studioFlags,[&](Matrix3x4* transformed,const dango::Vec3& adjusted){
    next(context,transformed,adjusted);
   });
  };
