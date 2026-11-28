@@ -7,6 +7,7 @@
 #include "first_person_body_config.hpp"
 #include "free_camera_body_policy.hpp"
 #include "first_person_native_gate.hpp"
+#include "first_person_native_visibility.hpp"
 #include "view_compat_runtime.hpp"
 #include "local_player.hpp"
 #include "survivors.hpp"
@@ -105,12 +106,24 @@ inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequeste
  }
   currentHandle=handle;currentEpoch=camera.epoch;localBase=entry.entity;localTick=camera.tick;
  validatedLocal=true;
+ // The one-byte patch previously stayed active through third-person views,
+ // even when the Studio cosmetic gate refused to alter the bones. That
+ // exposed local model draws which should remain owned by native rendering.
+ // Do this only on the post-render game callback, never from a Studio draw.
+ if(!visibility::allowNativeGate(bodyMode,cfg->thirdPersonCompatibility,
+       viewcompat::mode.load(std::memory_order_acquire),probeShoulder.load())){
+  worldBodyActive=false;
+  if(native::disable()){
+   gate.succeeded=true;
+   status=cfg->thirdPersonCompatibility?
+     u8"视角未确认为第一人称：原生 DrawModel 门控已恢复":
+     u8"明确第三人称：原生 DrawModel 门控已恢复";
+  }else status=native::state.load();
+  return;
+ }
  if(!native::enable(entry.entity)){worldBodyActive=false;status=native::state.load();return;}
  worldBodyActive=bodyMode==freecamerabody::Mode::WorldAnchored;
  gate.succeeded=true;
- if(bodyMode==freecamerabody::Mode::NormalView&&cfg->thirdPersonCompatibility&&viewcompat::mode.load()!=viewcompat::Mode::First){
-  status=u8"诊断：原生门控持续放行，保留完整模型";return;
- }
  status=worldBodyActive.load()?u8"FreeCamera：本机模型保留世界原位（原生骨骼）":
                               u8"本机原生 DrawModel 分支已放行";
 }
