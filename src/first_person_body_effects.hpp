@@ -130,6 +130,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  static thread_local dynamic::Track tracking;
  static thread_local viewpolicy::CameraGapHold cameraGap;
  static thread_local viewpolicy::MainViewPassFilter mainView;
+ static thread_local viewpolicy::AlignmentStability alignment;
  // Last trusted render-only transform, never reused outside the camera gap.
  static thread_local dango::Vec3 retainedTranslation{};
  static thread_local float retainedYaw=0.f;
@@ -144,7 +145,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  // Info fast path: do not clear recorder strings on every Studio draw.
  if(fpbDebug!=wasDebug){recorder.reset();cameraLogState=0;wasDebug=fpbDebug;}
  if(gateGeneration!=requestedGeneration){
-  distanceGate.reset();tracking.reset();cameraGap.reset();mainView.reset();retainedAt=0;
+  distanceGate.reset();tracking.reset();cameraGap.reset();mainView.reset();alignment.reset();retainedAt=0;
   gateGeneration=requestedGeneration;
  }
  dango::GameCameraFrame measuredFrame{};dango::CameraPose measuredPose{};
@@ -160,7 +161,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   prof=visual::firstperson::profile(*settings,visual::canonicalModel(studio->name),studio->checksum);
   if(gateEpoch!=ctx.camera->epoch||gateHandle!=ctx.handle||gateChecksum!=studio->checksum){
    gateEpoch=ctx.camera->epoch;gateHandle=ctx.handle;gateChecksum=studio->checksum;
-   distanceGate.reset();tracking.reset();cameraGap.reset();mainView.reset();retainedAt=0;
+   distanceGate.reset();tracking.reset();cameraGap.reset();mainView.reset();alignment.reset();retainedAt=0;
   }
  }
  const auto wallNow=GetTickCount64();
@@ -173,7 +174,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  const bool secondaryPass=measuredCamera&&mainView.isSecondary(
       committedFirst&&observedFirst,measured.shoulder,measured.originKnown,
       measured.view.horizontal,measured.view.eyeHeight,measuredPose.eye,
-      ctx.camera->epoch,ctx.handle,studio->checksum,wallNow);
+      ctx.camera->epoch,ctx.handle,studio->checksum,wallNow,measured.flags);
  if(secondaryPass){
   ++secondaryPassBypassed;
   if(fpbDebug&&(!lastSecondaryTrace||wallNow<lastSecondaryTrace||
@@ -240,7 +241,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  const char* path="native";
  dango::Vec3 applied{};float appliedYaw=0;bool haveApplied=false;
  if(!decision.full){
-  tracking.reset();retainedAt=0;
+  tracking.reset();alignment.reset();retainedAt=0;
   dynamicStatus=u8"视角组合判断：保留原生位置";
   if(ready&&settings->hideHead&&decision.earlyHead){
    auto result=parts::apply(*studio,plan,temporary,true,false);
@@ -251,43 +252,58 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   if(fpbDebug&&measuredCamera)recorder.record(measured,*studio,decision,tick,ctx.camera->epoch,ctx.handle,compatibility,path,false,headApplied,false,false,applied,appliedYaw);
   original(partChanged?temporary:bones,origin);return;
  }
+ // Alignment is chosen for the verified main-view sequence, never for an
+ // isolated Studio callback. Secondary camera passes returned above.
+ bool deferManual=false;
  if(wantDynamic){
+  dynamic::Result resolved{};
+  int candidateAnchor=-1;
   if(measuredCamera){
    ++sameFrameCamera;
    const auto& rig=measuredRig;
-   const auto resolved=dynamic::compute(*studio,rig,temporary,measuredPose,*settings,prof,
-                                       ctx.camera->epoch,ctx.handle,measuredFrame.tick,tracking);
-   if(resolved.ok&&rig.anchor>=0&&unsigned(rig.anchor)<studio->count){
-    auto pivot=dynamic::location(temporary[unsigned(rig.anchor)]);
-    if(dynamic::transform(temporary,studio->count,pivot,resolved.translation,resolved.yawRadians)){
-     shift=resolved.translation;dynamicMoved=moved=true;path="dynamic1";
-     ++dynamicApplied;dynamicStatus=u8"动态身体已对齐本帧相机与胸部锚点";
-     dynamicSource=resolved.usedBootstrap?"live-pose-bootstrap":resolved.source;
-     applied=resolved.translation;appliedYaw=resolved.yawRadians;haveApplied=true;
-     retainedTranslation=resolved.translation;retainedYaw=resolved.yawRadians;retainedAt=wallNow;
+   resolved=dynamic::compute(*studio,rig,temporary,measuredPose,*settings,prof,
+                             ctx.camera->epoch,ctx.handle,measuredFrame.tick,tracking);
+   if(resolved.ok&&rig.anchor>=0&&unsigned(rig.anchor)<studio->count)
+    candidateAnchor=rig.anchor;
+  }else ++liveCameraRejected;
+  const bool candidate=candidateAnchor>=0;
+  const auto choice=alignment.decide(candidate,wallNow);
+  if(choice==viewpolicy::AlignmentStability::Choice::Dynamic&&candidate){
+   const auto pivot=dynamic::location(temporary[unsigned(candidateAnchor)]);
+   if(dynamic::transform(temporary,studio->count,pivot,resolved.translation,resolved.yawRadians)){
+    shift=resolved.translation;dynamicMoved=moved=true;path="dynamic1";
+    ++dynamicApplied;dynamicStatus=u8"动态身体已对齐主视角与胸部锚点";
+    dynamicSource=resolved.usedBootstrap?"live-pose-bootstrap":resolved.source;
+    applied=shift;appliedYaw=resolved.yawRadians;haveApplied=true;
+    retainedTranslation=shift;retainedYaw=resolved.yawRadians;retainedAt=wallNow;
+   }else {alignment.reset();retainedAt=0;}
+  }else if(choice==viewpolicy::AlignmentStability::Choice::Hold&&
+           ready&&retainedAt&&wallNow>=retainedAt&&
+           wallNow-retainedAt<=viewpolicy::AlignmentStability::HoldMs&&
+           (measuredCamera||retainedCamera)){
+   const auto rig=measuredCamera?measuredRig:
+                  dynamic::discover(*studio,settings->fallbackEyeHeight);
+   if(rig.anchor>=0&&unsigned(rig.anchor)<studio->count){
+    const auto pivot=dynamic::location(temporary[unsigned(rig.anchor)]);
+    if(dynamic::transform(temporary,studio->count,pivot,retainedTranslation,retainedYaw)){
+     shift=retainedTranslation;dynamicMoved=moved=true;path="dynamic-grace";
+     applied=shift;appliedYaw=retainedYaw;haveApplied=true;
+     ++dynamicGraceApplied;dynamicStatus=u8"短暂失败：保持可信动态位置，不切换手动校准";
     }
    }
-  }else{
-   ++liveCameraRejected;
-   // The previous transform is safe for one brief missing-sample interval
-   // only after the view policy has already verified first-person retention.
-   if(retainedCamera&&retainedAt&&wallNow>=retainedAt&&
-      wallNow-retainedAt<=viewpolicy::CameraGapHold::MaxAgeMs){
-    const auto rig=dynamic::discover(*studio,settings->fallbackEyeHeight);
-    if(rig.anchor>=0&&unsigned(rig.anchor)<studio->count){
-     auto pivot=dynamic::location(temporary[unsigned(rig.anchor)]);
-     if(dynamic::transform(temporary,studio->count,pivot,retainedTranslation,retainedYaw)){
-      shift=retainedTranslation;dynamicMoved=moved=true;path="dynamic-grace";
-      applied=shift;appliedYaw=retainedYaw;haveApplied=true;
-      ++dynamicGraceApplied;dynamicStatus=u8"短暂相机丢样：保留最近一次可信身体定位";
-     }
-    }
-   }
-   if(!dynamicMoved)dynamicStatus=u8"同帧相机矩阵不可用：动态定位跳过";
   }
-  if(!dynamicMoved){++dynamicRejected;if(ready)dynamicStatus=u8"当前MOD锚点/姿态无法安全校准，保留原版位置";}
- }else {tracking.reset();dynamicStatus=u8"动态定位关闭";}
- if(!dynamicMoved&&wantOffset){
+  // A failed draw cannot instantly activate the differently placed manual
+  // pose. After a sustained failure the manual path remains stable until
+  // dynamic solutions have recovered continuously for 80ms.
+  deferManual=choice!=viewpolicy::AlignmentStability::Choice::Manual;
+  if(!dynamicMoved){
+   ++dynamicRejected;
+   if(ready)dynamicStatus=deferManual?
+      u8"动态定位暂时失效：等待稳定或保持原生绘制":
+      u8"动态定位持续不可用：稳定使用手动回退";
+  }
+ }else {tracking.reset();alignment.reset();retainedAt=0;dynamicStatus=u8"动态定位关闭";}
+ if(!dynamicMoved&&wantOffset&&!deferManual){
   dango::Vec3 manual{};
   if(ready&&math::offset(*ctx.camera,settings->forward,settings->right,settings->up,manual)){
    bool finite=true;
