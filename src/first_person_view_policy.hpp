@@ -1,6 +1,7 @@
 #pragma once
 // Pure, draw-time FPB cosmetic policy. Never changes the native DrawModel gate.
 #include "dango/world_camera.hpp"
+#include "first_person_alignment_stability.hpp"
 #include <cmath>
 #include <cstdint>
 namespace visual::firstperson::viewpolicy {
