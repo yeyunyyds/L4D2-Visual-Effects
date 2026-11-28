@@ -16,6 +16,10 @@ using Record=dango::inventory::Record;using Frame=dango::inventory::Frame;
 inline std::atomic<bool> browseRequested{false},combatRequested{false};
 inline std::shared_ptr<const Frame> combatSnapshot=std::make_shared<const Frame>();
 inline uint64_t nextCombat=0;
+inline unsigned localRequestedIndex=0; // game thread only
+inline unsigned lastLocalIndex=0;
+inline uint64_t nextLocal=0;
+inline std::shared_ptr<const Frame> localSnapshot=std::make_shared<const Frame>();
 
 inline std::shared_ptr<const dango::inventory::FollowRequest> followRequest=std::make_shared<dango::inventory::FollowRequest>();
 inline std::shared_ptr<const Frame> followSnapshot=std::make_shared<Frame>();
@@ -139,6 +143,15 @@ inline void capture(const GameCameraFrame& camera){
  for(unsigned i=0;i<unsigned(std::min(highest+1,int(profile::MaxNetworked)));++i){auto entry=entries[i];auto net=cache[i].networkable;if(!entry.entity||!net)continue;auto record=readRecord(i,entry,net,frame);if(record)frame.records.push_back(std::move(*record));}
  frame.classCatalog=classCatalog.names;frame.bindingChecks=bindingChecks;frame.modelLookup=modelReady;frame.status="Network inventory: "+std::to_string(frame.records.size())+" objects; position source=network properties; not render poses";publish(std::move(frame));
 }
+inline void captureLocal(const GameCameraFrame& camera,unsigned index){
+ Frame f;f.epoch=camera.epoch;f.tick=camera.tick;
+ if(index&&index<profile::MaxNetworked&&prepare(camera,f)){
+  auto object=uint32_t(reinterpret_cast<uintptr_t>(list));auto entries=uint32_t(int64_t(object)+profile::EntryBaseDelta);
+  wire::Entry e{};uint32_t net=0;
+  if(wire::load(reader,entries+index*sizeof(e),e)&&e.entity&&wire::load(reader,object+profile::CacheOffset+index*8,net)&&net){auto r=readRecord(index,e,net,f);if(r)f.records.push_back(std::move(*r));}
+ }
+ std::atomic_store(&localSnapshot,std::make_shared<const Frame>(std::move(f)));
+}
 inline void captureFollow(const GameCameraFrame& camera,const dango::inventory::FollowRequest& request){
  Frame f;f.epoch=camera.epoch;f.tick=camera.tick;
  auto finish=[&](){f.bindingChecks=bindingChecks;f.modelLookup=modelReady;std::atomic_store(&followSnapshot,std::make_shared<const Frame>(std::move(f)));};
@@ -165,10 +178,12 @@ inline void captureCombat(const GameCameraFrame& camera){
  }std::atomic_store(&combatSnapshot,std::make_shared<const Frame>(std::move(f)));
 }
 inline void onFrame(const GameCameraFrame& camera)noexcept{
- try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled;if(!active){if(wasEnabled){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}wasEnabled=false;return;}
- if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=nextCombat=0;epoch=camera.epoch;wasEnabled=true;}
+ try{auto request=std::atomic_load(&followRequest);bool active=enabled.load()||browseRequested.load()||request->enabled||localRequestedIndex!=0;if(!active){if(wasEnabled){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();list=modelInfo=nullptr;std::atomic_store(&followSnapshot,std::make_shared<const Frame>());Frame f;f.epoch=camera.epoch;f.tick=camera.tick;publish(std::move(f));}wasEnabled=false;lastLocalIndex=0;nextLocal=0;return;}
+ if(resetRequested.exchange(false)||!wasEnabled||epoch!=camera.epoch){classes.clear();models.clear();classCatalog.clear();bound=faulted=modelReady=false;bindingChecks.clear();nextCapture=nextFollow=nextCombat=nextLocal=0;lastLocalIndex=0;epoch=camera.epoch;wasEnabled=true;}
  if(request->enabled&&camera.tick>=nextFollow){nextFollow=camera.tick+33;captureFollow(camera,*request);}
  if((enabled.load()||browseRequested.load())&&camera.tick>=nextCapture){nextCapture=camera.tick+200;capture(camera);}
+ if(localRequestedIndex&&(localRequestedIndex!=lastLocalIndex||camera.tick>=nextLocal)){lastLocalIndex=localRequestedIndex;nextLocal=camera.tick+200;auto full=std::atomic_load(&snapshot);if(full->epoch==camera.epoch&&full->tick==camera.tick)std::atomic_store(&localSnapshot,full);else captureLocal(camera,localRequestedIndex);}
+ else if(!localRequestedIndex&&lastLocalIndex){lastLocalIndex=0;nextLocal=0;std::atomic_store(&localSnapshot,std::make_shared<const Frame>());}
  if(combatRequested&&camera.tick>=nextCombat){nextCombat=camera.tick+50;captureCombat(camera);}
  }catch(...){faulted=true;log("Capture stopped after an exception; toggle diagnostics to retry");}
 }
