@@ -279,12 +279,18 @@ inline bool statusExternal(L4D2VisualCameraStatusV1* output){
 // Caller holds motionMutex; only configured movement keys count as activity.
 inline bool hasHumanInputLocked(const Cmd* cmd=nullptr){
  if(cmd&&(cmd->mousedx||cmd->mousedy))return true;
+ // Share the recent keyboard sample between CreateMove and Present.
+ // Mouse deltas above are never throttled.
+ static ULONGLONG sampledAt=0;static bool pressed=false;
+ const auto at=GetTickCount64();
+ if(sampledAt&&at>=sampledAt&&at-sampledAt<4)return pressed;
+ sampledAt=at;pressed=false;
  const auto& k=movementKeys;
  const int toggle=hotkeyConfigValid.load()?hotkeyVk.load():0;
  for(int vk:{k.forward,k.back,k.left,k.right,k.up,k.down,k.walk}){
-  if(vk!=toggle&&key(vk))return true;
+  if(vk!=toggle&&key(vk)){pressed=true;break;}
  }
- return false;
+ return pressed;
 }
 inline double renderTimeSeconds(){
  static const double inv=[]{
@@ -621,11 +627,7 @@ inline void tryBind(){
 }
 inline void frame(const dango::GameCameraFrame& f){
  liveMap.store(f.active!=0,std::memory_order_release);
- bool externalPending=false;
- {
-  std::lock_guard<std::mutex> lock(motionMutex);
-  externalPending=ownerPolicy.desired;
- }
+ const bool externalPending=externalSession.load(std::memory_order_acquire);
  if(!f.active){
   const auto state=source_camera::captureState.load();
   const bool sameEpoch=observedEpoch!=0&&observedEpoch==f.epoch;
