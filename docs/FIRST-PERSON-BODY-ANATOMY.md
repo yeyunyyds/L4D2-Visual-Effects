@@ -28,9 +28,13 @@ display, independent head and arm hiding, dynamic positioning, camera yaw
 following, manual XYZ adjustments, per-model calibration, diagnostics, and
 saving settings.
 
-Optional third-person view compatibility is also off by default. It only
-governs cosmetic processing, not the verified native local-player draw gate.
-The gate remains open for validated local draws while FPB is enabled. The
+Optional third-person view compatibility is also off by default. In this
+experimental preview, verified native DrawModel visibility is now view-scoped:
+with compatibility ON, the gate is open only after the main view commits
+first-person; on third-person or unresolved view states it restores the original
+DrawModel byte. A positive native shoulder view closes the gate even with
+compatibility OFF. Visual-owned FreeCamera world-body mode remains explicitly
+allowed and keeps the real character in its world pose. The
 policy combines the original skeletal eye estimate, live entity-origin-relative
 camera height and horizontal separation, stationary-origin motion evidence,
 and explicit third-person evidence. On return, the head can be hidden alone
@@ -74,3 +78,24 @@ page shows the cumulative bypass count. This is an experimental isolation fix,
 not proof that extra colored geometry or shadow appearance is resolved. Verify
 with original and MODded survivors, crouch/landing, FreeCamera, native third
 person and model transitions before merging.
+
+### Preview: native visibility ownership and Studio shadow depth
+
+The previously unconditional native patch could expose local draws even when
+the game's own third-person visibility would suffice. This preview restores
+the original native JZ byte when a compatible normal camera is not positively
+confirmed first person; explicit shoulder third person also restores it.
+This is a game-frame transition, not a Studio-draw-time code patch. Restore
+failures retain the previous unknown/faulted handling.
+
+The Studio decorator now receives the original Studio flags. A Studio pass
+carrying bit `0x200` (called `STUDIORENDER_SHADOWDEPTHTEXTURE` in the public
+Source SDK, not yet independently proven for this L4D2 build) uses the original
+bones/position while still executing the original rendering continuation.
+This is *not* shadow removal and does not discard any color/model draw.
+
+Debug emits `FPB_SHADOW_NATIVE` (rate-limited) if that bit is observed;
+the diagnostics menu contains a count. If the flags are absent, this bypass
+does not activate. The fix remains experimental: a custom third-person camera
+that does not set the native shoulder CVar may still be classified as first
+person, and a color pass with no identifiable flags will still render.
