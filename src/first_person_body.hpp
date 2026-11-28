@@ -40,7 +40,7 @@ inline void onFrame(const dango::GameCameraFrame& camera,bool freeCameraRequeste
     camera.tick<frame->tick||camera.tick-frame->tick>250){
   clear();status=u8"实体快照未验证或过期";return;
  }
- auto handle=visual::localplayer::handle(*frame);
+ auto handle=visual::localplayer::handleAtIndex(*frame,int(source_entities::localRequestedIndex));
  if(handle==0xffffffffu){
   clear();status=u8"本机身份/引擎 ABI 未通过";return;
  }
