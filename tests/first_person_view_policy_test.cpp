@@ -120,4 +120,23 @@ int main(){
  assert(mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1060));
  mainView.reset();
  assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1060));
+ // Regression: two different camera observations from the same character
+ // used to alternate manual / dynamic1 inside the same render interval.
+ MainViewPassFilter vertical;
+ const dango::Vec3 lowerEye{103.1f,200,43.6f};
+ vertical.observe(true,0,true,0,62,center,5,42,99,1000);
+ assert(vertical.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1016,129));
+ // Avoid misidentifying a crouch, airborne sample or centered camera.
+ assert(!vertical.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1016,130));
+ assert(!vertical.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1016,131));
+ assert(!vertical.isSecondary(true,0,true,0.5f,43.6f,lowerEye,5,42,99,1016,129));
+ assert(!vertical.isSecondary(true,0,true,3.1f,62.f,lowerEye,5,42,99,1016,129));
+ assert(!vertical.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1110,129));
+ // The lower pass is not allowed to overwrite the primary camera anchor.
+ vertical.observe(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1020);
+ assert(vertical.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1030,129));
+ // Actual centered crouch updates the anchor and is not misidentified.
+ vertical.observe(true,0,true,0,42,{120,200,42},5,42,99,1040);
+ assert(!vertical.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1050,129));
+
 }
