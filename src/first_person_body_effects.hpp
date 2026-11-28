@@ -169,7 +169,11 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  // allow an off-axis pass to update the main-view hysteresis or pose tracking.
  // Only act after a centered first-person pass of the SAME player and model
  // has positively established a main-view eye in the last 100ms.
- const bool committedFirst=viewcompat::mode.load(std::memory_order_acquire)==viewcompat::Mode::First;
+ // With third-person compatibility disabled the committed camera mode is
+ // intentionally Unknown. Use positive same-draw evidence for pass isolation
+ // without changing the user's compatibility/visibility policy.
+ const bool committedFirst=!ctx.options->thirdPersonCompatibility||
+     viewcompat::mode.load(std::memory_order_acquire)==viewcompat::Mode::First;
  const bool observedFirst=measuredCamera&&measured.view.evidence==viewcompat::Mode::First;
  const bool secondaryPass=measuredCamera&&mainView.isSecondary(
       committedFirst&&observedFirst,measured.shoulder,measured.originKnown,
