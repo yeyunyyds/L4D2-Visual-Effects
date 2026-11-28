@@ -18,6 +18,7 @@ inline std::atomic<const char*> headStatus{u8"头部分支隐藏关闭"},armStat
 inline std::atomic<unsigned long> headHidden{0},headRejected{0},armsHidden{0},armsRejected{0};
 inline std::atomic<unsigned long> dynamicApplied{0},dynamicRejected{0},sameFrameCamera{0},liveCameraRejected{0};
 inline std::atomic<unsigned long> cameraGraceApplied{0},cameraGraceDenied{0},dynamicGraceApplied{0};
+inline std::atomic<unsigned long> secondaryPassBypassed{0};
 inline std::atomic<const char*> dynamicStatus{u8"动态定位关闭"},dynamicSource{"unavailable"};
 struct ModelIdentity{std::string name;std::uint32_t checksum=0,epoch=0;};
 inline std::shared_ptr<const ModelIdentity> modelIdentity=std::make_shared<ModelIdentity>();
@@ -106,12 +107,14 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  static thread_local distanceprobe::Recorder recorder;
  static thread_local dynamic::Track tracking;
  static thread_local viewpolicy::CameraGapHold cameraGap;
+ static thread_local viewpolicy::MainViewPassFilter mainView;
  // Last trusted render-only transform, never reused outside the camera gap.
  static thread_local dango::Vec3 retainedTranslation{};
  static thread_local float retainedYaw=0.f;
  static thread_local std::uint64_t retainedAt=0;
  static thread_local int cameraLogState=0;
  static thread_local bool wasDebug=false;
+ static thread_local std::uint64_t lastSecondaryTrace=0;
  static thread_local unsigned gateGeneration=0;
  static thread_local std::uint32_t gateEpoch=0,gateHandle=0xffffffffu,gateChecksum=0;
  const auto requestedGeneration=cosmeticGeneration.load();
@@ -119,7 +122,7 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  // Info fast path: do not clear recorder strings on every Studio draw.
  if(fpbDebug!=wasDebug){recorder.reset();cameraLogState=0;wasDebug=fpbDebug;}
  if(gateGeneration!=requestedGeneration){
-  distanceGate.reset();tracking.reset();cameraGap.reset();retainedAt=0;
+  distanceGate.reset();tracking.reset();cameraGap.reset();mainView.reset();retainedAt=0;
   gateGeneration=requestedGeneration;
  }
  dango::GameCameraFrame measuredFrame{};dango::CameraPose measuredPose{};
@@ -135,10 +138,41 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
   prof=visual::firstperson::profile(*settings,visual::canonicalModel(studio->name),studio->checksum);
   if(gateEpoch!=ctx.camera->epoch||gateHandle!=ctx.handle||gateChecksum!=studio->checksum){
    gateEpoch=ctx.camera->epoch;gateHandle=ctx.handle;gateChecksum=studio->checksum;
-   distanceGate.reset();tracking.reset();cameraGap.reset();retainedAt=0;
+   distanceGate.reset();tracking.reset();cameraGap.reset();mainView.reset();retainedAt=0;
   }
  }
  const auto wallNow=GetTickCount64();
+ // The engine's draw-time matrix may belong to another render pass. Do not
+ // allow an off-axis pass to update the main-view hysteresis or pose tracking.
+ // Only act after a centered first-person pass of the SAME player and model
+ // has positively established a main-view eye in the last 100ms.
+ const bool committedFirst=viewcompat::mode.load(std::memory_order_acquire)==viewcompat::Mode::First;
+ const bool observedFirst=measuredCamera&&measured.view.evidence==viewcompat::Mode::First;
+ const bool secondaryPass=measuredCamera&&mainView.isSecondary(
+      committedFirst&&observedFirst,measured.shoulder,measured.originKnown,
+      measured.view.horizontal,measured.view.eyeHeight,measuredPose.eye,
+      ctx.camera->epoch,ctx.handle,studio->checksum,wallNow);
+ if(secondaryPass){
+  ++secondaryPassBypassed;
+  if(fpbDebug&&(!lastSecondaryTrace||wallNow<lastSecondaryTrace||
+                wallNow-lastSecondaryTrace>=1000)){
+   char line[240]{};
+   std::snprintf(line,sizeof(line),
+      "FPB_SECONDARY_BYPASS frame=%llu eyeXY=%.2f eyeZ=%.2f checksum=%u",
+      static_cast<unsigned long long>(source_camera::renderBegins.load()),
+      double(measured.view.horizontal),double(measured.view.eyeHeight),
+      unsigned(studio->checksum));
+   source_camera::log(line);lastSecondaryTrace=wallNow;
+  }
+  // Keep the original studio pass intact; never suppress shadow/color draws
+  // until their flags have been independently verified on this build.
+  original(bones,origin);return;
+ }
+ if(measuredCamera){
+  mainView.observe(committedFirst&&observedFirst,measured.shoulder,
+    measured.originKnown,measured.view.horizontal,measured.view.eyeHeight,
+    measuredPose.eye,ctx.camera->epoch,ctx.handle,studio->checksum,wallNow);
+ }
  const auto tick=measuredCamera?measuredFrame.tick:wallNow;
  const bool compatibility=settings->thirdPersonCompatibility;
  viewpolicy::Decision decision{};
