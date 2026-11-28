@@ -11,8 +11,8 @@ inline void prepareRender(){
  auto& h=host();h.prepare();
  // Enabled-only Studio decoration; no FPB route in the off state.
  render::studioDecorator=std::atomic_load(&firstperson::options)->enabled?
-  +[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,void* data,render::StudioNext next){
-    host().decorateStudio(info,bones,origin,data,next);
+  +[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,int studioFlags,void* data,render::StudioNext next){
+    host().decorateStudio(info,bones,origin,studioFlags,data,next);
   }:nullptr;
  render::modelObserver=h.observing()?+[](std::uint32_t header,int index,const dango::Vec3& origin){host().observeModel(header,index,origin);}:nullptr;
  render::studioObserver=h.observing()?+[](std::uint32_t header,std::uint32_t entity,const dango::Vec3& origin){host().observeStudio(header,entity,origin);}:nullptr;
