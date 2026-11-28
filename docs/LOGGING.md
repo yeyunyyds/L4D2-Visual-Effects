@@ -24,6 +24,11 @@ Detailed periodic snapshots preserve the previous format and nominal
 two-second interval. Turning Debug off stops further periodic snapshots.
 Normal Info events remain enabled in either mode.
 
+The preview additionally emits throttled `FPB_SHADOW_NATIVE` events in Debug
+for Studio draws with the experimental shadow-depth bit (0x200), and exposes
+the count in FPB diagnostics. Native gate enable/restore changes remain
+Info-level lifecycle events.
+
 High-frequency first-person body traces (`FPB_VIEW`, `FPB_DISTANCE` and
 `FPB_CAMERA_GAP`) are emitted **only** in Debug. The FPB frame recorder is
 cleared when Debug is off, so an old buffered distance sample cannot be
