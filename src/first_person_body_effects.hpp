@@ -6,11 +6,13 @@
 #include "first_person_body_parts.hpp"
 #include "first_person_dynamic_alignment.hpp"
 #include "first_person_distance_probe.hpp"
+#include "first_person_studio_pass_policy.hpp"
 #include "log_settings.hpp"
 #include <atomic>
 #include <memory>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
 namespace visual::firstperson::effects {
 inline std::atomic<unsigned long> matched{0},shifted{0},shiftRejected{0};
 inline std::atomic<const char*> offsetStatus{u8"位置偏移为零"};
@@ -18,7 +20,7 @@ inline std::atomic<const char*> headStatus{u8"头部分支隐藏关闭"},armStat
 inline std::atomic<unsigned long> headHidden{0},headRejected{0},armsHidden{0},armsRejected{0};
 inline std::atomic<unsigned long> dynamicApplied{0},dynamicRejected{0},sameFrameCamera{0},liveCameraRejected{0};
 inline std::atomic<unsigned long> cameraGraceApplied{0},cameraGraceDenied{0},dynamicGraceApplied{0};
-inline std::atomic<unsigned long> secondaryPassBypassed{0};
+inline std::atomic<unsigned long> secondaryPassBypassed{0},shadowDepthOriginal{0};
 inline std::atomic<const char*> dynamicStatus{u8"动态定位关闭"},dynamicSource{"unavailable"};
 struct ModelIdentity{std::string name;std::uint32_t checksum=0,epoch=0;};
 inline std::shared_ptr<const ModelIdentity> modelIdentity=std::make_shared<ModelIdentity>();
@@ -68,7 +70,7 @@ inline bool select(std::uint32_t renderable,Context& ctx) noexcept {
  return true;
 }
 template<class Original> inline void draw(const void* info,visual::Matrix3x4* bones,
- const dango::Vec3& origin,Original&& original) {
+ const dango::Vec3& origin,int studioFlags,Original&& original) {
  std::uint32_t renderable=0,header=0;
  auto ptr=std::uint32_t(std::uintptr_t(info));
  if(!info||!source_entities::wire::load(source_entities::reader,ptr,header)||
@@ -80,7 +82,27 @@ template<class Original> inline void draw(const void* info,visual::Matrix3x4* bo
  // View-compatibility camera mode is committed once by the game-frame callback.
  // Do not reclassify/rewrite its state from individual Studio draw calls:
  // doing so flips the native gate during movement and resets alignment.
+
  ++matched;
+ // Source Studio shadow-depth passes must not receive first-person-only bone
+ // shrink/translation. Continue drawing the original model so actual shadow
+ // depth is not removed; no assumptions about render-to-color passes are made.
+ if(studiopass::preserveOriginal(studioFlags)){
+  ++shadowDepthOriginal;
+  if(visual::logging::periodicDebugEnabled()){
+   static thread_local std::uint64_t lastShadowLog=0;
+   const auto now=GetTickCount64();
+   if(!lastShadowLog||now<lastShadowLog||now-lastShadowLog>=1000){
+    char line[200]{};
+    std::snprintf(line,sizeof(line),
+     "FPB_SHADOW_NATIVE frame=%llu studioFlags=0x%x",
+     static_cast<unsigned long long>(source_camera::renderBegins.load()),
+     static_cast<unsigned>(studioFlags));
+    source_camera::log(line);lastShadowLog=now;
+   }
+  }
+  original(bones,origin);return;
+ }
  dango::Vec3 shift{};bool moved=false,partChanged=false,dynamicMoved=false;
  bool headApplied=false,leftArmApplied=false,rightArmApplied=false;
  visual::Matrix3x4 temporary[256];
