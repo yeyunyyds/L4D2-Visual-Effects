@@ -68,6 +68,7 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
   row("Live camera success/failure: "+std::to_string(visual::firstperson::effects::sameFrameCamera.load())+"/"+std::to_string(visual::firstperson::effects::liveCameraRejected.load()))+
   row("Camera gap accepted/denied, dynamic retained: "+std::to_string(visual::firstperson::effects::cameraGraceApplied.load())+"/"+std::to_string(visual::firstperson::effects::cameraGraceDenied.load())+"/"+std::to_string(visual::firstperson::effects::dynamicGraceApplied.load()))+
   row("Secondary off-axis passes bypassed: "+std::to_string(visual::firstperson::effects::secondaryPassBypassed.load()))+
+  row("Shadow-depth draws with native pose: "+std::to_string(visual::firstperson::effects::shadowDepthOriginal.load()))+
   row(visual::firstperson::effects::dynamicStatus.load())+row(visual::firstperson::effects::dynamicSource.load())+
   row(visual::firstperson::effects::headStatus.load())+row(visual::firstperson::effects::armStatus.load())+
   row(visual::firstperson::effects::offsetStatus.load())+
