@@ -9,14 +9,14 @@ struct AlignmentStability {
  static constexpr std::uint64_t HoldMs=48, RecoveryMs=80;
  State state=State::Cold;
  std::uint64_t lastDynamicAt=0,lastObservedAt=0,recoverySince=0;
- bool recovering=false;
+ bool recovering=false,everDynamic=false;
  void reset() noexcept {*this=AlignmentStability{};}
  Choice decide(bool validDynamic,std::uint64_t now) noexcept {
   if(lastObservedAt&&now<lastObservedAt)reset();
   lastObservedAt=now;
   if(state==State::Cold){
    state=validDynamic?State::Dynamic:State::Manual;
-   if(validDynamic){lastDynamicAt=now;return Choice::Dynamic;}
+   if(validDynamic){lastDynamicAt=now;everDynamic=true;return Choice::Dynamic;}
    return Choice::Manual;
   }
   if(state==State::Dynamic){
@@ -25,6 +25,8 @@ struct AlignmentStability {
    state=State::Manual;recovering=false;return Choice::Manual;
   }
   if(!validDynamic){recovering=false;return Choice::Manual;}
+  // Bootstrap from the first valid dynamic result; later recoveries must settle.
+  if(!everDynamic){state=State::Dynamic;lastDynamicAt=now;everDynamic=true;return Choice::Dynamic;}
   if(!recovering){recovering=true;recoverySince=now;return Choice::Manual;}
   if(now>=recoverySince&&now-recoverySince>=RecoveryMs){
    state=State::Dynamic;lastDynamicAt=now;recovering=false;
