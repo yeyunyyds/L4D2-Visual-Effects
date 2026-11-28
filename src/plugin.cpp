@@ -16,6 +16,17 @@ using namespace visual::ui;
 std::mutex appearanceMutex;
 dango::hud::Appearance appearance;
 void note(const std::string& s){visual::diagnostics::write(s);}
+bool cameraCaptureNeeded(){
+ visual::lifetime::Guard guard;if(!guard)return false;
+ if(visual::logging::periodicDebugEnabled()||visual::hudruntime::hud.isOpen()||
+    visual::freecamera::requested.load()||visual::freecamera::externalSession.load()||
+    std::atomic_load(&visual::firstperson::options)->enabled||
+    source_entities::enabled.load()||std::atomic_load(&source_entities::followRequest)->enabled)return true;
+ // Every entity consumer declares its demand through the frozen host. Include
+ // compatibility ownership so restoration failures are retried immediately.
+ return visual::features::host().needsEntities()||visual::features::host().needsCombat()||
+        visual::modelpath::setting.owned;
+}
 void onFrame(const dango::GameCameraFrame& frame){
  visual::lifetime::Guard guard;if(!guard)return;
  auto& modules=visual::features::host();visual::features::prepareRender();
@@ -53,7 +64,7 @@ const char* __cdecl openMenu(void*){visual::lifetime::Guard guard;if(!guard)retu
 void shutdownFromEngine();
 class Plugin final:public IL4NPlugin {
  std::atomic<bool> stopStarted{false};HANDLE worker=nullptr;
- void connect(){visual::lifetime::Guard guard;if(!guard)return;source_camera::shutdownListener=shutdownFromEngine;source_camera::logger=note;source_camera::frameListener=onFrame;if(!source_camera::clientModule)source_camera::clientModule=GetModuleHandleW(L"client.dll");if(!source_camera::engineModule)source_camera::engineModule=GetModuleHandleW(L"engine.dll");source_camera::connect();visual::render::connect();}
+ void connect(){visual::lifetime::Guard guard;if(!guard)return;source_camera::shutdownListener=shutdownFromEngine;source_camera::logger=note;source_camera::frameListener=onFrame;source_camera::captureDemand=cameraCaptureNeeded;if(!source_camera::clientModule)source_camera::clientModule=GetModuleHandleW(L"client.dll");if(!source_camera::engineModule)source_camera::engineModule=GetModuleHandleW(L"engine.dll");source_camera::connect();visual::render::connect();}
  // Periodic per-target and interface snapshots are DEBUG-only; INFO events stay active.
  static void periodicDebug(std::string& previous,ULONGLONG& last,ULONGLONG& lastPoll,ULONGLONG now){
    if(now-lastPoll>=200){lastPoll=now;
