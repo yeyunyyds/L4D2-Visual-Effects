@@ -97,4 +97,27 @@ int main(){
  assert(!hold.accept(true,true,0,1,7,123,999,999));   // time went backwards
  hold.observe(false,1,7,123,1030);
  assert(!hold.accept(true,true,0,1,7,123,1031,1030));
+ // Secondary pass: the reported stationary 0u/62u main camera and 17u/55u
+ // off-axis camera must not share the FPB cosmetic state machine.
+ MainViewPassFilter mainView;
+ const dango::Vec3 center{100,200,62};
+ const dango::Vec3 offset{83,200,55.6f};
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1000));
+ mainView.observe(true,0,true,0,62,center,5,42,99,1000);
+ assert(!mainView.isSecondary(true,0,true,0,62,center,5,42,99,1000));
+ assert(mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(true,1,true,17,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(false,0,true,17,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(true,0,false,17,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(true,0,true,13,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,6,42,99,1015));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,43,99,1015));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,100,1015));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1101));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,999));
+ // A legitimate, later centered primary eye refreshes the anchor.
+ mainView.observe(true,0,true,0,42,{120,200,42},5,42,99,1050);
+ assert(mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1060));
+ mainView.reset();
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1060));
 }
