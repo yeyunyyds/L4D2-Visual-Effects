@@ -276,14 +276,13 @@ inline bool statusExternal(L4D2VisualCameraStatusV1* output){
  };
  return true;
 }
-inline bool hasHumanInput(const Cmd* cmd=nullptr){
- // Only physical input counts as activity. AI/server model movement
- // and toggled command bits must not reset the AFK timer.
+// Caller holds motionMutex; only configured movement keys count as activity.
+inline bool hasHumanInputLocked(const Cmd* cmd=nullptr){
  if(cmd&&(cmd->mousedx||cmd->mousedy))return true;
- // Detect held keyboard/mouse buttons while the L4D2 window has focus.
- for(int vk=VK_LBUTTON;vk<=VK_OEM_CLEAR;++vk){
-  if(vk==VK_PACKET||vk==VK_PROCESSKEY||(externalSession.load()&&hotkeyConfigValid.load()&&vk==hotkeyVk.load()))continue;
-  if(GetAsyncKeyState(vk)&0x8000)return true;
+ const auto& k=movementKeys;
+ const int toggle=hotkeyConfigValid.load()?hotkeyVk.load():0;
+ for(int vk:{k.forward,k.back,k.left,k.right,k.up,k.down,k.walk}){
+  if(vk!=toggle&&key(vk))return true;
  }
  return false;
 }
@@ -321,6 +320,7 @@ inline void __fastcall overrideView(void* self,void*,void* setup){
  auto fn=reinterpret_cast<ViewCallback>(originalView);
  if(fn)fn(self,setup);
  visual::lifetime::Guard guard;if(!guard)return;
+ if(!requested.load(std::memory_order_acquire)&&!externalSession.load(std::memory_order_acquire))return;
  ++viewCount;
  external::Owner owner;
  {
@@ -415,7 +415,7 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
  bool result=fn?fn(self,dt,cmd):false;
  visual::lifetime::Guard guard;if(!guard)return result;
  ++cmdCount;
- if(!requested&&!externalPermission)return result;
+ if(!requested.load(std::memory_order_acquire)&&!externalSession.load(std::memory_order_acquire))return result;
  if(!cmd||!source_camera::readable(cmd,offsetof(Cmd,predicted)+1))return result;
  // Source ExtraMouseSample uses command_number==0 and must be observed.
  const auto kind=commandpolicy::classify(cmd->command_number);
@@ -425,11 +425,11 @@ inline bool __fastcall createMove(void* self,void*,float dt,Cmd* cmd){
   if(cmd->mousedx||cmd->mousedy)++extraMouseNonzero;
  }else ++serverCmdSamples;
  const bool focused=foreground();
- const bool input=focused&&externalPermission.load(std::memory_order_acquire)&&hasHumanInput(cmd);
  external::Owner owner;
  {
   std::lock_guard<std::mutex> lock(motionMutex);
   const auto at=GetTickCount64();expireLeaseLocked(at);
+  const bool input=focused&&ownerPolicy.desired&&hasHumanInputLocked(cmd);
   if(input||!focused||paused.load()||externalMenuBlocked.load())ownerPolicy.noteInput(at,input&&focused&&!paused.load()&&!externalMenuBlocked.load());
   else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
   owner=selectOwnerLocked(at);
@@ -642,9 +642,8 @@ inline void frame(const dango::GameCameraFrame& f){
  const bool mapChanged=observedEpoch!=0&&observedEpoch!=f.epoch;
  observedEpoch=f.epoch;
  if(mapChanged&&(requested||externalPending))disable("FreeCamera reset on map epoch");
- // External permission opts in to the SAME hooks before any external request;
- // until a valid pose and idle interval, CreateMove is native passthrough.
- if(requested.load(std::memory_order_acquire)||externalPermission.load(std::memory_order_acquire))tryBind();
+ // Authorization alone does not install hooks; arm them on a real session.
+ if(requested.load(std::memory_order_acquire)||externalPending)tryBind();
  if(enabled()&&f.epoch!=epoch){disable("FreeCamera reset on map epoch");}
  if(externalPending&&active.load()&&currentOwner.load()==external::Owner::External){
   dango::CameraPose rendered;
@@ -673,8 +672,8 @@ inline void poll(bool escape,bool menu,bool gameForeground){
  // Menus, lost focus and Escape all interrupt the external controller.
  // Never resume it while the menu is continuously open.
  if(externalSession.load(std::memory_order_acquire)){
-  const bool input=escape||menu||!gameForeground||hasHumanInput();
   std::lock_guard<std::mutex> lock(motionMutex);
+  const bool input=escape||menu||!gameForeground||hasHumanInputLocked();
   const auto at=GetTickCount64();expireLeaseLocked(at);
   if(input)ownerPolicy.noteInput(at,!shouldPause&&!edge);
   else if(liveMap.load()&&bound.load())ownerPolicy.advance(at);
