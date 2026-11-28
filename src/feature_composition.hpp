@@ -33,6 +33,7 @@ inline void install(){
  // Source Studio remains shared infrastructure, with a generic render callback.
  render::studioDecorator=nullptr; // FPB default off.
  hudruntime::configureModules(h);
+ hudruntime::configurePollDemand(+[]{return tankfeature::active()||rockruntime::active()||freecamera::requested.load()||freecamera::externalSession.load()||freecamera::f6Binding.load();});
  hudruntime::hud.configureOverlay([] {return host().needsNativeOverlay();},[](float w,float h){host().drawNativeOverlay(w,h);});
  hudruntime::hud.configureAddon([](std::uintptr_t page,float w,float h,bool focused){host().preview(page,w,h,focused);},[](std::uintptr_t page){return host().previewKeys(page);});
  hudruntime::hud.configureAdjustment([](std::uintptr_t page,int delta){return host().adjust(page,delta);});
