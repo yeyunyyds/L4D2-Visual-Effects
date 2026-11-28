@@ -1,4 +1,4 @@
-name: L4D2Visual v1.1.1 candidate build
+name: L4D2Visual v1.1.2 candidate build
 on:
   push:
     branches: [main]
@@ -39,7 +39,7 @@ jobs:
           import json, struct
           from pathlib import Path
           from zipfile import ZipFile
-          archive=Path("build/L4D2Visual-1.1.1.zip")
+          archive=Path("build/L4D2Visual-1.1.2.zip")
           expected={"README.md","bin/neko/plugins/L4D2Visual.dll",
                     "bin/neko/plugins/L4D2Visual/hud.json"}
           with ZipFile(archive) as z:
@@ -49,7 +49,7 @@ jobs:
               offset=struct.unpack_from("<I",dll,0x3c)[0]
               assert dll[offset:offset+4]==b"PE\x00\x00"
               assert struct.unpack_from("<H",dll,offset+4)[0]==0x14c
-              assert b"L4D2Visual 1.1.1" in dll
+              assert b"L4D2Visual 1.1.2" in dll
               cfg=json.loads(z.read("bin/neko/plugins/L4D2Visual/hud.json"))
               assert cfg["firstPersonBody"]["enabled"] is False
               assert "dynamicAnchor2" not in cfg["firstPersonBody"]
@@ -58,7 +58,7 @@ jobs:
               assert cfg["tankPrediction"]["occludeHud"] is True
               assert "warnOutline" not in cfg["tankPrediction"]
               assert cfg["freeCamera"]["f6Binding"] is False
-              assert "v1.1.1" in z.read("README.md").decode("utf-8")
+              assert "v1.1.2" in z.read("README.md").decode("utf-8")
           stage=Path("build/candidate-install")
           with ZipFile(archive) as z:z.extractall(stage)
           assert {p.relative_to(stage).as_posix() for p in stage.rglob("*") if p.is_file()}==expected
@@ -72,20 +72,20 @@ jobs:
           done
       - name: Prepare release assets
         run: |
-          git archive --format=zip --output=build/L4D2Visual-1.1.1-source.zip HEAD
+          git archive --format=zip --output=build/L4D2Visual-1.1.2-source.zip HEAD
           cd build
-          sha256sum L4D2Visual-1.1.1.zip > L4D2Visual-1.1.1.zip.sha256
-          sha256sum L4D2Visual-1.1.1-source.zip > L4D2Visual-1.1.1-source.zip.sha256
+          sha256sum L4D2Visual-1.1.2.zip > L4D2Visual-1.1.2.zip.sha256
+          sha256sum L4D2Visual-1.1.2-source.zip > L4D2Visual-1.1.2-source.zip.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: L4D2Visual-1.1.1-release-assets
+          name: L4D2Visual-1.1.2-release-assets
           path: |
-            build/L4D2Visual-1.1.1*.zip
-            build/L4D2Visual-1.1.1*.sha256
+            build/L4D2Visual-1.1.2*.zip
+            build/L4D2Visual-1.1.2*.sha256
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
-          name: L4D2Visual-1.1.1-candidate-MinGW-x86
+          name: L4D2Visual-1.1.2-candidate-MinGW-x86
           path: build/candidate-install/
           if-no-files-found: error
   msvc-x86:
@@ -97,7 +97,7 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86 -host_arch=x64
           if not exist build mkdir build
-          for %%T in (view_compat log_settings first_person_body_patch first_person_native_gate_policy first_person_body_math first_person_body_parts first_person_dynamic_alignment first_person_view_policy first_person_body_config module_host native_menu free_camera_activation_policy tank_occlusion) do (
+          for %%T in (view_compat log_settings first_person_body_patch first_person_native_gate_policy first_person_body_math first_person_body_parts first_person_dynamic_alignment first_person_view_policy first_person_alignment_stability first_person_native_visibility first_person_studio_pass_policy first_person_body_config module_host native_menu free_camera_activation_policy tank_occlusion) do (
             cl /nologo /utf-8 /std:c++17 /EHsc /MT /I src /I vendor /I vendor\dango tests\%%T_test.cpp /Fe:build\%%T_test.exe
             if errorlevel 1 exit /b 1
             build\%%T_test.exe
@@ -113,7 +113,7 @@ jobs:
         shell: pwsh
         run: |
           python scripts/package.py
-          $archive = "build/L4D2Visual-1.1.1.zip"
+          $archive = "build/L4D2Visual-1.1.2.zip"
           if (!(Test-Path $archive)) { throw "Candidate installer missing" }
           Expand-Archive -Path $archive -DestinationPath "build/candidate-install" -Force
           $files = @(Get-ChildItem build/candidate-install -Recurse -File | ForEach-Object { $_.FullName.Substring((Resolve-Path build/candidate-install).Path.Length + 1).Replace('\','/') })
@@ -121,7 +121,36 @@ jobs:
           if (@(Compare-Object $files $expected).Count -ne 0) { throw "Unexpected artifact contents" }
       - uses: actions/upload-artifact@v4
         with:
-          name: L4D2Visual-1.1.1-candidate-MSVC-x86
+          name: L4D2Visual-1.1.2-candidate-MSVC-x86
           path: build/candidate-install/
           if-no-files-found: error
 
+
+  prepare-draft:
+    if: github.ref == 'refs/heads/main'
+    needs: [mingw-x86, msvc-x86]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: L4D2Visual-1.1.2-release-assets
+          path: release-assets
+      - name: Prepare unpublished release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          (cd release-assets && sha256sum -c *.sha256)
+          tag=v1.1.2
+          if gh release view "$tag" --json isDraft,targetCommitish > /tmp/release.json 2>/dev/null; then
+            test "$(jq -r .isDraft /tmp/release.json)" = true
+            test "$(jq -r .targetCommitish /tmp/release.json)" = "$GITHUB_SHA"
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --draft --title "L4D2Visual $tag" --notes-file docs/releases/v1.1.2.md
+          fi
+          gh release upload "$tag" release-assets/* --clobber
+          gh release view "$tag" --json isDraft,url,assets

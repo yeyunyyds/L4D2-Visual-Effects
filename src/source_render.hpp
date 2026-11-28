@@ -55,7 +55,7 @@ inline std::atomic<PoseModifier> poseModifier{nullptr};
 // Studio draw decoration follows all existing pose modifiers, and never changes
 // the shared render implementation's dependency on feature modules.
 using StudioNext=void(*)(void*,Matrix3x4*,const Vec3&);
-using StudioDecorator=void(*)(const void*,Matrix3x4*,const Vec3&,void*,StudioNext);
+using StudioDecorator=void(*)(const void*,Matrix3x4*,const Vec3&,int,void*,StudioNext);
 inline std::atomic<StudioDecorator> studioDecorator{nullptr};
 inline HMODULE studioModule=nullptr;
 inline std::atomic<const char*> studioProfile{u8"尚未匹配"};
@@ -220,7 +220,7 @@ inline void studioPass(void* self,void* results,const void* info,Matrix3x4* bone
   studioOriginal(c.self,c.results,c.info,nextBones,c.flex,c.delayed,nextOrigin,c.flags);
  };
  if(auto decorate=studioDecorator.load(std::memory_order_acquire))
-  decorate(info,bones,origin,&context,continuation);
+  decorate(info,bones,origin,flags,&context,continuation);
  else continuation(&context,bones,origin);
 }
 inline void __fastcall engineHook(void* self,void*,const DrawState& state,const ModelInfo& info,Matrix3x4* bones) {

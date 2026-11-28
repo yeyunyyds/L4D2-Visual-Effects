@@ -66,6 +66,9 @@ if(id==860){auto s=std::atomic_load(&visual::firstperson::options);return "\"第
   row("Arm branch applied/rejected: "+std::to_string(visual::firstperson::effects::armsHidden.load())+"/"+std::to_string(visual::firstperson::effects::armsRejected.load()))+
   row("Dynamic applied/rejected: "+std::to_string(visual::firstperson::effects::dynamicApplied.load())+"/"+std::to_string(visual::firstperson::effects::dynamicRejected.load()))+
   row("Live camera success/failure: "+std::to_string(visual::firstperson::effects::sameFrameCamera.load())+"/"+std::to_string(visual::firstperson::effects::liveCameraRejected.load()))+
+  row("Camera gap accepted/denied, dynamic retained: "+std::to_string(visual::firstperson::effects::cameraGraceApplied.load())+"/"+std::to_string(visual::firstperson::effects::cameraGraceDenied.load())+"/"+std::to_string(visual::firstperson::effects::dynamicGraceApplied.load()))+
+  row("Secondary off-axis passes bypassed: "+std::to_string(visual::firstperson::effects::secondaryPassBypassed.load()))+
+  row("Shadow-depth draws with native pose: "+std::to_string(visual::firstperson::effects::shadowDepthOriginal.load()))+
   row(visual::firstperson::effects::dynamicStatus.load())+row(visual::firstperson::effects::dynamicSource.load())+
   row(visual::firstperson::effects::headStatus.load())+row(visual::firstperson::effects::armStatus.load())+
   row(visual::firstperson::effects::offsetStatus.load())+
@@ -133,7 +136,7 @@ inline modules::Module create(){
  // At this point the shared Studio pipeline has already applied any entity
  // deformation. First-person effects decorate the FINAL draw only.
  m.studioDraw=[](const void* info,Matrix3x4* bones,const dango::Vec3& origin,
-                  void* context,modules::StudioNext next){
+                  int studioFlags,void* context,modules::StudioNext next){
   // No model metadata, pointer reads or pose processing while FPB is off.
   if(!std::atomic_load(&firstperson::options)->enabled||
      !firstperson::native::active.load(std::memory_order_acquire)){
@@ -145,7 +148,7 @@ inline modules::Module create(){
    // match the detached camera. Keep the model at its true game-world pose.
    next(context,bones,origin);return;
   }
-  firstperson::effects::draw(info,bones,origin,[&](Matrix3x4* transformed,const dango::Vec3& adjusted){
+  firstperson::effects::draw(info,bones,origin,studioFlags,[&](Matrix3x4* transformed,const dango::Vec3& adjusted){
    next(context,transformed,adjusted);
   });
  };

@@ -39,7 +39,7 @@ struct Module {
  std::function<void(const char*)> unavailable;
  std::function<void(IDirect3DDevice9*)> deviceCreated;
  // Optional post-pose, draw-only wrapper; continuations must run exactly once.
- std::function<void(const void*,Matrix3x4*,const dango::Vec3&,void*,StudioNext)> studioDraw;
+ std::function<void(const void*,Matrix3x4*,const dango::Vec3&,int,void*,StudioNext)> studioDraw;
  std::function<bool(std::uintptr_t)> previewKeys;
  std::function<void(std::uintptr_t,float,float,bool)> preview;
 };
@@ -71,8 +71,8 @@ public:
  void drawNativeOverlay(float w,float h){if(quiet)return;for(auto& e:entries)if(e.drawNativeOverlay)e.drawNativeOverlay(w,h);}
  void unavailable(const char* reason){for(auto& e:entries)if(e.unavailable)e.unavailable(reason);}
  void deviceCreated(IDirect3DDevice9* d){if(!quiet)for(auto& e:entries)if(e.deviceCreated)e.deviceCreated(d);}
- void decorateStudio(const void* info,Matrix3x4* bones,const dango::Vec3& origin,void* data,StudioNext next){
-  if(!quiet)for(auto& e:entries)if(e.studioDraw){e.studioDraw(info,bones,origin,data,next);return;}
+ void decorateStudio(const void* info,Matrix3x4* bones,const dango::Vec3& origin,int flags,void* data,StudioNext next){
+  if(!quiet)for(auto& e:entries)if(e.studioDraw){e.studioDraw(info,bones,origin,flags,data,next);return;}
   next(data,bones,origin);
  }
  bool previewKeys(std::uintptr_t page)const{if(quiet)return false;for(auto& e:entries)if(e.previewKeys&&e.previewKeys(page))return true;return false;}

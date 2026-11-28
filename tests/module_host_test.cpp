@@ -44,11 +44,11 @@ int main(){
   if(!bones||value.x!=1)throw std::runtime_error("Studio original input changed");
  };
  Module stage;stage.id="studio";
- stage.studioDraw=[](const void*,visual::Matrix3x4* b,const dango::Vec3& o,void* data,StudioNext next){next(data,b,o);};
+ stage.studioDraw=[](const void*,visual::Matrix3x4* b,const dango::Vec3& o,int flags,void* data,StudioNext next){if(flags!=0x200)throw std::runtime_error("Studio flags not forwarded");next(data,b,o);};
  stage.deviceCreated=[&](IDirect3DDevice9*){++calls;};
  decorators.add(stage);decorators.freeze();decorators.deviceCreated(nullptr);check(calls==1);
- decorators.decorateStudio(nullptr,&pose,origin,&calls,once);check(calls==2);
- decorators.quiesce();decorators.decorateStudio(nullptr,&pose,origin,&calls,once);check(calls==3);
+ decorators.decorateStudio(nullptr,&pose,origin,0x200,&calls,once);check(calls==2);
+ decorators.quiesce();decorators.decorateStudio(nullptr,&pose,origin,0x200,&calls,once);check(calls==3);
  decorators.deviceCreated(nullptr);check(calls==3);decorators.stop();
  std::cout<<"PASS: module registration, demand aggregation, ordered lifecycle/restore drain, independent config/menu dispatch, observer broadcast, pose ownership, overlay failure isolation and module omission\n";
 }

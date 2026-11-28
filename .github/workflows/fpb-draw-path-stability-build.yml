@@ -1,0 +1,32 @@
+name: FPB draw path stability preview (no release)
+on:
+  push:
+    branches: [fix/fpb-draw-path-stability]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mingw-x86:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Windows x86 compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-i686-posix
+      - name: Run regression tests
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: bash scripts/test.sh
+      - name: Compile Windows x86 DLL
+        env:
+          CXX_X86: i686-w64-mingw32-g++-posix
+        run: bash scripts/build-mingw.sh
+      - name: Create install archive
+        run: python3 scripts/package.py
+      - name: Upload experimental build
+        uses: actions/upload-artifact@v4
+        with:
+          name: L4D2Visual-FPB-Draw-Path-Stability-x86
+          path: build/L4D2Visual-1.1.1.zip
+          if-no-files-found: error

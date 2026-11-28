@@ -35,4 +35,108 @@ int main(){
  assert(!g.update(at(1460,30,36,0,62,28,20)).full);
  // Unknown evidence fails closed.
  Input unknown{};unknown.tick=1540;assert(!g.update(unknown).full);
+ // Running/landing: horizontal entity motion is sufficient for the
+ // bounded height exception; animated head geometry is irrelevant.
+ Gate run;
+ run.update(at(100,0,36,0,44,15,14));
+ assert(run.update(at(180,10,30,1,47,13,13)).full);
+ d=run.update(at(196,14,16,1.5f,67,9,20));
+ assert(d.full&&d.originMotionXY>.75f);
+ assert(run.update(at(212,18,2,1.5f,67,9,25)).full);
+ assert(run.update(at(228,22,0,1,62,6,8)).full);
+ // Purely horizontal movement also qualifies, with no head data.
+ Gate flat;
+ flat.update(at(100,0,0,0,62,4));
+ assert(flat.update(at(180,0,0,0,62,4)).full);
+ auto sample=at(196,4,0,1,67,9);
+ sample.headKnown=false;
+ d=flat.update(sample);assert(d.full&&d.originMotionXY>.75f);
+ // Once the completed movement window is stationary, the exemption ends.
+ assert(flat.update(at(260,4,0,1,67,9)).full);
+ assert(!flat.update(at(340,4,0,1,67,9)).full);
+ // Vertical-only movement must NOT qualify as horizontal movement.
+ Gate vertical;
+ vertical.update(at(100,0,30,0,44,15));
+ assert(vertical.update(at(180,0,20,0,47,13)).full);
+ assert(!vertical.update(at(196,0,2,0,67,9)).full);
+ // Hard exits and existing re-entry hysteresis remain unchanged.
+ for(int scenario=0;scenario<6;++scenario){
+  Gate guard;
+  guard.update(at(100,0,36,0,44,15));
+  assert(guard.update(at(180,10,30,1,47,13)).full);
+  sample=at(196,14,2,1,67,9);
+  if(scenario==0)sample.shoulder=1;
+  if(scenario==1)sample.camera.x=sample.origin.x+4;
+  if(scenario==2)sample.camera.z=sample.origin.z+71;
+  if(scenario==3)sample.eyeDistance=28;
+  if(scenario==4){sample.eyeKnown=false;sample.fallbackFirst=false;}
+  if(scenario==5)sample.shoulder=-1;
+  assert(!guard.update(sample).full);
+ }
+ Gate cold;
+ cold.update(at(100,0,30,1,47,13));
+ assert(!cold.update(at(116,4,2,1,67,9)).full);
+ Gate gap;
+ gap.update(at(100,0,30,1,47,13));
+ assert(gap.update(at(180,10,20,1,47,13)).full);
+ assert(!gap.update(at(280,14,2,1,67,9)).full);
+ // A missing single-draw camera sample may retain cosmetics only while
+ // the last verified first-person evidence and the frame snapshot are fresh.
+ CameraGapHold hold;
+ assert(!hold.accept(true,true,0,1,7,123,1016,1016));
+ hold.observe(true,1,7,123,1000);
+ assert(hold.accept(true,true,0,1,7,123,1020,1016));
+ assert(!hold.accept(true,true,1,1,7,123,1020,1016)); // explicit shoulder camera
+ assert(!hold.accept(true,false,0,1,7,123,1020,1016)); // committed third person
+ assert(!hold.accept(false,true,0,1,7,123,1020,1016)); // invalid skeleton
+ assert(!hold.accept(true,true,0,2,7,123,1020,1016)); // new map
+ assert(!hold.accept(true,true,0,1,8,123,1020,1016)); // new local entity
+ assert(!hold.accept(true,true,0,1,7,124,1020,1016)); // new model
+ assert(!hold.accept(true,true,0,1,7,123,1050,1040)); // expired verified camera
+ assert(!hold.accept(true,true,0,1,7,123,1030,960));  // stale frame snapshot
+ assert(!hold.accept(true,true,0,1,7,123,999,999));   // time went backwards
+ hold.observe(false,1,7,123,1030);
+ assert(!hold.accept(true,true,0,1,7,123,1031,1030));
+ // Secondary pass: the reported stationary 0u/62u main camera and 17u/55u
+ // off-axis camera must not share the FPB cosmetic state machine.
+ MainViewPassFilter mainView;
+ const dango::Vec3 center{100,200,62};
+ const dango::Vec3 offset{83,200,55.6f};
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1000));
+ mainView.observe(true,0,true,0,62,center,5,42,99,1000);
+ assert(!mainView.isSecondary(true,0,true,0,62,center,5,42,99,1000));
+ assert(mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(true,1,true,17,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(false,0,true,17,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(true,0,false,17,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(true,0,true,13,55.6f,offset,5,42,99,1015));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,6,42,99,1015));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,43,99,1015));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,100,1015));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1101));
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,999));
+ // A legitimate, later centered primary eye refreshes the anchor.
+ mainView.observe(true,0,true,0,42,{120,200,42},5,42,99,1050);
+ assert(mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1060));
+ mainView.reset();
+ assert(!mainView.isSecondary(true,0,true,17,55.6f,offset,5,42,99,1060));
+ // Regression: two different camera observations from the same character
+ // used to alternate manual / dynamic1 inside the same render interval.
+ MainViewPassFilter verticalPass;
+ const dango::Vec3 lowerEye{103.1f,200,43.6f};
+ verticalPass.observe(true,0,true,0,62,center,5,42,99,1000);
+ assert(verticalPass.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1016,129));
+ // Avoid misidentifying a crouch, airborne sample or centered camera.
+ assert(!verticalPass.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1016,130));
+ assert(!verticalPass.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1016,131));
+ assert(!verticalPass.isSecondary(true,0,true,0.5f,43.6f,lowerEye,5,42,99,1016,129));
+ assert(!verticalPass.isSecondary(true,0,true,3.1f,62.f,lowerEye,5,42,99,1016,129));
+ assert(!verticalPass.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1110,129));
+ // The lower pass is not allowed to overwrite the primary camera anchor.
+ verticalPass.observe(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1020);
+ assert(verticalPass.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1030,129));
+ // Actual centered crouch updates the anchor and is not misidentified.
+ verticalPass.observe(true,0,true,0,42,{120,200,42},5,42,99,1040);
+ assert(!verticalPass.isSecondary(true,0,true,3.1f,43.6f,lowerEye,5,42,99,1050,129));
+
 }

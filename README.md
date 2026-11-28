@@ -2,7 +2,11 @@
 
 面向《Left 4 Dead 2》的 **Windows x86 / L4N v2** 客户端视觉效果插件。插件及 DLL 名称均为 `L4D2Visual`。
 
-**当前正式版：v1.1.1。** [下载正式安装包](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.1) · [安装说明](docs/INSTALL.md) · [更新日志](docs/releases/v1.1.1.md) · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v1.1.1) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip)。历史正式版 [v1.1.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.0)、[v1.0.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0) 与 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留供回退。
+**当前正式版以 [GitHub Releases](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/latest) 为准。**
+
+主线 v1.1.2 整合性能与 FPB 稳定性修复，详见 [更新日志](docs/releases/v1.1.2.md)。正式发布前可从 Actions 下载候选包。
+
+上一正式版 v1.1.1： [下载正式安装包](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.1) · [安装说明](docs/INSTALL.md) · [更新日志](docs/releases/v1.1.1.md) · [对应源码](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/v1.1.1) · [下载分支](https://github.com/yeyunyyds/L4D2-Visual-Effects/tree/zip)。历史正式版 [v1.1.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.1.0)、[v1.0.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v1.0.0) 与 [v0.8.0](https://github.com/yeyunyyds/L4D2-Visual-Effects/releases/tag/v0.8.0) 保留供回退。
 
 ## 功能
 
@@ -43,7 +47,7 @@ CXX_X86=i686-w64-mingw32-g++-posix bash scripts/build-mingw.sh
 python3 scripts/package.py
 ```
 
-构建产物为 `build/L4D2Visual-1.1.1.zip`。源码、依赖许可与署名见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md) 和 [v1.1.1 更新日志](docs/releases/v1.1.1.md)。安装包内的 README 附有完整许可内容。
+构建产物为 `build/L4D2Visual-1.1.2.zip`。源码、依赖许可与署名见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md) 和 [v1.1.1 更新日志](docs/releases/v1.1.1.md)。安装包内的 README 附有完整许可内容。
 
 ## 设计与说明
 
